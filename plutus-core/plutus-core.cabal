@@ -272,6 +272,7 @@ library
     UntypedPlutusCore.Simplify
     UntypedPlutusCore.Size
     UntypedPlutusCore.Subst
+    UntypedPlutusCore.Transform.CaseReduce
     UntypedPlutusCore.Transform.ForceDelay
     UntypedPlutusCore.Transform.Inline
 
@@ -335,6 +336,7 @@ library
     , time
     , transformers
     , unordered-containers
+    , vector
     , witherable
     , word-array                  ^>=1.1
 
