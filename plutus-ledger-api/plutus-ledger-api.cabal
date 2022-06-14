@@ -95,6 +95,18 @@ library
     , text
     , transformers
 
+library plutus-ledger-api-testlib
+  import:          lang
+  visibility:      public
+  hs-source-dirs:  testlib
+  exposed-modules: PlutusLedgerApi.Test.EvaluationEvent
+  build-depends:
+    , base               >=4.9 && <5
+    , bytestring
+    , plutus-core        ^>=1.0
+    , plutus-ledger-api
+    , serialise
+
 test-suite plutus-ledger-api-test
   import:         lang
   type:           exitcode-stdio-1.0
