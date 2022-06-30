@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
@@ -19,6 +20,7 @@ import Control.Monad.Reader as Reader
 
 import PlutusCore qualified as PLC
 import PlutusCore.Compiler qualified as PLC
+import PlutusCore.Default qualified as PLC
 import PlutusCore.Name
 import PlutusCore.Pretty
 import PlutusCore.Pretty qualified as PLC
@@ -41,12 +43,14 @@ import Prettyprinter.Render.Text
 instance ( PLC.Pretty (PLC.SomeTypeIn uni), PLC.GEq uni, PLC.Typecheckable uni fun
          , PLC.Closed uni, uni `PLC.Everywhere` PrettyConst, Pretty fun, Pretty a
          , Typeable a, Typeable uni, Typeable fun, Ord a
+         , fun ~ PLC.DefaultFun
          ) => ToTPlc (PIR.Term TyName Name uni fun a) uni fun where
     toTPlc = asIfThrown . fmap (PLC.Program () (PLC.defaultVersion ()) . void) . compileAndMaybeTypecheck True
 
 instance ( PLC.Pretty (PLC.SomeTypeIn uni), PLC.GEq uni, PLC.Typecheckable uni fun
          , PLC.Closed uni, uni `PLC.Everywhere` PrettyConst, Pretty fun, Pretty a
          , Typeable a, Typeable uni, Typeable fun, Ord a
+         , fun ~ PLC.DefaultFun
          ) => ToUPlc (PIR.Term TyName Name uni fun a) uni fun where
     toUPlc t = do
         p' <- toTPlc t
@@ -60,7 +64,8 @@ asIfThrown
 asIfThrown = withExceptT SomeException . hoist (pure . runIdentity)
 
 compileAndMaybeTypecheck
-    :: (PLC.GEq uni, PLC.Typecheckable uni fun, Ord a, PLC.Pretty fun, PLC.Closed uni, PLC.Pretty (PLC.SomeTypeIn uni), uni `PLC.Everywhere` PLC.PrettyConst, PLC.Pretty a)
+    :: (fun ~ PLC.DefaultFun, PLC.Typecheckable uni fun, PLC.GEq uni, PLC.Closed uni
+      , PLC.Pretty fun, PLC.Pretty (PLC.SomeTypeIn uni), uni `PLC.Everywhere` PLC.PrettyConst, PLC.Pretty a, Ord a)
     => Bool
     -> Term TyName Name uni fun a
     -> Except (PIR.Error uni fun (PIR.Provenance a)) (PLC.Term TyName Name uni fun (PIR.Provenance a))
@@ -70,7 +75,7 @@ compileAndMaybeTypecheck doTypecheck pir = do
                                                     then id
                                                     else set ccTypeCheckConfig Nothing
     flip runReaderT pirCtx $ runQuoteT $ do
-        compiled <- compileTerm pir
+        compiled <- compileTerm PLC.currentVerDefaultFun pir
         when doTypecheck $ do
             -- PLC errors are parameterized over PLC.Terms, whereas PIR errors over PIR.Terms and as such, these prism errors cannot be unified.
             -- We instead run the ExceptT, collect any PLC error and explicitly lift into a PIR error by wrapping with PIR._PLCError

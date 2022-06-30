@@ -79,15 +79,15 @@ defaultUnliftingMode :: UnliftingMode
 defaultUnliftingMode = UnliftingImmediate
 
 defaultCekParameters :: MachineParameters CekMachineCosts CekValue DefaultUni DefaultFun
-defaultCekParameters = mkMachineParameters defaultUnliftingMode defaultCekCostModel
+defaultCekParameters = mkMachineParameters currentVerDefaultFun defaultUnliftingMode defaultCekCostModel
 
 unitCekParameters :: MachineParameters CekMachineCosts CekValue DefaultUni DefaultFun
 unitCekParameters =
-    mkMachineParameters defaultUnliftingMode $
+    mkMachineParameters currentVerDefaultFun defaultUnliftingMode $
         CostModel unitCekMachineCosts unitCostBuiltinCostModel
 
 defaultBuiltinsRuntime :: HasMeaningIn DefaultUni term => BuiltinsRuntime DefaultFun term
-defaultBuiltinsRuntime = toBuiltinsRuntime defaultUnliftingMode defaultBuiltinCostModel
+defaultBuiltinsRuntime = toBuiltinsRuntime currentVerDefaultFun defaultUnliftingMode defaultBuiltinCostModel
 
 
 -- A cost model with unit costs, so we can count how often each builtin is called

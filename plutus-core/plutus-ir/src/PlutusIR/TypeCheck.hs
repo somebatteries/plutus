@@ -15,6 +15,7 @@ module PlutusIR.TypeCheck
     , checkTypeOfProgram
     ) where
 
+import PlutusCore.Default
 import PlutusCore.Rename
 import PlutusCore.TypeCheck qualified as PLC
 import PlutusIR
@@ -52,7 +53,7 @@ would be better written as `let (nonrec) x = 3 in`. In such cases we could signa
 
 -- | The default 'TypeCheckConfig'.
 getDefTypeCheckConfig
-    :: (MonadKindCheck err term uni fun ann m, PLC.Typecheckable uni fun)
+    :: (fun ~ DefaultFun, MonadKindCheck err term uni fun ann m, PLC.Typecheckable uni fun)
     => ann -> m (PirTCConfig uni fun)
 getDefTypeCheckConfig ann = do
     configPlc <- PLC.getDefTypeCheckConfig ann

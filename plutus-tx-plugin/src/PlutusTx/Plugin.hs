@@ -31,6 +31,7 @@ import Panic qualified as GHC
 
 import PlutusCore qualified as PLC
 import PlutusCore.Compiler qualified as PLC
+import PlutusCore.Default qualified as PLC
 import PlutusCore.Pretty as PLC
 import PlutusCore.Quote
 
@@ -377,12 +378,12 @@ runCompiler moduleName opts expr = do
         dumpFlat (PIR.Program () (void pirT)) "initial PIR program" (moduleName ++ ".pir-initial.flat")
 
     -- Pir -> (Simplified) Pir pass. We can then dump/store a more legible PIR program.
-    spirT <- flip runReaderT pirCtx $ PIR.compileToReadable pirT
+    spirT <- flip runReaderT pirCtx $ PIR.compileToReadable PLC.currentVerDefaultFun pirT
     let spirP = PIR.Program () . void $ spirT
     when (_posDumpPir opts) . liftIO $ dumpFlat spirP "simplified PIR program" (moduleName ++ ".pir-simplified.flat")
 
     -- (Simplified) Pir -> Plc translation.
-    plcT <- flip runReaderT pirCtx $ PIR.compileReadableToPlc spirT
+    plcT <- flip runReaderT pirCtx $ PIR.compileReadableToPlc PLC.currentVerDefaultFun spirT
     let plcP = PLC.Program () (PLC.defaultVersion ()) $ void plcT
     when (_posDumpPlc opts) . liftIO $ dumpFlat plcP "typed PLC program" (moduleName ++ ".plc.flat")
 

@@ -11,6 +11,7 @@ import PlutusPrelude
 
 import PlutusCore
 import PlutusCore.Builtin
+import PlutusCore.Default
 
 import Data.Foldable
 import Test.Tasty
@@ -27,6 +28,6 @@ test_TypeSchemesAndRuntimeSchemesAgree :: TestTree
 test_TypeSchemesAndRuntimeSchemesAgree =
     testCase "type schemes are coherent with runtime schemes" $
         for_ (enumerate @DefaultFun) $ \fun ->
-            case toBuiltinMeaning @_ @_ @(Term TyName Name DefaultUni DefaultFun ()) fun of
+            case toBuiltinMeaning @_ @_ @(Term TyName Name DefaultUni DefaultFun ()) currentVerDefaultFun fun of
                 BuiltinMeaning typeSch _ (BuiltinRuntimeOptions runtimeSch _ _ _) ->
                     typeSchemeToRuntimeScheme typeSch @?= runtimeSch

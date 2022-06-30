@@ -14,6 +14,7 @@ module Evaluation.Spec (test_evaluation) where
 import PlutusCore hiding (Term)
 import PlutusCore qualified as PLC
 import PlutusCore.Builtin
+import PlutusCore.Default qualified as PLC
 import PlutusCore.Generators (GenArbitraryTerm (..), GenTypedTerm (..), forAllNoShow)
 import PlutusCore.Pretty
 
@@ -48,11 +49,12 @@ test_builtinsDon'tThrow =
         $ fmap
             ( \fun ->
                 testProperty (display fun) $
-                    prop_builtinEvaluation @_ @DefaultFun fun gen f
+                    prop_builtinEvaluation @_ @DefaultFun ver fun gen f
             )
             List.enumerate
   where
-    gen bn = Gen.choice [genArgsWellTyped bn, genArgsArbitrary bn]
+    ver = PLC.currentVerDefaultFun
+    gen bn = Gen.choice [genArgsWellTyped ver bn, genArgsArbitrary ver bn]
     f bn args = \case
         Left e -> do
             annotate "Builtin function evaluation failed"
@@ -72,7 +74,8 @@ instance Pretty AlwaysThrows where
 
 instance uni ~ DefaultUni => ToBuiltinMeaning uni AlwaysThrows where
     type CostingPart uni AlwaysThrows = ()
-    toBuiltinMeaning AlwaysThrows = makeBuiltinMeaning f mempty
+    data BuiltinVersion AlwaysThrows = AlwaysThrowsV1
+    toBuiltinMeaning _ver AlwaysThrows = makeBuiltinMeaning f mempty
       where
         f :: Integer -> Integer
         f _ = error "This builtin function always throws an exception."
@@ -85,9 +88,10 @@ test_alwaysThrows =
     testGroup
         "Builtins throwing exceptions should cause tests to fail"
         [ testProperty (display AlwaysThrows) $
-            prop_builtinEvaluation @_ @AlwaysThrows AlwaysThrows genArgsWellTyped f
+            prop_builtinEvaluation @_ @AlwaysThrows ver AlwaysThrows (genArgsWellTyped ver) f
         ]
   where
+    ver = AlwaysThrowsV1
     f bn args = \case
         Left _ -> success
         Right _ -> do
@@ -99,20 +103,21 @@ test_alwaysThrows =
 prop_builtinEvaluation ::
     forall uni fun.
     (ToBuiltinMeaning uni fun, Pretty (SomeTypeIn uni),
-        Pretty fun, Closed uni, uni `Everywhere` PrettyConst) =>
-    fun ->
+        Pretty fun, Closed uni, uni `Everywhere` PrettyConst)
+    => PLC.BuiltinVersion fun
+    -> fun ->
     -- | A function making a generator for @fun@'s arguments.
     (fun -> Gen [Term uni fun]) ->
     -- | A function that takes a builtin function, a list of arguments, and the evaluation
     -- outcome, and decides whether to pass or fail the property.
     (fun -> [Term uni fun] -> Either SomeException (MakeKnownM (Term uni fun)) -> PropertyT IO ()) ->
     Property
-prop_builtinEvaluation bn mkGen f = property $ do
+prop_builtinEvaluation ver bn mkGen f = property $ do
     args <- forAllNoShow (mkGen bn)
     f bn args =<< liftIO (try @SomeException . evaluate $ eval args)
   where
     meaning :: BuiltinMeaning (Term uni fun) (CostingPart uni fun)
-    meaning = toBuiltinMeaning bn
+    meaning = toBuiltinMeaning ver bn
 
     eval :: [Term uni fun] -> MakeKnownM (Term uni fun)
     eval args0 = case meaning of
@@ -136,27 +141,30 @@ prop_builtinEvaluation bn mkGen f = property $ do
 
 genArgsWellTyped ::
     forall uni fun.
-    (GenTypedTerm uni, ToBuiltinMeaning uni fun) =>
-    fun ->
-    Gen [Term uni fun]
-genArgsWellTyped = genArgs genTypedTerm
+    (GenTypedTerm uni, ToBuiltinMeaning uni fun)
+    => PLC.BuiltinVersion fun
+    -> fun
+    -> Gen [Term uni fun]
+genArgsWellTyped ver = genArgs ver genTypedTerm
 
 -- | Generate arbitrary (most likely ill-typed) Term arguments to a builtin function.
 genArgsArbitrary ::
     forall uni fun.
-    (GenArbitraryTerm uni, ToBuiltinMeaning uni fun) =>
-    fun ->
+    (GenArbitraryTerm uni, ToBuiltinMeaning uni fun)
+    => PLC.BuiltinVersion fun
+    -> fun ->
     Gen [Term uni fun]
-genArgsArbitrary = genArgs (\_ -> genArbitraryTerm @uni)
+genArgsArbitrary ver = genArgs ver (\_ -> genArbitraryTerm @uni)
 
 -- | Generate value arguments to a builtin function based on its `TypeScheme`.
 genArgs ::
     forall uni fun.
-    ToBuiltinMeaning uni fun =>
-    (forall (a :: GHC.Type). TypeRep a -> Gen (Term uni fun)) ->
-    fun ->
-    Gen [Term uni fun]
-genArgs genArg bn = sequenceA $ case meaning of
+    ToBuiltinMeaning uni fun
+    => PLC.BuiltinVersion fun
+    -> (forall (a :: GHC.Type). TypeRep a -> Gen (Term uni fun))
+    -> fun
+    -> Gen [Term uni fun]
+genArgs ver genArg bn = sequenceA $ case meaning of
     BuiltinMeaning tySch _ _ -> go tySch
       where
         go :: forall args res. TypeScheme (Term uni fun) args res -> [Gen (Term uni fun)]
@@ -166,7 +174,7 @@ genArgs genArg bn = sequenceA $ case meaning of
             TypeSchemeAll _ sch -> go sch
   where
     meaning :: BuiltinMeaning (Term uni fun) (CostingPart uni fun)
-    meaning = toBuiltinMeaning bn
+    meaning = toBuiltinMeaning ver bn
 
 type family Head a where
     Head (x ': xs) = x

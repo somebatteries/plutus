@@ -36,6 +36,7 @@ import PlutusIR.Purity qualified as PIR
 import PlutusCore qualified as PLC
 import PlutusCore.Builtin qualified as PLC
 import PlutusCore.Data qualified as PLC
+import PlutusCore.Default qualified as PLC
 import PlutusCore.Quote
 
 import GhcPlugins qualified as GHC
@@ -244,7 +245,7 @@ defineBuiltinTerm ann name term = do
     ghcId <- GHC.tyThingId <$> getThing name
     var <- compileVarFresh ann ghcId
     -- See Note [Builtin terms and values]
-    let strictness = if PIR.isPure (const PIR.NonStrict) term then PIR.Strict else PIR.NonStrict
+    let strictness = if PIR.isPure PLC.currentVerDefaultFun (const PIR.NonStrict) term then PIR.Strict else PIR.NonStrict
         def = PIR.Def var (term, strictness)
     PIR.defineTerm (LexName $ GHC.getName ghcId) def mempty
 

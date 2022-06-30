@@ -32,6 +32,7 @@ import PlutusCore (DefaultFun (VerifyEcdsaSecp256k1Signature, VerifySchnorrSecp2
                    EvaluationResult (EvaluationFailure, EvaluationSuccess))
 import PlutusCore.Evaluation.Machine.ExBudgetingDefaults (defaultCekParameters)
 
+import PlutusCore.Default (currentVerDefaultFun)
 import PlutusCore.MkPlc (builtin, mkConstant, mkIterApp)
 import Text.Show.Pretty (ppShow)
 
@@ -71,7 +72,7 @@ runTestDataWith testData f op = do
         mkConstant @ByteString () msg,
         mkConstant @ByteString () sig
         ]
-  let result = typecheckEvaluateCek defaultCekParameters actualExp
+  let result = typecheckEvaluateCek currentVerDefaultFun defaultCekParameters actualExp
   case result of
     Left x -> annotateShow x >> failure
     Right (res, logs) -> do
