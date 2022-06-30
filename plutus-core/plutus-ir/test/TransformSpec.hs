@@ -10,6 +10,7 @@ import Test.Tasty.Extras
 import PlutusCore.Quote
 
 import PlutusCore qualified as PLC
+import PlutusCore.Default qualified as PLC
 import PlutusCore.Pretty qualified as PLC
 import PlutusCore.Test
 
@@ -49,7 +50,7 @@ transform = testNested "transform" [
 
 thunkRecursions :: TestNested
 thunkRecursions = testNested "thunkRecursions"
-    $ map (goldenPir ThunkRec.thunkRecursions pTerm)
+    $ map (goldenPir (ThunkRec.thunkRecursions PLC.currentVerDefaultFun) pTerm)
     [ "listFold"
     , "monoMap"
     , "errorBinding"
@@ -102,7 +103,7 @@ letFloat =
   ]
  where
    goldenFloatTC pir = rethrow . asIfThrown @(PIR.Error PLC.DefaultUni PLC.DefaultFun ()) $ do
-       let pirFloated = RecSplit.recSplit . LetFloat.floatTerm . runQuote $ PLC.rename pir
+       let pirFloated = RecSplit.recSplit . LetFloat.floatTerm PLC.currentVerDefaultFun . runQuote $ PLC.rename pir
        -- make sure the floated result typechecks
        _ <- runQuoteT . flip inferType (() <$ pirFloated) =<< TC.getDefTypeCheckConfig ()
        -- letmerge is not necessary for floating, but is a nice visual transformation
@@ -131,7 +132,7 @@ instance Monoid SourcePos where
 inline :: TestNested
 inline =
     testNested "inline"
-    $ map (goldenPir (runQuote . (Inline.inline mempty <=< PLC.rename)) $ pTerm)
+    $ map (goldenPir (runQuote . (Inline.inline PLC.currentVerDefaultFun mempty <=< PLC.rename)) $ pTerm)
     [ "var"
     , "builtin"
     , "constant"
@@ -164,7 +165,7 @@ unwrapCancel =
 deadCode :: TestNested
 deadCode =
     testNested "deadCode"
-    $ map (goldenPir (runQuote . DeadCode.removeDeadBindings) pTerm)
+    $ map (goldenPir (runQuote . DeadCode.removeDeadBindings PLC.currentVerDefaultFun) pTerm)
     [ "typeLet"
     , "termLet"
     , "strictLet"
@@ -210,7 +211,7 @@ retainedSize =
         displayAnnsConfig = PLC.PrettyConfigClassic PLC.defPrettyConfigName True
         renameAndAnnotate
             = PLC.AttachPrettyConfig displayAnnsConfig
-            . RetainedSize.annotateWithRetainedSize
+            . RetainedSize.annotateWithRetainedSize PLC.currentVerDefaultFun
             . runQuote
             . PLC.rename
 

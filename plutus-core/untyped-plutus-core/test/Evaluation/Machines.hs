@@ -115,7 +115,7 @@ test_budget
     . testNested "Budget"
     $ concat
         [ folder Plc.defaultBuiltinsRuntime bunchOfFibs
-        , folder (toBuiltinsRuntime Plc.defaultUnliftingMode ()) bunchOfIdNats
+        , folder (toBuiltinsRuntime ExtensionFunV1 Plc.defaultUnliftingMode ()) bunchOfIdNats
         , folder Plc.defaultBuiltinsRuntime bunchOfIfThenElseNats
         ]
   where

@@ -20,6 +20,7 @@ import GHC.Generics
 import Options.Applicative
 import Parsers
 import PlutusCore qualified as PLC
+import PlutusCore.Default as PLC
 import PlutusCore.Quote (runQuoteT)
 import PlutusIR as PIR
 import PlutusIR.Analysis.RetainedSize qualified as PIR
@@ -90,7 +91,7 @@ compile :: COpts -> PIRTerm -> Either PIRError PLCTerm
 compile opts pirT = do
     plcTcConfig <- PLC.getDefTypeCheckConfig PIR.noProvenance
     let pirCtx = defaultCompilationCtx plcTcConfig
-    runExcept $ flip runReaderT pirCtx $ runQuoteT $ PIR.compileTerm pirT
+    runExcept $ flip runReaderT pirCtx $ runQuoteT $ PIR.compileTerm PLC.currentVerDefaultFun pirT
   where
     set' :: Lens' (PIR.CompilationOpts a) b -> (COpts -> b) -> PIRCompilationCtx a -> PIRCompilationCtx a
     set' pirOpt opt = set (PIR.ccOpts . pirOpt) (opt opts)
@@ -122,7 +123,7 @@ loadPirAndAnalyse aopts = do
         nameTable = IM.fromList [(coerce $ nameUnique n , nameString n) | n <- names]
 
         -- build the retentionMap
-        retentionMap = PIR.termRetentionMap pirT
+        retentionMap = PIR.termRetentionMap PLC.currentVerDefaultFun pirT
         -- sort the map by decreasing retained size
         sortedRetained = sortOn (negate . snd) $ IM.assocs retentionMap
 

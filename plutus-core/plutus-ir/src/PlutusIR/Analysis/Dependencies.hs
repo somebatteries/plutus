@@ -59,9 +59,10 @@ varStrictnessFun = do
 runTermDeps
     :: (DepGraph g, PLC.HasUnique tyname PLC.TypeUnique, PLC.HasUnique name PLC.TermUnique,
        PLC.ToBuiltinMeaning uni fun)
-    => Term tyname name uni fun a
+    => PLC.BuiltinVersion fun
+    -> Term tyname name uni fun a
     -> (g, StrictnessMap)
-runTermDeps t = flip runState mempty $ flip runReaderT Root $ termDeps t
+runTermDeps ver = flip runState mempty . flip runReaderT Root . termDeps ver
 
 -- | Compute the dependency graph of a 'Type'. The 'Root' node will correspond to the type itself.
 --
@@ -145,18 +146,19 @@ so that this is visible to the dependency analysis.
 bindingDeps
     :: (DepGraph g, MonadReader (DepCtx term) m, MonadState DepState m, PLC.HasUnique tyname PLC.TypeUnique, PLC.HasUnique name PLC.TermUnique,
        PLC.ToBuiltinMeaning uni fun)
-    => Binding tyname name uni fun a
+    => PLC.BuiltinVersion fun
+    -> Binding tyname name uni fun a
     -> m g
-bindingDeps b = case b of
+bindingDeps ver b = case b of
     TermBind _ strictness d@(VarDecl _ n _) rhs -> do
         vDeps <- varDeclDeps d
-        tDeps <- withCurrent n $ termDeps rhs
+        tDeps <- withCurrent n $ termDeps ver rhs
 
         -- See Note [Strict term bindings and dependencies]
         strictnessFun <- varStrictnessFun
         evalDeps <- case strictness of
-            Strict | not (isPure strictnessFun rhs) -> currentDependsOn [n ^. PLC.theUnique]
-            _                                       -> pure G.empty
+            Strict | not (isPure ver strictnessFun rhs) -> currentDependsOn [n ^. PLC.theUnique]
+            _                                           -> pure G.empty
 
         pure $ G.overlays [vDeps, tDeps, evalDeps]
     TypeBind _ d@(TyVarDecl _ n _) rhs -> do
@@ -211,25 +213,26 @@ tyVarDeclDeps _ = pure G.empty
 termDeps
     :: (DepGraph g, MonadReader (DepCtx term) m, MonadState DepState m, PLC.HasUnique tyname PLC.TypeUnique, PLC.HasUnique name PLC.TermUnique,
        PLC.ToBuiltinMeaning uni fun)
-    => Term tyname name uni fun a
+    => PLC.BuiltinVersion fun
+    -> Term tyname name uni fun a
     -> m g
-termDeps = \case
+termDeps ver = \case
     Let _ _ bs t -> do
         -- Need to do this before processing the RHSs of the bindings, as recursive bindings may need to know about
         -- the strictnesses of other variables.
         traverse_ bindingStrictness bs
-        bGraphs <- traverse bindingDeps bs
-        bodyGraph <- termDeps t
+        bGraphs <- traverse (bindingDeps ver) bs
+        bodyGraph <- termDeps ver t
         pure . G.overlays . NE.toList $ bodyGraph NE.<| bGraphs
     Var _ n -> currentDependsOn [n ^. PLC.theUnique]
     LamAbs _ n ty t -> do
         -- Record that lambda-bound variables are strict
         modify (Map.insert (n ^. PLC.theUnique) Strict)
-        tds <- termDeps t
+        tds <- termDeps ver t
         tyds <- typeDeps ty
         pure $ G.overlays [tds, tyds]
     x -> do
-        tds <- traverse termDeps (x ^.. termSubterms)
+        tds <- traverse (termDeps ver) (x ^.. termSubterms)
         tyds <- traverse typeDeps (x ^.. termSubtypes)
         pure $ G.overlays $ tds ++ tyds
 

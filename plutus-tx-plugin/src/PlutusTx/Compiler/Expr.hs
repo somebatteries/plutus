@@ -44,6 +44,7 @@ import PlutusIR.MkPir qualified as PIR
 import PlutusIR.Purity qualified as PIR
 
 import PlutusCore qualified as PLC
+import PlutusCore.Default qualified as PLC
 import PlutusCore.MkPlc qualified as PLC
 import PlutusCore.Pretty qualified as PP
 import PlutusCore.Subst qualified as PLC
@@ -462,7 +463,7 @@ hoistExpr var t = do
 
             t' <- maybeProfileRhs var' =<< compileExpr t
             -- See Note [Non-strict let-bindings]
-            let strict = PIR.isPure (const PIR.NonStrict) t'
+            let strict = PIR.isPure PLC.currentVerDefaultFun (const PIR.NonStrict) t'
 
             PIR.modifyTermDef lexName (const $ PIR.Def var' (t', if strict then PIR.Strict else PIR.NonStrict))
             pure $ PIR.mkVar AnnOther var'
@@ -747,7 +748,7 @@ compileExpr e = withContextM 2 (sdToTxt $ "Compiling expr:" GHC.<+> GHC.ppr e) $
             -- the binding is in scope for the body, but not for the arg
             rhs' <- compileExpr rhs
             -- See Note [Non-strict let-bindings]
-            let strict = PIR.isPure (const PIR.NonStrict) rhs'
+            let strict = PIR.isPure PLC.currentVerDefaultFun (const PIR.NonStrict) rhs'
             withVarScoped b $ \v -> do
                 rhs'' <- maybeProfileRhs v rhs'
                 let binds = pure $ PIR.TermBind AnnOther (if strict then PIR.Strict else PIR.NonStrict) v rhs''
@@ -760,7 +761,7 @@ compileExpr e = withContextM 2 (sdToTxt $ "Compiling expr:" GHC.<+> GHC.ppr e) $
                 binds <- for (zip vars bs) $ \(v, (_, rhs)) -> do
                     rhs' <- maybeProfileRhs v =<< compileExpr rhs
                     -- See Note [Non-strict let-bindings]
-                    let strict = PIR.isPure (const PIR.NonStrict) rhs'
+                    let strict = PIR.isPure PLC.currentVerDefaultFun (const PIR.NonStrict) rhs'
                     pure $ PIR.TermBind AnnOther (if strict then PIR.Strict else PIR.NonStrict) v rhs'
                 body' <- compileExpr body
                 pure $ PIR.mkLet AnnOther PIR.Rec binds body'
@@ -799,7 +800,7 @@ compileExpr e = withContextM 2 (sdToTxt $ "Compiling expr:" GHC.<+> GHC.ppr e) $
                     (nonDelayedAlt, delayedAlt) <- compileAlt alt instArgTys
                     return (nonDelayedAlt, delayedAlt)
                 let
-                    isPureAlt = compiledAlts <&> \(nonDelayed, _) -> PIR.isPure (const PIR.NonStrict) nonDelayed
+                    isPureAlt = compiledAlts <&> \(nonDelayed, _) -> PIR.isPure PLC.currentVerDefaultFun (const PIR.NonStrict) nonDelayed
                     lazyCase = not (and isPureAlt || length dcs == 1)
                     branches = compiledAlts <&> \(nonDelayedAlt, delayedAlt) ->
                         if lazyCase then delayedAlt else nonDelayedAlt

@@ -204,18 +204,19 @@ and rename everything when we substitute in, which GHC considers too expensive b
 inline
     :: forall tyname name uni fun a m
     . ExternalConstraints tyname name uni fun m
-    => InlineHints name a
+    => PLC.BuiltinVersion fun
+    -> InlineHints name a
     -> Term tyname name uni fun a
     -> m (Term tyname name uni fun a)
-inline hints t = let
+inline ver hints t = let
         inlineInfo :: InlineInfo name a
         inlineInfo = InlineInfo (snd deps) usgs hints
         -- We actually just want the variable strictness information here!
         deps :: (G.Graph Deps.Node, Map.Map PLC.Unique Strictness)
-        deps = Deps.runTermDeps t
+        deps = Deps.runTermDeps ver t
         usgs :: Map.Map Unique Int
         usgs = Usages.runTermUsages t
-    in liftQuote $ flip evalStateT mempty $ flip runReaderT inlineInfo $ processTerm t
+    in liftQuote $ flip evalStateT mempty $ flip runReaderT inlineInfo $ processTerm ver t
 
 {- Note [Removing inlined bindings]
 We *do* remove bindings that we inline (since we only do unconditional inlining). We *could*
@@ -231,9 +232,10 @@ This might mean reinventing GHC's OccAnal...
 
 processTerm
     :: forall tyname name uni fun a. InliningConstraints tyname name uni fun
-    => Term tyname name uni fun a
+    => PLC.BuiltinVersion fun
+    -> Term tyname name uni fun a
     -> InlineM tyname name uni fun a (Term tyname name uni fun a)
-processTerm = handleTerm <=< traverseOf termSubtypes applyTypeSubstitution where
+processTerm ver = handleTerm <=< traverseOf termSubtypes applyTypeSubstitution where
     handleTerm :: Term tyname name uni fun a -> InlineM tyname name uni fun a (Term tyname name uni fun a)
     handleTerm = \case
         v@(Var _ n) -> fromMaybe v <$> substName n
@@ -244,8 +246,8 @@ processTerm = handleTerm <=< traverseOf termSubtypes applyTypeSubstitution where
             -- Note that we don't *remove* the bindings or scope the state, so the state will carry over
             -- into "sibling" terms. This is fine because we have global uniqueness
             -- (see Note [Inlining and global uniqueness]), if somewhat wasteful.
-            bs' <- wither processSingleBinding (toList bs)
-            t' <- processTerm t
+            bs' <- wither (processSingleBinding ver) (toList bs)
+            t' <- processTerm ver t
             -- Use 'mkLet': we're using lists of bindings rather than NonEmpty since we might actually
             -- have got rid of all of them!
             pure $ mkLet a NonRec bs' t'
@@ -253,12 +255,12 @@ processTerm = handleTerm <=< traverseOf termSubtypes applyTypeSubstitution where
         -- immediately instantiated type abstractions here directly.
         (TyInst a (TyAbs a' tn k t) rhs) -> do
             b' <- maybeAddTySubst tn rhs
-            t' <- processTerm t
+            t' <- processTerm ver t
             case b' of
                 Just rhs' -> pure $ TyInst a (TyAbs a' tn k t') rhs'
                 Nothing   -> pure t'
         -- This includes recursive let terms, we don't even consider inlining them at the moment
-        t -> forMOf termSubterms t processTerm
+        t -> forMOf termSubterms t (processTerm ver)
     applyTypeSubstitution :: Type tyname uni a -> InlineM tyname name uni fun a (Type tyname uni a)
     applyTypeSubstitution t = gets isTypeSubstEmpty >>= \case
         -- The type substitution is very often empty, and there are lots of types in the program, so this saves a lot of work (determined from profiling)
@@ -288,30 +290,32 @@ We rename both terms and types as both may have binders in them.
 
 processSingleBinding
     :: forall tyname name uni fun a. InliningConstraints tyname name uni fun
-    => Binding tyname name uni fun a
+    => PLC.BuiltinVersion fun
+    -> Binding tyname name uni fun a
     -> InlineM tyname name uni fun a (Maybe (Binding tyname name uni fun a))
-processSingleBinding = \case
+processSingleBinding ver = \case
     TermBind a s v@(VarDecl _ n _) rhs -> do
-        maybeRhs' <- maybeAddSubst a s n rhs
+        maybeRhs' <- maybeAddSubst ver a s n rhs
         pure $ TermBind a s v <$> maybeRhs'
     TypeBind a v@(TyVarDecl _ n _) rhs -> do
         maybeRhs' <- maybeAddTySubst n rhs
         pure $ TypeBind a v <$> maybeRhs'
     -- Just process all the subterms
-    b -> Just <$> forMOf bindingSubterms b processTerm
+    b -> Just <$> forMOf bindingSubterms b (processTerm ver)
 
 -- NOTE:  Nothing means that we are inlining the term:
 --   * we have extended the substitution, and
 --   * we are removing the binding (hence we return Nothing)
 maybeAddSubst
     :: forall tyname name uni fun a. InliningConstraints tyname name uni fun
-    => a
+    => PLC.BuiltinVersion fun
+    -> a
     -> Strictness
     -> name
     -> Term tyname name uni fun a
     -> InlineM tyname name uni fun a (Maybe (Term tyname name uni fun a))
-maybeAddSubst a s n rhs = do
-    rhs' <- processTerm rhs
+maybeAddSubst ver a s n rhs = do
+    rhs' <- processTerm ver rhs
 
     -- Check whether we've been told specifically to inline this
     hints <- asks _hints
@@ -334,7 +338,7 @@ maybeAddSubst a s n rhs = do
         checkPurity t = do
             strctMap <- asks _strictnessMap
             let strictnessFun = \n' -> Map.findWithDefault NonStrict (n' ^. theUnique) strctMap
-            pure $ isPure strictnessFun t
+            pure $ isPure ver strictnessFun t
 
         preInlineUnconditional :: Term tyname name uni fun a -> InlineM tyname name uni fun a Bool
         preInlineUnconditional t = do

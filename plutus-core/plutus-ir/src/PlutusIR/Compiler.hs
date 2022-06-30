@@ -54,6 +54,7 @@ import PlutusIR.Transform.Unwrap qualified as Unwrap
 import PlutusIR.TypeCheck.Internal
 
 import PlutusCore qualified as PLC
+import PlutusCore.Builtin.Meaning qualified as PLC
 
 import Control.Lens
 import Control.Monad
@@ -93,24 +94,26 @@ applyPass pass = runIf (_shouldRun pass) $ through check <=< \term -> do
   logDebug   $ "        !!! After " ++ passName ++ "\n" ++ show (pretty term')
   pure term'
 
-availablePasses :: [Pass uni fun]
-availablePasses =
+availablePasses :: PLC.BuiltinVersion fun -> [Pass uni fun]
+availablePasses ver =
     [ Pass "unwrap cancel"        (onOption coDoSimplifierUnwrapCancel)       (pure . Unwrap.unwrapCancel)
     , Pass "beta"                 (onOption coDoSimplifierBeta)               (pure . Beta.beta)
-    , Pass "inline"               (onOption coDoSimplifierInline)             (\t -> do { hints <- asks (view (ccOpts . coInlineHints)); Inline.inline hints t })
+    , Pass "inline"               (onOption coDoSimplifierInline)             (\t -> do { hints <- asks (view (ccOpts . coInlineHints)); Inline.inline ver hints t })
     ]
 
 -- | Actual simplifier
 simplify
     :: forall m e uni fun a b. (Compiling m e uni fun a, b ~ Provenance a)
-    => Term TyName Name uni fun b -> m (Term TyName Name uni fun b)
-simplify = foldl' (>=>) pure (map applyPass availablePasses)
+    => PLC.BuiltinVersion fun
+    -> Term TyName Name uni fun b -> m (Term TyName Name uni fun b)
+simplify ver = foldl' (>=>) pure (map applyPass $ availablePasses ver)
 
 -- | Perform some simplification of a 'Term'.
 simplifyTerm
   :: forall m e uni fun a b. (Compiling m e uni fun a, b ~ Provenance a)
-  => Term TyName Name uni fun b -> m (Term TyName Name uni fun b)
-simplifyTerm = runIfOpts simplify'
+  => PLC.BuiltinVersion fun
+  -> Term TyName Name uni fun b -> m (Term TyName Name uni fun b)
+simplifyTerm ver = runIfOpts simplify'
     -- NOTE: we need at least one pass of dead code elimination
     where
         simplify' :: Term TyName Name uni fun b -> m (Term TyName Name uni fun b)
@@ -124,13 +127,17 @@ simplifyTerm = runIfOpts simplify'
         simplifyStep :: Int -> Term TyName Name uni fun b -> m (Term TyName Name uni fun b)
         simplifyStep i term = do
           logVerbose $ "    !!! simplifier pass " ++ show i
-          simplify term
+          simplify ver term
 
 
 -- | Perform floating/merging of lets in a 'Term' to their nearest lambda/Lambda/letStrictNonValue.
 -- Note: It assumes globally unique names
-floatTerm :: (Compiling m e uni fun a, Semigroup b) => Term TyName Name uni fun b -> m (Term TyName Name uni fun b)
-floatTerm = runIfOpts $ pure . LetMerge.letMerge . RecSplit.recSplit . LetFloat.floatTerm
+floatTerm
+    :: (Compiling m e uni fun a, Semigroup b)
+    => PLC.BuiltinVersion fun
+    -> Term TyName Name uni fun b
+    -> m (Term TyName Name uni fun b)
+floatTerm ver = runIfOpts $ pure . LetMerge.letMerge . RecSplit.recSplit . LetFloat.floatTerm ver
 
 -- | Typecheck a PIR Term iff the context demands it.
 -- Note: assumes globally unique names
@@ -152,32 +159,37 @@ check arg = do
 -- to dump a "readable" version of pir (i.e. floated).
 compileToReadable
   :: (Compiling m e uni fun a, b ~ Provenance a)
-  => Term TyName Name uni fun a
+  => PLC.BuiltinVersion fun
+  -> Term TyName Name uni fun a
   -> m (Term TyName Name uni fun b)
-compileToReadable =
+compileToReadable ver =
     (pure . original)
     -- We need globally unique names for typechecking, floating, and compiling non-strict bindings
     >=> (<$ logVerbose "  !!! rename")
     >=> PLC.rename
     >=> through typeCheckTerm
     >=> (<$ logVerbose "  !!! removeDeadBindings")
-    >=> DeadCode.removeDeadBindings
+    >=> DeadCode.removeDeadBindings ver
     >=> (<$ logVerbose "  !!! simplifyTerm")
-    >=> simplifyTerm
+    >=> simplifyTerm ver
     >=> (<$ logVerbose "  !!! floatTerm")
-    >=> floatTerm
+    >=> floatTerm ver
     >=> through check
 
 -- | The 2nd half of the PIR compiler pipeline.
 -- Compiles a 'Term' into a PLC Term, by removing/translating step-by-step the PIR's language constructs to PLC.
 -- Note: the result *does* have globally unique names.
-compileReadableToPlc :: (Compiling m e uni fun a, b ~ Provenance a) => Term TyName Name uni fun b -> m (PLCTerm uni fun a)
-compileReadableToPlc =
+compileReadableToPlc
+    :: (Compiling m e uni fun a, b ~ Provenance a)
+    => PLC.BuiltinVersion fun
+    -> Term TyName Name uni fun b
+    -> m (PLCTerm uni fun a)
+compileReadableToPlc ver =
     (<$ logVerbose "  !!! compileNonStrictBindings")
     >=> NonStrict.compileNonStrictBindings False
     >=> through check
     >=> (<$ logVerbose "  !!! thunkRecursions")
-    >=> (pure . ThunkRec.thunkRecursions)
+    >=> (pure . ThunkRec.thunkRecursions ver)
     -- Thunking recursions breaks global uniqueness
     >=> PLC.rename
     >=> through check
@@ -195,10 +207,10 @@ compileReadableToPlc =
     -- We introduce some non-recursive let bindings while eliminating recursive let-bindings, so we
     -- can eliminate any of them which are unused here.
     >=> (<$ logVerbose "  !!! removeDeadBindings")
-    >=> DeadCode.removeDeadBindings
+    >=> DeadCode.removeDeadBindings ver
     >=> through check
     >=> (<$ logVerbose "  !!! simplifyTerm")
-    >=> simplifyTerm
+    >=> simplifyTerm ver
     >=> through check
     >=> (<$ logVerbose "  !!! compileLets Types")
     >=> Let.compileLets Let.Types
@@ -210,10 +222,13 @@ compileReadableToPlc =
     >=> lowerTerm
 
 --- | Compile a 'Term' into a PLC Term. Note: the result *does* have globally unique names.
-compileTerm :: Compiling m e uni fun a
-            => Term TyName Name uni fun a -> m (PLCTerm uni fun a)
-compileTerm =
+compileTerm
+    :: Compiling m e uni fun a
+    => PLC.BuiltinVersion fun
+    -> Term TyName Name uni fun a
+    -> m (PLCTerm uni fun a)
+compileTerm ver =
   (<$ logVerbose "!!! compileToReadable")
-  >=> compileToReadable
+  >=> compileToReadable ver
   >=> (<$ logVerbose "!!! compileReadableToPlc")
-  >=> compileReadableToPlc
+  >=> compileReadableToPlc ver

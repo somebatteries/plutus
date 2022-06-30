@@ -9,12 +9,13 @@
 
 module Common where
 
-import PlutusPrelude (through)
+import PlutusPrelude
 
 import PlutusCore qualified as PLC
 import PlutusCore.Builtin qualified as PLC
 import PlutusCore.Check.Uniques as PLC (checkProgram)
 import PlutusCore.Compiler.Erase qualified as PLC
+import PlutusCore.Default qualified as PLC
 import PlutusCore.Error (AsUniqueError, ParserErrorBundle, UniqueError)
 import PlutusCore.Evaluation.Machine.ExBudget (ExBudget (..), ExRestrictingBudget (..))
 import PlutusCore.Evaluation.Machine.ExBudgetingDefaults qualified as PLC
@@ -625,8 +626,8 @@ typeSchemeToSignature = toSig []
 
 runPrintBuiltinSignatures :: IO ()
 runPrintBuiltinSignatures = do
-  let builtins = [minBound..maxBound] :: [UPLC.DefaultFun]
+  let builtins = enumerate @UPLC.DefaultFun
   mapM_ (\x -> putStr (printf "%-25s: %s\n" (show $ PP.pretty x) (show $ getSignature x))) builtins
-      where getSignature (PLC.toBuiltinMeaning @_ @_ @PlcTerm -> PLC.BuiltinMeaning sch _ _) = typeSchemeToSignature sch
+      where getSignature (PLC.toBuiltinMeaning @_ @_ @PlcTerm PLC.currentVerDefaultFun -> PLC.BuiltinMeaning sch _ _) = typeSchemeToSignature sch
 
 

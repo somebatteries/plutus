@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 module PlutusTx.Lift (
     makeLift,
@@ -30,6 +31,7 @@ import PlutusIR.MkPir qualified as PIR
 
 import PlutusCore qualified as PLC
 import PlutusCore.Compiler qualified as PLC
+import PlutusCore.Default qualified as PLC
 import PlutusCore.Pretty (PrettyConst)
 import PlutusCore.Quote
 import PlutusCore.StdLib.Data.Function qualified as PLC
@@ -64,6 +66,7 @@ safeLift
        , AsError e uni fun (Provenance ()), MonadError e m, MonadQuote m
        , PLC.Typecheckable uni fun
        , PrettyPrintable uni fun
+       , fun ~ UPLC.DefaultFun
        )
     => a -> m (UPLC.Term UPLC.NamedDeBruijn uni fun ())
 safeLift x = do
@@ -72,7 +75,7 @@ safeLift x = do
     -- NOTE:  Disabling simplifier, as it takes a lot of time during runtime
     let ccConfig = set (ccOpts . coMaxSimplifierIterations) 0 (toDefaultCompilationCtx tcConfig)
         ucOpts = PLC.defaultCompilationOpts & PLC.coSimplifyOpts . UPLC.soMaxSimplifierIterations .~ 0
-    plc <- flip runReaderT ccConfig $ compileTerm lifted
+    plc <- flip runReaderT ccConfig $ compileTerm PLC.currentVerDefaultFun lifted
     uplc <- flip runReaderT ucOpts $ PLC.compileTerm plc
     db <- UPLC.deBruijnTerm uplc
     pure $ void db
@@ -86,6 +89,7 @@ safeLiftProgram
        , AsError e uni fun (Provenance ()), MonadError e m, MonadQuote m
        , PLC.Typecheckable uni fun
        , PrettyPrintable uni fun
+       , fun ~ UPLC.DefaultFun
        )
     => a -> m (UPLC.Program UPLC.NamedDeBruijn uni fun ())
 safeLiftProgram x = UPLC.Program () (PLC.defaultVersion ()) <$> safeLift x
@@ -98,6 +102,7 @@ safeLiftCode
        , AsError e uni fun (Provenance ()), MonadError e m, MonadQuote m
        , PLC.Typecheckable uni fun
        , PrettyPrintable uni fun
+       , fun ~ UPLC.DefaultFun
        )
     => a -> m (CompiledCodeIn uni fun a)
 safeLiftCode x = DeserializedCode <$> safeLiftProgram x <*> pure Nothing <*> pure mempty
@@ -113,13 +118,13 @@ unsafely ma = runQuote $ do
 
 -- | Get a Plutus Core term corresponding to the given value, throwing any errors that occur as exceptions and ignoring fresh names.
 lift
-    :: (Lift.Lift uni a, Throwable uni fun, PLC.Typecheckable uni fun)
+    :: (Lift.Lift uni a, Throwable uni fun, PLC.Typecheckable uni fun, fun ~ UPLC.DefaultFun)
     => a -> UPLC.Term UPLC.NamedDeBruijn uni fun ()
 lift a = unsafely $ safeLift a
 
 -- | Get a Plutus Core program corresponding to the given value, throwing any errors that occur as exceptions and ignoring fresh names.
 liftProgram
-    :: (Lift.Lift uni a, Throwable uni fun, PLC.Typecheckable uni fun)
+    :: (Lift.Lift uni a, Throwable uni fun, PLC.Typecheckable uni fun, fun ~ UPLC.DefaultFun)
     => a -> UPLC.Program UPLC.NamedDeBruijn uni fun ()
 liftProgram x = UPLC.Program () (PLC.defaultVersion ()) $ lift x
 
@@ -131,7 +136,7 @@ liftProgramDef = liftProgram
 
 -- | Get a Plutus Core program corresponding to the given value as a 'CompiledCodeIn', throwing any errors that occur as exceptions and ignoring fresh names.
 liftCode
-    :: (Lift.Lift uni a, Throwable uni fun, PLC.Typecheckable uni fun)
+    :: (Lift.Lift uni a, Throwable uni fun, PLC.Typecheckable uni fun, fun ~ UPLC.DefaultFun)
     => a -> CompiledCodeIn uni fun a
 liftCode x = unsafely $ safeLiftCode x
 
@@ -158,6 +163,7 @@ typeCheckAgainst
        , PLC.GEq uni
        , PLC.Typecheckable uni fun
        , PrettyPrintable uni fun
+       , fun ~ UPLC.DefaultFun
        )
     => Proxy a
     -> PLC.Term PLC.TyName PLC.Name uni fun ()
@@ -172,7 +178,7 @@ typeCheckAgainst p plcTerm = do
         pure $ TyInst () PLC.idFun ty
     let applied = Apply () idFun term
     tcConfig <- PLC.getDefTypeCheckConfig (Original ())
-    compiled <- flip runReaderT (toDefaultCompilationCtx tcConfig) $ compileTerm applied
+    compiled <- flip runReaderT (toDefaultCompilationCtx tcConfig) $ compileTerm PLC.currentVerDefaultFun applied
     -- PLC errors are parameterized over PLC.Terms, whereas PIR errors over PIR.Terms and as such, these prism errors cannot be unified.
     -- We instead run the ExceptT, collect any PLC error and explicitly lift into a PIR error by wrapping with PIR._PLCError
     plcConcrete <- runExceptT $ void $ PLC.inferType tcConfig compiled
@@ -192,6 +198,7 @@ typeCode
        , PLC.GEq uni
        , PLC.Typecheckable uni fun
        , PrettyPrintable uni fun
+       , fun ~ UPLC.DefaultFun
        )
     => Proxy a
     -> PLC.Program PLC.TyName PLC.Name uni fun ()

@@ -189,9 +189,10 @@ type FloatTable tyname name uni fun a = MM.MonoidalMap Pos (NE.NonEmpty (Binding
 -- | The 1st pass of marking floatable lets
 mark :: forall tyname name uni fun a.
       (Ord tyname, Ord name, PLC.HasUnique tyname PLC.TypeUnique, PLC.HasUnique name PLC.TermUnique, PLC.ToBuiltinMeaning uni fun)
-     => Term tyname name uni fun a
+     => PLC.BuiltinVersion fun
+     -> Term tyname name uni fun a
      -> Marks
-mark = snd . runWriter . flip runReaderT (MarkCtx topDepth mempty) . go
+mark ver = snd . runWriter . flip runReaderT (MarkCtx topDepth mempty) . go
   where
     go :: Term tyname name uni fun a -> ReaderT MarkCtx (Writer Marks) ()
     go = breakNonRec >>> \case
@@ -202,7 +203,7 @@ mark = snd . runWriter . flip runReaderT (MarkCtx topDepth mempty) . go
         -- main operation: for letrec or single letnonrec
         Let ann r bs@(representativeBindingUnique -> letU) tIn ->
           let letN = BindingGrp ann r bs in
-          if floatable letN
+          if floatable ver letN
           then do
             scope <- asks _markCtxScope
             let freeVars =
@@ -390,9 +391,9 @@ floatTerm :: (PLC.ToBuiltinMeaning uni fun,
             PLC.HasUnique tyname PLC.TypeUnique, PLC.HasUnique name PLC.TermUnique,
             Ord tyname, Ord name, Semigroup a
             )
-          => Term tyname name uni fun a -> Term tyname name uni fun a
-floatTerm t =
-    mark t
+          => PLC.BuiltinVersion fun -> Term tyname name uni fun a -> Term tyname name uni fun a
+floatTerm ver t =
+    mark ver t
     & flip removeLets t
     & uncurry floatBackLets
 
@@ -427,9 +428,9 @@ ifRec r f a = case r of
     Rec    -> f a
     NonRec -> a
 
-floatable :: PLC.ToBuiltinMeaning uni fun => BindingGrp tyname name uni fun a -> Bool
-floatable (BindingGrp _ _ bs) =
-    all hasNoEffects bs
+floatable :: PLC.ToBuiltinMeaning uni fun => PLC.BuiltinVersion fun -> BindingGrp tyname name uni fun a -> Bool
+floatable ver (BindingGrp _ _ bs) =
+    all (hasNoEffects ver) bs
         &&
         -- See Note [Floating type-lets]
         none isTypeBind bs
@@ -439,14 +440,14 @@ See Note [Purity, strictness, and variables]
 An extreme alternative implementation is to treat *all strict* bindings as unfloatable, e.g.:
 `hasNoEffects = \case {TermBind _ Strict _  _ -> False; _ -> True}`
 -}
-hasNoEffects :: PLC.ToBuiltinMeaning uni fun => Binding tyname name uni fun a -> Bool
-hasNoEffects = \case
+hasNoEffects :: PLC.ToBuiltinMeaning uni fun => PLC.BuiltinVersion fun -> Binding tyname name uni fun a -> Bool
+hasNoEffects ver = \case
     TypeBind{}               -> True
     DatatypeBind{}           -> True
     TermBind _ NonStrict _ _ -> True
     -- have to check for purity
     -- TODO: We could maybe do better here, but not worth it at the moment
-    TermBind _ Strict _ t    -> isPure (const NonStrict) t
+    TermBind _ Strict _ t    -> isPure ver (const NonStrict) t
 
 isTypeBind :: Binding tyname name uni fun a -> Bool
 isTypeBind = \case TypeBind{} -> True; _ -> False
