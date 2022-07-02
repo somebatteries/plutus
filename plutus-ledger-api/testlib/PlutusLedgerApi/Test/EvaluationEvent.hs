@@ -31,6 +31,7 @@ import Data.Text.Encoding qualified as Text
 import GHC.Generics (Generic)
 import Prettyprinter
 import PyF (fmt)
+import System.IO.Unsafe
 
 data ScriptEvaluationResult = ScriptEvaluationSuccess | ScriptEvaluationFailure
     deriving stock (Show, Generic)
@@ -173,7 +174,7 @@ checkEvaluationEvent ctx params ev = case ev of
                     dataBudget
                     dataScript
                     dataInputs
-         in verify expected actual
+         in verify "V1" expected actual
     PlutusV2Event ScriptEvaluationData{..} expected ->
         let (_, actual) =
                 V2.evaluateScriptRestricting
@@ -183,10 +184,13 @@ checkEvaluationEvent ctx params ev = case ev of
                     dataBudget
                     dataScript
                     dataInputs
-         in verify expected actual
+         in verify "V2" expected actual
   where
-    verify ScriptEvaluationSuccess (Left err) =
+    verify _ver ScriptEvaluationSuccess (Left err) =
         Just $ UnexpectedEvaluationFailure ev params err
-    verify ScriptEvaluationFailure (Right budget) =
+    verify _ver ScriptEvaluationFailure (Right budget) =
         Just $ UnexpectedEvaluationSuccess ev params budget
-    verify _ _ = Nothing
+    verify ver ScriptEvaluationFailure _ = unsafePerformIO $ do
+        putStrLn $ "Failed evaluation: " <> ver
+        pure Nothing
+    verify _ _ _ = Nothing
