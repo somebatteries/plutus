@@ -79,9 +79,9 @@ mkTermToEvaluate lv pv bs args = do
 -- | Which unlifting mode should we use in the given 'ProtocolVersion'
 -- so as to correctly construct the machine's parameters
 unliftingModeIn :: ProtocolVersion -> UnliftingMode
-unliftingModeIn pv =
-    -- This just changes once in version 7.0
-    if pv >= ProtocolVersion 7 0 then UnliftingDeferred else UnliftingImmediate
+unliftingModeIn _pv = UnliftingDeferred
+    -- -- This just changes once in version 7.0
+    -- if pv >= ProtocolVersion 7 0 then UnliftingDeferred else UnliftingImmediate
 
 toMachineParameters :: ProtocolVersion -> EvaluationContext -> DefaultMachineParameters
 toMachineParameters pv = case unliftingModeIn pv of
