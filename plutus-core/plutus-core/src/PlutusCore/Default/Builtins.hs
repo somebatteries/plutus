@@ -1062,9 +1062,6 @@ instance uni ~ DefaultUni => ToBuiltinMeaning uni DefaultFun where
             (runCostingFunTwoArguments . paramAppendByteString)
     toBuiltinMeaning ver ConsByteString =
         case ver of
-            DefaultFunV1 -> makeBuiltinMeaning
-               (\n xs -> BS.cons (fromIntegral @Integer n) xs)
-               (runCostingFunTwoArguments . paramConsByteString)
             _ -> makeBuiltinMeaning
               (\(n :: Word8) xs -> BS.cons n xs)
               (runCostingFunTwoArguments . paramConsByteString)
