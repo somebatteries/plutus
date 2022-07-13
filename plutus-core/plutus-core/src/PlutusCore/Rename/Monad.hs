@@ -5,6 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE UndecidableInstances  #-}
 
 module PlutusCore.Rename.Monad
     ( RenameT (..)
@@ -97,27 +98,27 @@ insertByNameM
     => name -> unique -> ren -> ren
 insertByNameM name = over renaming . mapRenaming . insertByName name
 
--- class (Monad m, HasUnique name) => MonadRename m name where
-class Monad m => MonadRename m unique where
+class (Monad m, HasUniqueOf name) => MonadRename m name where
     -- | Look up the new unique a name got mapped to.
-    lookupNameM :: HasUnique name unique => name -> m (Maybe unique)
+    lookupNameM :: name -> m (Maybe (UniqueOf name))
     default lookupNameM
-        :: (HasUnique name unique, HasRenaming ren unique, MonadReader ren m)
-        => name -> m (Maybe unique)
+        :: (HasRenaming ren (UniqueOf name), MonadReader ren m)
+        => name -> m (Maybe (UniqueOf name))
     lookupNameM name = asks $ lookupName name . unRenaming . view renaming
 
     -- | Run a renaming computation in the environment extended by the mapping from an old name
     -- to a new one.
-    withRenamedName :: HasUnique name unique => name -> name -> m c -> m c
+    withRenamedName :: name -> name -> m c -> m c
     default withRenamedName
         :: (HasUnique name unique, HasRenaming ren unique, MonadReader ren m)
         => name -> name -> m c -> m c
     withRenamedName old new = local $ insertByNameM old (new ^. unique)
 
-instance (Monad m, HasRenaming ren unique) => MonadRename (RenameT ren m) unique
+instance (Monad m, HasUnique name unique, HasRenaming ren unique) =>
+        MonadRename (RenameT ren m) name
 
 -- | Rename a name that has a unique inside.
-renameNameM :: (MonadRename m unique, HasUnique name unique) => name -> m name
+renameNameM :: MonadRename m name => name -> m name
 renameNameM name = do
     mayUniqNew <- lookupNameM name
     pure $ case mayUniqNew of
@@ -127,7 +128,7 @@ renameNameM name = do
 -- | Replace the unique in a name by a new unique, save the mapping
 -- from the old unique to the new one and supply the updated value to a continuation.
 withFreshenedName
-    :: (MonadRename m unique, HasUnique name unique, MonadQuote m)
+    :: (MonadRename m name, MonadQuote m)
     => name -> (name -> m c) -> m c
 withFreshenedName nameOld k = do
     uniqNew <- coerce <$> freshUnique

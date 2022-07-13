@@ -6,6 +6,7 @@
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
 module PlutusCore.Eq
@@ -126,8 +127,10 @@ makeLenses ''Bilateral
 
 instance Wrapped (LR a)
 instance Wrapped (RL a)
-instance HasUnique name unique => HasUnique (LR name) (LR unique)
-instance HasUnique name unique => HasUnique (RL name) (RL unique)
+instance HasUniqueOf name => HasUniqueOf (LR name) where
+    type UniqueOf (LR name) = LR (UniqueOf name)
+instance HasUniqueOf name => HasUniqueOf (RL name) where
+    type UniqueOf (RL name) = RL (UniqueOf name)
 
 instance Semigroup a => Semigroup (Bilateral a) where
     Bilateral l1 r1 <> Bilateral l2 r2 = Bilateral (l1 <> l2) (r1 <> r2)

@@ -159,11 +159,13 @@ makeLenses ''TyDecl
 tyDeclVar :: TyVarDecl tyname ann -> TyDecl tyname uni ann
 tyDeclVar (TyVarDecl ann name kind) = TyDecl ann (TyVar ann name) kind
 
-instance HasUnique tyname TypeUnique => HasUnique (TyVarDecl tyname ann) TypeUnique where
+instance HasUnique tyname TypeUnique => HasUniqueOf (TyVarDecl tyname ann) where
+    type UniqueOf (TyVarDecl _ _) = TypeUnique
     unique f (TyVarDecl ann tyname kind) =
         unique f tyname <&> \tyname' -> TyVarDecl ann tyname' kind
 
-instance HasUnique name TermUnique => HasUnique (VarDecl tyname name uni fun ann) TermUnique where
+instance HasUnique name TermUnique => HasUniqueOf (VarDecl tyname name uni fun ann) where
+    type UniqueOf (VarDecl _ _ _ _ _) = TermUnique
     unique f (VarDecl ann name ty) =
         unique f name <&> \name' -> VarDecl ann name' ty
 

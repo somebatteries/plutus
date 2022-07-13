@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE OverloadedStrings      #-}
+{-# LANGUAGE TypeFamilies           #-}
 
 module PlutusCore.Name
     ( -- * Types
@@ -12,7 +13,8 @@ module PlutusCore.Name
     , Unique (..)
     , TypeUnique (..)
     , TermUnique (..)
-    , HasUnique (..)
+    , HasUniqueOf (..)
+    , HasUnique
     , theUnique
     , UniqueMap (..)
     -- * Functions
@@ -94,23 +96,30 @@ newtype TermUnique = TermUnique
     deriving newtype Hashable
 
 -- | Types which have a 'Unique' attached to them, mostly names.
-class Coercible unique Unique => HasUnique a unique | a -> unique where
-    unique :: Lens' a unique
+class Coercible (UniqueOf a) Unique => HasUniqueOf a where
+    type UniqueOf a
+    unique :: Lens' a (UniqueOf a)
     -- | The default implementation of 'HasUnique' for newtypes.
     default unique
-        :: (Wrapped a, HasUnique (Unwrapped a) unique', Coercible unique' unique)
-        => Lens' a unique
+        :: (Wrapped a, HasUnique (Unwrapped a) unique')
+        => Lens' a (UniqueOf a)
     unique = _Wrapped' . unique . coerced
 
-instance HasUnique Unique Unique where
+class    (HasUniqueOf a, UniqueOf a ~ unique) => HasUnique a unique
+instance (HasUniqueOf a, UniqueOf a ~ unique) => HasUnique a unique
+
+instance HasUniqueOf Unique where
+    type UniqueOf Unique = Unique
     unique = id
 
-instance HasUnique Name TermUnique where
+instance HasUniqueOf Name where
+    type UniqueOf Name = TermUnique
     unique = lens g s where
         g = TermUnique . nameUnique
         s n (TermUnique u) = n{nameUnique=u}
 
-instance HasUnique TyName TypeUnique
+instance HasUniqueOf TyName where
+    type UniqueOf TyName = TypeUnique
 
 -- | A lens focused on the 'Unique' of a name.
 theUnique :: HasUnique name unique => Lens' name Unique
