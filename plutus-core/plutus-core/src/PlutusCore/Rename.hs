@@ -59,11 +59,11 @@ instance HasUniques (Type tyname uni ann) => Rename (Type tyname uni ann) where
 
 instance HasUniques (Term tyname name uni fun ann) => Rename (Term tyname name uni fun ann) where
     -- See Note [Marking].
-    rename = through markNonFreshTerm >=> runRenameT . renameTermM
+    rename = through markNonFreshTerm >=> runRenameT @ScopedRenaming . renameTermM
 
 instance HasUniques (Program tyname name uni fun ann) => Rename (Program tyname name uni fun ann) where
     -- See Note [Marking].
-    rename = through markNonFreshProgram >=> runRenameT . renameProgramM
+    rename = through markNonFreshProgram >=> runRenameT @ScopedRenaming . renameProgramM
 
 instance Rename a => Rename (Normalized a) where
     rename = traverse rename

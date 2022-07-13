@@ -1,5 +1,6 @@
 -- | The monad that the renamer runs in and related infrastructure.
 
+{-# LANGUAGE DefaultSignatures     #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
@@ -12,13 +13,12 @@ module PlutusCore.Rename.Monad
     , TypeRenaming
     , ScopedRenaming (..)
     , HasRenaming (..)
+    , MonadRename (..)
     , scopedRenamingTypes
     , scopedRenamingTerms
     , runRenameT
-    , lookupNameM
     , renameNameM
     , withFreshenedName
-    , withRenamedName
     ) where
 
 import PlutusPrelude
@@ -97,16 +97,27 @@ insertByNameM
     => name -> unique -> ren -> ren
 insertByNameM name = over renaming . mapRenaming . insertByName name
 
--- | Look up the new unique a name got mapped to.
-lookupNameM
-    :: (HasUnique name unique, HasRenaming ren unique, MonadReader ren m)
-    => name -> m (Maybe unique)
-lookupNameM name = asks $ lookupName name . unRenaming . view renaming
+-- class (Monad m, HasUnique name) => MonadRename m name where
+class Monad m => MonadRename m unique where
+    -- | Look up the new unique a name got mapped to.
+    lookupNameM :: HasUnique name unique => name -> m (Maybe unique)
+    default lookupNameM
+        :: (HasUnique name unique, HasRenaming ren unique, MonadReader ren m)
+        => name -> m (Maybe unique)
+    lookupNameM name = asks $ lookupName name . unRenaming . view renaming
+
+    -- | Run a renaming computation in the environment extended by the mapping from an old name
+    -- to a new one.
+    withRenamedName :: HasUnique name unique => name -> name -> m c -> m c
+    default withRenamedName
+        :: (HasUnique name unique, HasRenaming ren unique, MonadReader ren m)
+        => name -> name -> m c -> m c
+    withRenamedName old new = local $ insertByNameM old (new ^. unique)
+
+instance (Monad m, HasRenaming ren unique) => MonadRename (RenameT ren m) unique
 
 -- | Rename a name that has a unique inside.
-renameNameM
-    :: (HasRenaming ren unique, HasUnique name unique, MonadReader ren m)
-    => name -> m name
+renameNameM :: (MonadRename m unique, HasUnique name unique) => name -> m name
 renameNameM name = do
     mayUniqNew <- lookupNameM name
     pure $ case mayUniqNew of
@@ -116,15 +127,9 @@ renameNameM name = do
 -- | Replace the unique in a name by a new unique, save the mapping
 -- from the old unique to the new one and supply the updated value to a continuation.
 withFreshenedName
-    :: (HasRenaming ren unique, HasUnique name unique, MonadQuote m, MonadReader ren m)
+    :: (MonadRename m unique, HasUnique name unique, MonadQuote m)
     => name -> (name -> m c) -> m c
 withFreshenedName nameOld k = do
     uniqNew <- coerce <$> freshUnique
-    local (insertByNameM nameOld uniqNew) $ k (nameOld & unique .~ uniqNew)
-
--- | Run a 'RenameT' computation in the environment extended by the mapping from an old name
--- to a new one.
-withRenamedName
-    :: (HasRenaming ren unique, HasUnique name unique, MonadReader ren m)
-    => name -> name -> m c -> m c
-withRenamedName old new = local $ insertByNameM old (new ^. unique)
+    let nameNew = nameOld & unique .~ uniqNew
+    withRenamedName nameOld nameNew $ k nameNew
