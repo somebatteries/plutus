@@ -1,5 +1,7 @@
 -- | The user-facing API of the normalizer.
 
+{-# LANGUAGE TypeFamilies #-}
+
 module PlutusCore.Normalize
     ( normalizeType
     , normalizeTypesIn

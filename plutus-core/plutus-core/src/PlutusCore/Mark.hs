@@ -1,4 +1,5 @@
 -- editorconfig-checker-disable-file
+{-# LANGUAGE TypeFamilies #-}
 module PlutusCore.Mark
     ( markNonFreshTerm
     , markNonFreshType

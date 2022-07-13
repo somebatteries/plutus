@@ -5,6 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeFamilies          #-}
 -- | Support for using de Bruijn indices for term and type names.
 module PlutusCore.DeBruijn.Internal
     ( Index (..)

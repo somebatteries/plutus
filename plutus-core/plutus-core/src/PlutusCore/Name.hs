@@ -1,4 +1,5 @@
 -- editorconfig-checker-disable-file
+{-# LANGUAGE ConstraintKinds        #-}
 {-# LANGUAGE DefaultSignatures      #-}
 {-# LANGUAGE DeriveAnyClass         #-}
 {-# LANGUAGE FlexibleInstances      #-}
@@ -105,8 +106,7 @@ class Coercible (UniqueOf a) Unique => HasUniqueOf a where
         => Lens' a (UniqueOf a)
     unique = _Wrapped' . unique . coerced
 
-class    (HasUniqueOf a, UniqueOf a ~ unique) => HasUnique a unique
-instance (HasUniqueOf a, UniqueOf a ~ unique) => HasUnique a unique
+type HasUnique a unique = (HasUniqueOf a, UniqueOf a ~ unique)
 
 instance HasUniqueOf Unique where
     type UniqueOf Unique = Unique

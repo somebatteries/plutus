@@ -4,6 +4,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE PolyKinds       #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies    #-}
 
 module PlutusCore.Normalize.Internal
     ( NormalizeTypeT

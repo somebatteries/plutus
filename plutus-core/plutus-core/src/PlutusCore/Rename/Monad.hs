@@ -3,6 +3,7 @@
 {-# LANGUAGE DefaultSignatures     #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE UndecidableInstances  #-}
@@ -110,7 +111,7 @@ class (Monad m, HasUniqueOf name) => MonadRename m name where
     -- to a new one.
     withRenamedName :: name -> name -> m c -> m c
     default withRenamedName
-        :: (HasUnique name unique, HasRenaming ren unique, MonadReader ren m)
+        :: (HasRenaming ren (UniqueOf name), MonadReader ren m)
         => name -> name -> m c -> m c
     withRenamedName old new = local $ insertByNameM old (new ^. unique)
 

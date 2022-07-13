@@ -2,6 +2,7 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE LambdaCase    #-}
 {-# LANGUAGE RankNTypes    #-}
+{-# LANGUAGE TypeFamilies  #-}
 module PlutusIR.Core.Plated
     ( termSubterms
     , termSubtermsDeep
