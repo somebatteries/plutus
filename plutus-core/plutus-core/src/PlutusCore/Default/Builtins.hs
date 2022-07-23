@@ -27,6 +27,7 @@ import PlutusCore.Pretty
 import Codec.Serialise (serialise)
 import Crypto (verifyEcdsaSecp256k1Signature, verifyEd25519Signature_V1, verifySchnorrSecp256k1Signature)
 import Data.ByteString qualified as BS
+import Data.ByteString.Base64 qualified as Base64
 import Data.ByteString.Hash qualified as Hash
 import Data.ByteString.Lazy qualified as BS (toStrict)
 import Data.Char
@@ -1343,7 +1344,7 @@ instance uni ~ DefaultUni => ToBuiltinMeaning uni DefaultFun where
             (runCostingFunOneArgument . paramShowInteger)
     toBuiltinMeaning ShowByteString =
         makeBuiltinMeaning
-            (Text.pack . show @BS.ByteString)
+            (Text.pack . show . Base64.encode)
             (runCostingFunOneArgument . paramShowByteString)
     -- See Note [Inlining meanings of builtins].
     {-# INLINE toBuiltinMeaning #-}
