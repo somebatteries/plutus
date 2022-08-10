@@ -82,7 +82,7 @@ The reasoning is essentially the same as for type signatures. We've got used to 
 
 === Write Haddock
 
-Every top-level exported binding should have Haddock. Non-exported bindings should probably have Haddock too.
+Every top-level exported binding should have Haddock. Non-exported bindings should probably have Haddock too. See https://haskell-haddock.readthedocs.io/en/latest/markup.html#markup[this section] on using markup to make the Haddock more helpful. 
 
 Put the module’s haddock comment _right_ above the `module M where` line, and below the PRAGMAs. 
 
