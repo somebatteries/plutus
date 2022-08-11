@@ -104,9 +104,9 @@ module PlutusLedgerApi.V1 (
     , builtinDataToData
     -- * Errors
     , EvaluationError (..)
+    , ScriptDecodeError (..)
     ) where
 
-import Codec.CBOR.Read qualified as CBOR (DeserialiseFailure)
 import Control.Monad.Except (MonadError)
 import Data.SatInt
 import PlutusCore.Data qualified as PLC
@@ -150,7 +150,7 @@ anything, we're just going to create new versions.
 
 -- | Check if a 'Script' is "valid" according to a protocol version. At the moment this means "deserialises correctly", which in particular
 -- implies that it is (almost certainly) an encoded script and the script does not mention any builtins unavailable in the given protocol version.
-assertScriptWellFormed :: MonadError CBOR.DeserialiseFailure m
+assertScriptWellFormed :: MonadError ScriptDecodeError m
                        => ProtocolVersion
                        -> SerialisedScript
                        -> m ()

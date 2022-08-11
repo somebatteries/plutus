@@ -1,5 +1,6 @@
 -- editorconfig-checker-disable-file
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Spec.Builtins where
 
 import PlutusCore as PLC
@@ -15,13 +16,14 @@ import UntypedPlutusCore as UPLC
 
 import Codec.Serialise
 import Data.ByteString.Lazy as BSL
-import Data.ByteString.Short
+import Data.ByteString.Short as BSS
 import Data.Either
 import Data.Foldable (fold, for_)
 import Data.Map qualified as Map
 import Data.Set qualified as Set
 import Test.Tasty
 import Test.Tasty.HUnit
+import Test.Tasty.QuickCheck
 
 serialiseDataExScript :: SerialisedScript
 serialiseDataExScript = toShort . toStrict $ serialise serialiseDataEx
@@ -29,6 +31,12 @@ serialiseDataExScript = toShort . toStrict $ serialise serialiseDataEx
       serialiseDataEx :: Script
       serialiseDataEx = Script $ UPLC.Program () (PLC.defaultVersion ()) $
                              UPLC.Apply () (UPLC.Builtin () PLC.SerialiseData) (PLC.mkConstant () $ I 1)
+
+errorScript :: SerialisedScript
+errorScript = toShort . toStrict $ serialise errorEx
+    where
+      errorEx :: Script
+      errorEx = Script $ UPLC.Program () (PLC.defaultVersion ()) $ UPLC.Error ()
 
 tests :: TestTree
 tests =
@@ -46,4 +54,12 @@ tests =
          assertBool "in l3,Alonzo" $ isLeft $ V3.assertScriptWellFormed alonzoPV serialiseDataExScript
          assertBool "not in l2,Vasil" $ isRight $ V2.assertScriptWellFormed vasilPV serialiseDataExScript
          assertBool "not in l3,Chang" $ isRight $ V3.assertScriptWellFormed changPV serialiseDataExScript
+         assertBool "remdr1" $ isRight $ V1.assertScriptWellFormed changPV $ errorScript <> "remdr1"
+         assertBool "remdr2" $ isRight $ V2.assertScriptWellFormed changPV $ errorScript <> "remdr2"
+         assertEqual "remdr3" (Left $ RemderError "remdr3") $ V3.assertScriptWellFormed changPV $ errorScript <> "remdr3"
+    , testProperty "remdr1gen"$ \remdr -> isRight $ V1.assertScriptWellFormed changPV $ errorScript <> BSS.pack remdr
+    , testProperty "remdr2gen"$ \remdr -> isRight $ V2.assertScriptWellFormed changPV $ errorScript <> BSS.pack remdr
+    -- we cannot make the same property as above for remdr3gen because it may generate valid bytestring append extensios to the original script
+    -- a more sophisticated one could work though
     ]
+

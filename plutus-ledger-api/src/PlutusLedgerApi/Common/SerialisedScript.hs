@@ -1,8 +1,12 @@
 -- editorconfig-checker-disable-file
+{-# LANGUAGE TemplateHaskell #-}
 module PlutusLedgerApi.Common.SerialisedScript
     ( SerialisedScript
     , scriptCBORDecoder
     , ScriptForExecution (..)
+    , ScriptDecodeError (..)
+    , AsScriptDecodeError (..)
+    , fromSerialisedScript
     , assertScriptWellFormed
     ) where
 
@@ -14,13 +18,22 @@ import Codec.CBOR.Decoding qualified as CBOR
 import Codec.CBOR.Extras
 import Codec.CBOR.Read qualified as CBOR
 import Control.Arrow ((>>>))
+import Control.Lens
+import Control.Monad.Error.Lens
 import Control.Monad.Except
-import Data.Bifunctor
-import Data.ByteString.Lazy (fromStrict)
+import Data.ByteString.Lazy as BSL (ByteString, fromStrict)
 import Data.ByteString.Short
 import Data.Coerce
 import Data.Set as Set
 import Prettyprinter
+
+
+data ScriptDecodeError =
+      CBORDeserialiseError CBOR.DeserialiseFailure
+    | RemderError BSL.ByteString
+    deriving stock (Eq, Show)
+makeClassyPrisms ''ScriptDecodeError
+
 
 {- Note [Size checking of constants in PLC programs]
 We impose a 64-byte *on-the-wire* limit on the constants inside PLC programs. This prevents people from inserting
@@ -56,22 +69,37 @@ scriptCBORDecoder lv pv =
         (p :: UPLC.Program UPLC.FakeNamedDeBruijn DefaultUni DefaultFun ()) <- decodeViaFlat flatDecoder
         pure $ coerce p
 
+-- | The deserialization from a serialised script to a Script (for execution).
+-- Used both in phase-1 validation (assertScriptWellFormed) and phase-2's `mkTermToEvaluate`
+fromSerialisedScript :: forall e m. (AsScriptDecodeError e, MonadError e m)
+                     => LedgerPlutusVersion
+                     -> ProtocolVersion
+                     -> SerialisedScript
+                     -> m ScriptForExecution
+fromSerialisedScript lv pv sScript = do
+    (remderBS, script) <- deserialiseSScript sScript
+    when (lv /= PlutusV1 && lv /= PlutusV2 && remderBS /= mempty) $
+        throwing _ScriptDecodeError $ RemderError remderBS
+    pure script
+  where
+    deserialiseSScript :: SerialisedScript -> m (BSL.ByteString, ScriptForExecution)
+    deserialiseSScript = fromShort
+                       >>> fromStrict
+                       >>> CBOR.deserialiseFromBytes (scriptCBORDecoder lv pv)
+                       -- lift the underlying cbor error to our custom error
+                       >>> either (throwing _ScriptDecodeError . CBORDeserialiseError) pure
+
 {-| Check if a 'Script' is "valid" according to a protocol version. At the moment this means "deserialises correctly", which in particular
 implies that it is (almost certainly) an encoded script and the script does not mention any builtins unavailable in the given protocol version.
 
 Note: Parameterized over the ledger-plutus-version since the builtins allowed (during decoding) differs.
 -}
-assertScriptWellFormed :: MonadError CBOR.DeserialiseFailure m
+assertScriptWellFormed :: forall m. MonadError ScriptDecodeError m
                        => LedgerPlutusVersion
                        -> ProtocolVersion
                        -> SerialisedScript
                        -> m ()
-assertScriptWellFormed lv pv = fromShort
-                             >>> fromStrict
-                             >>> CBOR.deserialiseFromBytes (scriptCBORDecoder lv pv)
-                             {- Returning here the ScriptExecution could allow us to reuse
-                                the function in `mkTermToEvaluate`, but it has the downside
-                                of "leaking" the actual Script through the API. Instead,
-                                we opt to throw away the ScriptExecution result. -}
-                             >>> second (const ())
-                             >>> liftEither
+assertScriptWellFormed lv pv =
+    -- We opt to throw away the ScriptExecution result. for not "leaking" the actual Script through the API.
+    void
+    . fromSerialisedScript lv pv
