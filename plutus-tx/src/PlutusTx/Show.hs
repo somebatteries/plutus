@@ -14,6 +14,7 @@ module PlutusTx.Show (
     appPrec,
     appPrec1,
     deriveShow,
+    fromRange,
 ) where
 
 import PlutusTx.Base
@@ -67,8 +68,11 @@ toDigits = go []
 instance Show Builtins.BuiltinByteString where
     {-# INLINEABLE showsPrec #-}
     -- Base16-encode the ByteString and show the result.
-    showsPrec _ s = foldr alg id [0 .. Builtins.subtractInteger (Builtins.lengthOfByteString s) 1]
+    showsPrec _ s = foldr alg id (fromRange 0 (len `Builtins.subtractInteger` 1))
       where
+        len :: Builtins.Integer
+        len = Builtins.lengthOfByteString s
+
         showWord8 :: Builtins.Integer -> ShowS
         showWord8 x =
             toHex (x `Builtins.divideInteger` 16)
@@ -85,6 +89,16 @@ instance Show Builtins.BuiltinByteString where
                 | otherwise                            -> showString "<invalid byte>"
         alg :: Builtins.Integer -> ShowS -> ShowS
         alg i acc = showWord8 (Builtins.indexByteString s i) . acc
+
+{-# INLINEABLE fromRange #-}
+fromRange :: Builtins.Integer -> Builtins.Integer -> [Builtins.Integer]
+fromRange start end = go [] end
+    where
+        step :: Builtins.Integer
+        step = if start `Builtins.lessThanEqualsInteger` end then 1 else -1
+        go acc x
+            | x `Builtins.equalsInteger` (start `Builtins.subtractInteger` step) = acc
+            | otherwise = go (x : acc) (x `Builtins.subtractInteger` step)
 
 instance Show Builtins.BuiltinString where
     {-# INLINEABLE showsPrec #-}
