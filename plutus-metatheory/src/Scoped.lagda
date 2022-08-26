@@ -44,48 +44,26 @@ data ScopedTy n where
 Tel⋆ : ℕ → ℕ → Set
 Tel⋆ n m = Vec (ScopedTy n) m
 
--- contexts
+-- contexts for type and term variables
 
 data Weirdℕ : ℕ → Set where
   Z : Weirdℕ 0
-  S : ∀{n} → Weirdℕ n  → Weirdℕ n
-  T : ∀{n} → Weirdℕ n → Weirdℕ (suc n)
+  S : ∀{n} → Weirdℕ n  → Weirdℕ n -- term variable
+  T : ∀{n} → Weirdℕ n → Weirdℕ (suc n) -- type variable
 
--- variables
+-- variable counter for both types and terms.
 
 data WeirdFin : ∀{n} → Weirdℕ n → Set where
   Z : ∀{n}{w : Weirdℕ n} → WeirdFin (S w)
+  -- add a term variable
   S : ∀{n}{w : Weirdℕ n} → WeirdFin w → WeirdFin (S w)
+  -- add a type variable
   T : ∀{n}{w : Weirdℕ n} → WeirdFin w → WeirdFin (T w)
-
-
--- what is this for?
--- there are two meaningful things here:
--- 1. one to literally convert the number
--- 2. to extract a type context from a term one
--- this looks like (1)
-
-wtoℕ : ∀{n} → Weirdℕ n → ℕ
-wtoℕ Z = zero
-wtoℕ (S x) = suc (wtoℕ x)
-wtoℕ (T x) = suc (wtoℕ x)
 
 WeirdFintoℕ : ∀{n}{w : Weirdℕ n} → WeirdFin w → ℕ
 WeirdFintoℕ Z     = 0
-WeirdFintoℕ (S i) = suc (WeirdFintoℕ i)
-WeirdFintoℕ (T i) = WeirdFintoℕ i
-
--- extract number of term binders we are under
-wtoℕTm : ∀{n} → Weirdℕ n → ℕ
-wtoℕTm Z = zero
-wtoℕTm (S x) = suc (wtoℕTm x)
-wtoℕTm (T x) = wtoℕTm x
-
-wtoℕTy : ∀{n} → Weirdℕ n → ℕ
-wtoℕTy Z     = zero
-wtoℕTy (S x) = wtoℕTm x
-wtoℕTy (T x) = suc (wtoℕTm x)
-
+WeirdFintoℕ (S i) = suc (WeirdFintoℕ i) -- a term variable, count it
+WeirdFintoℕ (T i) = WeirdFintoℕ i -- a type variable, don't count it
 
 -- extract the number of type binders
 
@@ -105,12 +83,12 @@ lookupWTy (suc x) Z = nothing
 lookupWTy (suc x) (S w) = lookupWTy x w
 lookupWTy (suc x) (T w) = fmap suc (lookupWTy x w)
 
-
 lookupWTm' : ∀(x : ℕ){n} → Weirdℕ n → ℕ
 lookupWTm' i Z = i
 lookupWTm' zero (S w) = 1
 lookupWTm' (suc i) (S w) = suc (lookupWTm' i w)
 lookupWTm' i (T w) = suc (lookupWTm' i w)
+
 {-
 lookupWTm' x (S m) = lookupWTm' x m
 lookupWTm' x (T m) = lookupWTm' (suc x) m
