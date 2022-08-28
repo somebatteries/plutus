@@ -18,8 +18,6 @@ module PlutusLedgerApi.V1.Scripts
     , fromCompiledCode
     , ScriptError (..)
     , applyValidator
-    , applyMintingPolicyScript
-    , applyStakeValidatorScript
     , applyArguments
     -- * Script wrappers
     , mkValidatorScript
@@ -27,12 +25,6 @@ module PlutusLedgerApi.V1.Scripts
     , unValidatorScript
     , Redeemer(..)
     , Datum(..)
-    , mkMintingPolicyScript
-    , MintingPolicy (..)
-    , unMintingPolicyScript
-    , mkStakeValidatorScript
-    , StakeValidator (..)
-    , unStakeValidatorScript
     , Context(..)
     -- * Hashes
     , DatumHash(..)
@@ -159,18 +151,6 @@ mkValidatorScript = Validator . fromCompiledCode
 unValidatorScript :: Validator -> Script
 unValidatorScript = getValidator
 
-mkMintingPolicyScript :: CompiledCode (BuiltinData -> BuiltinData -> ()) -> MintingPolicy
-mkMintingPolicyScript = MintingPolicy . fromCompiledCode
-
-unMintingPolicyScript :: MintingPolicy -> Script
-unMintingPolicyScript = getMintingPolicy
-
-mkStakeValidatorScript :: CompiledCode (BuiltinData -> BuiltinData -> ()) -> StakeValidator
-mkStakeValidatorScript = StakeValidator . fromCompiledCode
-
-unStakeValidatorScript :: StakeValidator -> Script
-unStakeValidatorScript = getStakeValidator
-
 -- | 'Validator' is a wrapper around 'Script's which are used as validators in transaction outputs.
 newtype Validator = Validator { getValidator :: Script }
   deriving stock (Generic)
@@ -202,26 +182,6 @@ newtype Redeemer = Redeemer { getRedeemer :: BuiltinData }
 instance Serialise Redeemer where
     encode (Redeemer (BuiltinData d)) = encode d
     decode = Redeemer . BuiltinData Haskell.<$> decode
-
--- | 'MintingPolicy' is a wrapper around 'Script's which are used as validators for minting constraints.
-newtype MintingPolicy = MintingPolicy { getMintingPolicy :: Script }
-  deriving stock (Generic)
-  deriving newtype (Haskell.Eq, Haskell.Ord, Serialise)
-  deriving anyclass (NFData)
-  deriving Pretty via (PrettyShow MintingPolicy)
-
-instance Haskell.Show MintingPolicy where
-    show = const "MintingPolicy { <script> }"
-
--- | 'StakeValidator' is a wrapper around 'Script's which are used as validators for withdrawals and stake address certificates.
-newtype StakeValidator = StakeValidator { getStakeValidator :: Script }
-  deriving stock (Generic)
-  deriving newtype (Haskell.Eq, Haskell.Ord, Serialise)
-  deriving anyclass (NFData)
-  deriving Pretty via (PrettyShow MintingPolicy)
-
-instance Haskell.Show StakeValidator where
-    show = const "StakeValidator { <script> }"
 
 -- | Script runtime representation of a @Digest SHA256@.
 newtype ScriptHash =
@@ -285,24 +245,6 @@ applyValidator
     -> Script
 applyValidator (Context (BuiltinData valData)) (Validator validator) (Datum (BuiltinData datum)) (Redeemer (BuiltinData redeemer)) =
     applyArguments validator [datum, redeemer, valData]
-
--- | Apply 'MintingPolicy' to its 'Context' and 'Redeemer'.
-applyMintingPolicyScript
-    :: Context
-    -> MintingPolicy
-    -> Redeemer
-    -> Script
-applyMintingPolicyScript (Context (BuiltinData valData)) (MintingPolicy validator) (Redeemer (BuiltinData red)) =
-    applyArguments validator [red, valData]
-
--- | Apply 'StakeValidator' to its 'Context' and 'Redeemer'.
-applyStakeValidatorScript
-    :: Context
-    -> StakeValidator
-    -> Redeemer
-    -> Script
-applyStakeValidatorScript (Context (BuiltinData valData)) (StakeValidator validator) (Redeemer (BuiltinData red)) =
-    applyArguments validator [red, valData]
 
 makeLift ''ScriptHash
 
