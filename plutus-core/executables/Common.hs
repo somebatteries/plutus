@@ -37,6 +37,7 @@ import UntypedPlutusCore.Evaluation.Machine.Cek qualified as Cek
 import UntypedPlutusCore.Parser qualified as UPLC (parse, program)
 
 import PlutusIR.Core.Type qualified as PIR
+import PlutusIR.Error qualified as PIR
 import PlutusIR.Parser qualified as PIR (parse, program)
 
 import Control.DeepSeq (rnf)
@@ -59,7 +60,7 @@ import Prettyprinter ((<+>))
 import System.CPUTime (getCPUTime)
 import System.Exit (exitFailure, exitSuccess)
 import System.Mem (performGC)
-import Text.Megaparsec (errorBundlePretty)
+import Text.Megaparsec (SourcePos, errorBundlePretty)
 import Text.Printf (printf)
 
 ----------- Executable type class -----------
@@ -78,6 +79,8 @@ type UplcProg =
 
 class Executable p where
 
+  type Error ann p :: * -- so that we can specify the error type for each program type.
+
   -- | Parse a program.  The first argument (normally the file path) describes
   -- the input stream, the second is the program text.
   parseNamedProgram ::
@@ -85,11 +88,19 @@ class Executable p where
 
   -- | Check a program for unique names.
   -- Throws a @UniqueError@ when not all names are unique.
-  checkProgram ::
-     (Ord ann, AsUniqueError e ann,
-       MonadError e m)
+  checkUnique ::
+     (Ord ann, MonadError (Error ann p) m)
     => (UniqueError ann -> Bool)
     -> p ann
+    -> m ()
+
+-- | Perform some checks for the program.
+-- For UPLC: check for unique errors.
+-- For PLC: check for unique errors and typecheck.
+-- For PIR: typecheck.
+  checkProg ::
+     (Ord ann, MonadError (Error ann p) m)
+    => p ann
     -> m ()
 
   -- | Convert names to de Bruijn indices and then serialise
@@ -108,22 +119,28 @@ serialiseTProgramFlat nameType p =
 
 -- | Instance for PIR program.
 instance Executable PirProg where
+  type Error ann PirProg = PIR.Error PLC.DefaultUni PLC.DefaultFun ann
   parseNamedProgram inputName = PLC.runQuoteT . PIR.parse PIR.program inputName
-  checkProgram _ _ = pure () -- should I add this?
+  checkUnique _ _ = pure () -- decided that it's not worth implementing since it's checked in PLC.
+  checkProg p = undefined
   serialiseProgramFlat = serialiseTProgramFlat
   loadASTfromFlat = loadTplcASTfromFlat
 
 -- | Instance for PLC program.
 instance Executable PlcProg where
+  type Error ann PlcProg = PLC.Error PLC.DefaultUni PLC.DefaultFun ann
   parseNamedProgram inputName = PLC.runQuoteT . UPLC.parse PLC.program inputName
-  checkProgram = PLC.checkProgram
+  checkUnique = PLC.checkProgram
+  checkProg = undefined
   serialiseProgramFlat = serialiseTProgramFlat
   loadASTfromFlat = loadTplcASTfromFlat
 
 -- | Instance for UPLC program.
 instance Executable UplcProg where
+  type Error ann UplcProg = UPLC.UPLCError ann
   parseNamedProgram inputName = PLC.runQuoteT . UPLC.parse UPLC.program inputName
-  checkProgram = UPLC.checkProgram
+  checkUnique = UPLC.checkProgram
+  checkProg = undefined
   serialiseProgramFlat nameType p =
       case nameType of
         Named         -> pure $ BSL.fromStrict $ flat p
@@ -317,7 +334,7 @@ getInput StdInput         = T.getContents
 
 -- | For PLC and UPLC source programs. Read and parse and check the program for @UniqueError@'s.
 parseInput ::
-  (Executable p, PLC.Rename (p PLC.SourcePos) ) =>
+  (Executable p) =>
   -- | The source program
   Input ->
   -- | The output is either a UPLC or PLC program with annotation
@@ -330,17 +347,22 @@ parseInput inp = do
       Left (ParseErrorB err) ->
           errorWithoutStackTrace $ errorBundlePretty err
       -- otherwise,
-      Right p -> do
-        -- run @rename@ through the program
-        renamed <- PLC.runQuoteT $ rename p
-        -- check the program for @UniqueError@'s
-        let checked = through (Common.checkProgram (const True)) renamed
-        case checked of
-          -- pretty print the error
-          Left (err :: PLC.UniqueError PLC.SourcePos) ->
-            errorWithoutStackTrace $ PP.render $ pretty err
-          -- if there's no errors, return the parsed program
-          Right _ -> pure p
+      Right p -> pure p
+
+-- | Run the renamer through the program then check for unique errors.
+-- Can apply to UPLC or PIR programs.
+renameCheckUnique ::
+  (Executable p, PLC.Rename (p PLC.SourcePos)) => p ann -> m ()
+renameCheckUnique p = do
+  -- run @rename@ through the program
+  renamed <- PLC.runQuoteT $ rename p
+  -- check the program for @UniqueError@'s
+  let checked = through (Common.checkUnique (const True)) renamed
+  case checked of
+    -- pretty print the error
+    Left err ->
+      errorWithoutStackTrace $ PP.render $ pretty err
+    Right _ -> pure ()
 
 -- Read a binary-encoded file (eg, Flat-encoded PLC)
 getBinaryInput :: Input -> IO BSL.ByteString
@@ -399,9 +421,7 @@ loadUplcASTfromFlat flatMode inp = do
 
 -- Read either a UPLC/PLC/PIR file or a Flat file, depending on 'fmt'
 getProgram ::
-  (Executable p,
-   Functor p,
-   PLC.Rename (p PLC.SourcePos)) =>
+  (Executable p, Functor p) =>
   Format -> Input -> IO (p PLC.SourcePos)
 getProgram fmt inp =
     case fmt of
