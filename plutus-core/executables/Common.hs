@@ -89,7 +89,7 @@ class PlutusProgram p where
   -- | Check a program for unique names.
   -- Throws a @UniqueError@ when not all names are unique.
   checkUnique ::
-     (Ord ann, MonadError (Error ann p) m)
+     (Ord ann, AsUniqueError (UniqueError ann) ann) --, MonadError (Error ann p) m)
     => p ann
     -> m ()
 
@@ -361,7 +361,7 @@ renameCheckUnique p = do
   case checked of
     -- pretty print the error
     Left err ->
-      errorWithoutStackTrace $ PP.render $ pretty err
+      errorWithoutStackTrace $ show err -- PP.render $ pretty err
     Right _ -> return ()
 
 -- Read a binary-encoded file (eg, Flat-encoded PLC)

@@ -71,7 +71,7 @@ wtoℕ (S x) = suc (wtoℕ x)
 wtoℕ (T x) = suc (wtoℕ x)
 
 WeirdFintoℕ : ∀{n}{w : Weirdℕ n} → WeirdFin w → ℕ
-WeirdFintoℕ Z     = 0
+WeirdFintoℕ Z     = 1
 WeirdFintoℕ (S i) = suc (WeirdFintoℕ i)
 WeirdFintoℕ (T i) = WeirdFintoℕ i
 
@@ -91,7 +91,7 @@ wtoℕTy (T x) = suc (wtoℕTm x)
 
 lookupWTm : ∀(x : ℕ){n}(w : Weirdℕ n) → Maybe ℕ
 lookupWTm zero Z = nothing
-lookupWTm zero (S w) = just 0
+lookupWTm zero (S w) = just 1
 lookupWTm zero (T w) = nothing
 lookupWTm (suc x) Z = nothing
 lookupWTm (suc x) (S w) = fmap suc (lookupWTm x w)
@@ -100,7 +100,7 @@ lookupWTm (suc x) (T w) = lookupWTm x w
 lookupWTy : ∀(x : ℕ){n}(w : Weirdℕ n) → Maybe ℕ
 lookupWTy zero Z = nothing
 lookupWTy zero (S w) = nothing
-lookupWTy zero (T w) = just 0
+lookupWTy zero (T w) = just 1
 lookupWTy (suc x) Z = nothing
 lookupWTy (suc x) (S w) = lookupWTy x w
 lookupWTy (suc x) (T w) = fmap suc (lookupWTy x w)
@@ -121,7 +121,7 @@ lookupWTy' : ∀(x : ℕ){n} → Weirdℕ n → ℕ
 lookupWTy' i Z = i
 lookupWTy' i (S w) = suc (lookupWTy' i w)
 lookupWTy' (suc i) (T w) = suc (lookupWTy' i w)
-lookupWTy' 0 (T w) = 1
+lookupWTy' 1 (T w) = 0
 
 {-
 lookupWTy' x (S m) = lookupWTy' (suc x) m
@@ -336,7 +336,7 @@ extricateScope (unwrap t) = unwrap (extricateScope t)
 open import Data.String
 
 uglyWeirdFin : ∀{n}{w : Weirdℕ n} → WeirdFin w → String
-uglyWeirdFin Z = "0"
+uglyWeirdFin Z = "1"
 uglyWeirdFin (T x) = "(T " ++ uglyWeirdFin x ++ ")"
 uglyWeirdFin (S x) = "(S " ++ uglyWeirdFin x ++ ")"
 

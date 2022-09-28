@@ -26,6 +26,7 @@ import PlutusCore.Core qualified as PLC
 import PlutusCore.Default qualified as PLC
 import PlutusCore.Error
 import PlutusCore.Name as Export
+import PlutusCore.Pretty
 
 -- | Take one UPLC program and apply it to another.
 applyProgram :: Program name uni fun () -> Program name uni fun () -> Program name uni fun ()
@@ -44,3 +45,7 @@ data UPLCError ann
     deriving anyclass (NFData)
 deriving stock instance (Show ann) => Show (UPLCError ann)
 
+instance (Pretty ann) => Pretty (UPLCError ann) where
+    pretty (UntypedPlutusCore.ParseErrorE e)           = pretty e
+    pretty (UntypedPlutusCore.UniqueCoherencyErrorE e) = pretty e
+    pretty (UntypedPlutusCore.FreeVariableErrorE e)    = pretty e
