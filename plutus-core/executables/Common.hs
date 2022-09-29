@@ -79,7 +79,7 @@ type UplcProg =
 
 class PlutusProgram p where
 
-  type Error ann p :: * -- so that we can specify the error type for each program type.
+  -- type Error ann p :: * -- so that we can specify the error type for each program type.
 
   -- | Parse a program.  The first argument (normally the file path) describes
   -- the input stream, the second is the program text.
@@ -89,7 +89,7 @@ class PlutusProgram p where
   -- | Check a program for unique names.
   -- Throws a @UniqueError@ when not all names are unique.
   checkUnique ::
-     (Ord ann, AsUniqueError (UniqueError ann) ann) --, MonadError (Error ann p) m)
+     (Ord ann, MonadError e m, (AsUniqueError e ann))-- (Error ann p) m)
     => p ann
     -> m ()
 
@@ -98,7 +98,7 @@ class PlutusProgram p where
 -- For PLC: check for unique errors and typecheck.
 -- For PIR: typecheck.
   checkProg ::
-     (Ord ann, MonadError (Error ann p) m)
+     (Ord ann, MonadError e m) --(Error ann p) m)
     => p ann
     -> m ()
 
@@ -118,7 +118,7 @@ serialiseTProgramFlat nameType p =
 
 -- | Instance for PIR program.
 instance PlutusProgram PirProg where
-  type Error ann PirProg = PIR.Error PLC.DefaultUni PLC.DefaultFun ann
+  -- type Error ann PirProg = PIR.Error PLC.DefaultUni PLC.DefaultFun ann
   parseNamedProgram inputName = PLC.runQuoteT . PIR.parse PIR.program inputName
   checkUnique _ = pure () -- decided that it's not worth implementing since it's checked in PLC.
   checkProg p = undefined
@@ -127,7 +127,7 @@ instance PlutusProgram PirProg where
 
 -- | Instance for PLC program.
 instance PlutusProgram PlcProg where
-  type Error ann PlcProg = PLC.Error PLC.DefaultUni PLC.DefaultFun ann
+  -- type Error ann PlcProg = PLC.Error PLC.DefaultUni PLC.DefaultFun ann
   parseNamedProgram inputName = PLC.runQuoteT . UPLC.parse PLC.program inputName
   checkUnique = PLC.checkProgram (const True)
   checkProg = undefined
@@ -136,7 +136,7 @@ instance PlutusProgram PlcProg where
 
 -- | Instance for UPLC program.
 instance PlutusProgram UplcProg where
-  type Error ann UplcProg = UPLC.UPLCError ann
+  -- type Error ann UplcProg = UPLC.UPLCError ann
   parseNamedProgram inputName = PLC.runQuoteT . UPLC.parse UPLC.program inputName
   checkUnique = UPLC.checkProgram (const True)
   checkProg = undefined
@@ -352,7 +352,7 @@ parseInput inp = do
 -- | Run the renamer through the program then check for unique errors.
 -- Can apply to UPLC or PIR programs.
 renameCheckUnique ::
-  (Ord ann, PlutusProgram p, PLC.Rename (p PLC.SourcePos)) => p ann -> m ()
+  (Ord ann, PlutusProgram p, PLC.Rename (p PLC.SourcePos), Monad m) => p ann -> m ()
 renameCheckUnique p = do
   -- run @rename@ through the program
   renamed <- PLC.runQuoteT $ rename p
@@ -361,7 +361,7 @@ renameCheckUnique p = do
   case checked of
     -- pretty print the error
     Left err ->
-      errorWithoutStackTrace $ show err -- PP.render $ pretty err
+      errorWithoutStackTrace $ PP.render $ pretty err
     Right _ -> return ()
 
 -- Read a binary-encoded file (eg, Flat-encoded PLC)
