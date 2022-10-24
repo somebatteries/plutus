@@ -183,9 +183,8 @@ instance (ExMemoryUsage a, ExMemoryUsage b) => ExMemoryUsage (a, b) where
     memoryUsage (a, b) = 1 <> memoryUsage a <> memoryUsage b
     {-# INLINE memoryUsage #-}
 
--- See https://github.com/input-output-hk/plutus/issues/1861
-instance ExMemoryUsage (SomeTypeIn uni) where
-  memoryUsage _ = 1 -- TODO things like @list (list (list integer))@ take up a non-constant amount of space.
+instance ExMemoryUsage (SomeHeadIn uni) where
+  memoryUsage _ = 1
   {-# INLINE memoryUsage #-}
 
 -- See https://github.com/input-output-hk/plutus/issues/1861

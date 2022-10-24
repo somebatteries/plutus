@@ -329,111 +329,48 @@ price to pay for some superficial syntactic nicety and hence we choose the safe 
 even though that required reworking all the infrastructure in a backwards-incompatible manner.
 -}
 
--- class uni `Includes` (a :: k) => TextualType uni a where
---     textualType :: Text
+type ProxyHeadIn :: forall k. (Type -> Type) -> k -> Type
+data ProxyHeadIn uni a = ProxyHeadIn
 
--- class uni `Includes` (a :: k) => TextualType uni a where
---     type TypeLevel uni
---     typeLevelUni ::
-
--- uni `Includes` a => (TypeLevel uni -> r) -> r
-
--- Type
-
--- ReifiedTypeLevel uni -> TypeLevel uni
-
--- instance Show (TypeLevel uni) => Show (TypeLevelReified uni) where
---     show
-
--- class (uni `Includes` (a :: k), KnownSymbol (TypeNameIn uni a)) => KnownTypeIn uni a where
---     type TypeNameIn uni a :: TypeLevel
-
-
--- class KnownTypeIn uni a => ToKindIn uni (a :: k) where
---     toKind :: SingKind k
-
--- uni `EverywhereK` ToKindIn uni
-
--- bring ::
-
-
--- class ToKind uni where
---     toKind :: forall a. KnownTypeIn uni a => SingKind a
-
--- class KnownTypeIn uni a => ToKind uni a
-
--- Everywhere
-
-
--- class Closed uni where
---     -- | A constrant for \"@constr a@ holds for any @a@ from @uni@\".
---     type Everywhere uni (constr :: Type -> Constraint) :: Constraint
-
---     -- | Encode a type as a sequence of 'Int' tags.
---     -- The opposite of 'decodeUni'.
---     encodeUni :: uni a -> [Int]
-
---     -- | Decode a type and feed it to the continuation.
---     withDecodedUni :: (forall k (a :: k). Typeable k => uni (Esc a) -> DecodeUniM r) -> DecodeUniM r
-
---     -- | Bring a @constr a@ instance in scope, provided @a@ is a type from the universe and
---     -- @constr@ holds for any type from the universe.
---     bring :: uni `Everywhere` constr => proxy constr -> uni (Esc a) -> (constr a => r) -> r
-
-
-
---
-
---     blah :: Proxy a -> (TypeLevel uni -> r) -> r
-
--- class KnownUni uni where
---     foo :: (KnownTypeIn uni a => r) -> r
-
--- instance KnownKind DefaultUni Integer
-
--- data TypeLevel uni = forall a. TextualType uni a => TypeLevel
-
-
--- instance Show (TypeLevel uni) where
-
--- Proxy :: Proxy Integer ->
-
-
-type TypeIn :: forall k. (Type -> Type) -> k -> Type
-data TypeIn uni a = TypeIn
-
--- > withKnownTypeIn someUni reifyType === someUni
+-- > withNamedHeadIn someHead reifyType === someHead
 type KnownReified :: (Type -> Type) -> Constraint
 class KnownReified uni where
-    data SomeReifiedTypeIn uni :: Type
-    withKnownTypeIn
-        :: SomeReifiedTypeIn uni
-        -> (forall a. KnownTypeIn uni a => TypeIn uni a -> r)
+    data SomeHeadIn uni :: Type
+    withNamedHeadIn
+        :: SomeHeadIn uni
+        -> (forall k (a :: k). NamedHeadIn uni a => ProxyHeadIn uni a -> r)
         -> r
 
-type KnownTypeIn :: forall k. (Type -> Type) -> k -> Constraint
-class uni `Includes` a => KnownTypeIn uni a where
-    typeName  :: TypeIn uni a -> String
-    reifyType :: TypeIn uni a -> SomeReifiedTypeIn uni
+type NamedHeadIn :: forall k. (Type -> Type) -> k -> Constraint
+class uni `Includes` a => NamedHeadIn uni a where
+    showType  :: ProxyHeadIn uni a -> String
+    reifyType :: ProxyHeadIn uni a -> SomeHeadIn uni
 
--- | A particular type from a universe.
-type SomeTypeIn :: (Type -> Type) -> Type
-data SomeTypeIn uni = forall k (a :: k). KnownTypeIn uni a => SomeTypeIn !(TypeIn uni a)
+data DefaultUni a where
+    DefaultUniInteger :: DefaultUni Integer
+    DefaultUniList    :: DefaultUni a -> DefaultUni [a]
 
+instance DefaultUni `Contains` Integer where
+    knownUni = DefaultUniInteger
 
+instance DefaultUni `Contains` a => DefaultUni `Contains` [a] where
+    knownUni = DefaultUniList knownUni
 
--- instance KnownTypeIn DefaultUni Integer
---     type TypeNameIn DefaultUni Integer = "integer"
+instance KnownReified DefaultUni where
+    data SomeHeadIn DefaultUni
+        = DefaultUniHeadInteger
+        | DefaultUniHeadList
 
+    withNamedHeadIn DefaultUniHeadInteger k = k @_ @Integer ProxyHeadIn
+    withNamedHeadIn DefaultUniHeadList    k = k @_ @[]      ProxyHeadIn
 
--- -- class (uni `Includes` (a :: k), KnownSymbol (TypeNameIn uni a)) => KnownTypeIn uni name where
--- --     type TypeNameIn uni name :: k
+instance NamedHeadIn DefaultUni Integer where
+    showType _ = "DefaultUniHeadInteger"
+    reifyType _ = DefaultUniHeadInteger
 
--- Proxy Integer -> ...
--- Proxy []      -> ...
-
-
-
+instance NamedHeadIn DefaultUni [] where
+    showType _ = "DefaultUniHeadList"
+    reifyType _ = DefaultUniHeadList
 
 
 -- | A value of a particular type from a universe.
@@ -811,11 +748,8 @@ $(return [])  -- Stage restriction, see https://gitlab.haskell.org/ghc/ghc/issue
 instance GShow f => Show (AG f a) where
     showsPrec pr (AG a) = gshowsPrec pr a
 
-instance GShow uni => Show (SomeTypeIn uni) where
-    show (SomeTypeIn uni) = typeName uni
-
-instance KnownReified uni => Show (SomeReifiedTypeIn uni) where
-    show someUni = withKnownTypeIn someUni typeName
+instance KnownReified uni => Show (SomeHeadIn uni) where
+    show someHead = withNamedHeadIn someHead showType
 
 instance (GShow uni, Closed uni, uni `Everywhere` Show) => GShow (ValueOf uni) where
     gshowsPrec = showsPrec
@@ -831,14 +765,11 @@ instance (GEq uni, Closed uni, uni `Everywhere` Eq) => GEq (ValueOf uni) where
         guard $ bring (Proxy @Eq) uni1 (x1 == x2)
         Just Refl
 
-instance GEq uni => Eq (SomeTypeIn uni) where
-    SomeTypeIn a1 == SomeTypeIn a2 = typeName a1 == typeName a2
-
-instance KnownReified uni => Eq (SomeReifiedTypeIn uni) where
-    someUni1 == someUni2 =
-        withKnownTypeIn someUni1 $ \typeIn1 ->
-            withKnownTypeIn someUni2 $ \typeIn2 ->
-                typeName typeIn1 == typeName typeIn2
+instance KnownReified uni => Eq (SomeHeadIn uni) where
+    someHead1 == someHead2 =
+        withNamedHeadIn someHead1 $ \headIn1 ->
+            withNamedHeadIn someHead2 $ \headIn2 ->
+                showType headIn1 == showType headIn2
 
 instance (GEq uni, Closed uni, uni `Everywhere` Eq) => Eq (ValueOf uni a) where
     (==) = defaultEq
@@ -857,9 +788,6 @@ instance (GCompare uni, Closed uni, uni `Everywhere` Ord, uni `Everywhere` Eq) =
                     LT -> GLT
                     GT -> GGT
 
-instance GCompare uni => Ord (SomeTypeIn uni) where
-    SomeTypeIn a1 `compare` SomeTypeIn a2 = typeName a1 `compare` typeName a2
-
 -- We need the 'Eq' constraint in order for @Ord (ValueOf uni a)@ to imply @Eq (ValueOf uni a)@.
 instance (GCompare uni, Closed uni, uni `Everywhere` Ord, uni `Everywhere` Eq) =>
             Ord (ValueOf uni a) where
@@ -870,10 +798,7 @@ instance (GCompare uni, Closed uni, uni `Everywhere` Ord, uni `Everywhere` Eq) =
 instance (Closed uni, uni `Everywhere` NFData) => GNFData (ValueOf uni) where
     grnf (ValueOf uni x) = bring (Proxy @NFData) uni $ rnf x
 
-instance NFData (SomeTypeIn uni) where
-    rnf (SomeTypeIn uni) = rwhnf $ typeName uni
-
-instance NFData (SomeReifiedTypeIn uni) where
+instance NFData (SomeHeadIn uni) where
     rnf = rwhnf
 
 instance (Closed uni, uni `Everywhere` NFData) => NFData (ValueOf uni a) where
