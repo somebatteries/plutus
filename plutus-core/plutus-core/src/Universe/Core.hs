@@ -329,48 +329,12 @@ price to pay for some superficial syntactic nicety and hence we choose the safe 
 even though that required reworking all the infrastructure in a backwards-incompatible manner.
 -}
 
-type ProxyHeadIn :: forall k. (Type -> Type) -> k -> Type
-data ProxyHeadIn uni a = ProxyHeadIn
-
 -- > withNamedHeadIn someHead reifyType === someHead
-type KnownReified :: (Type -> Type) -> Constraint
-class KnownReified uni where
+type KnownHeads :: (Type -> Type) -> Constraint
+class KnownHeads uni where
     data SomeHeadIn uni :: Type
-    withNamedHeadIn
-        :: SomeHeadIn uni
-        -> (forall k (a :: k). NamedHeadIn uni a => ProxyHeadIn uni a -> r)
-        -> r
+    showSomeHead :: SomeHeadIn uni -> String
 
-type NamedHeadIn :: forall k. (Type -> Type) -> k -> Constraint
-class uni `Includes` a => NamedHeadIn uni a where
-    showType  :: ProxyHeadIn uni a -> String
-    reifyType :: ProxyHeadIn uni a -> SomeHeadIn uni
-
-data DefaultUni a where
-    DefaultUniInteger :: DefaultUni Integer
-    DefaultUniList    :: DefaultUni a -> DefaultUni [a]
-
-instance DefaultUni `Contains` Integer where
-    knownUni = DefaultUniInteger
-
-instance DefaultUni `Contains` a => DefaultUni `Contains` [a] where
-    knownUni = DefaultUniList knownUni
-
-instance KnownReified DefaultUni where
-    data SomeHeadIn DefaultUni
-        = DefaultUniHeadInteger
-        | DefaultUniHeadList
-
-    withNamedHeadIn DefaultUniHeadInteger k = k @_ @Integer ProxyHeadIn
-    withNamedHeadIn DefaultUniHeadList    k = k @_ @[]      ProxyHeadIn
-
-instance NamedHeadIn DefaultUni Integer where
-    showType _ = "DefaultUniHeadInteger"
-    reifyType _ = DefaultUniHeadInteger
-
-instance NamedHeadIn DefaultUni [] where
-    showType _ = "DefaultUniHeadList"
-    reifyType _ = DefaultUniHeadList
 
 
 -- | A value of a particular type from a universe.
@@ -748,8 +712,8 @@ $(return [])  -- Stage restriction, see https://gitlab.haskell.org/ghc/ghc/issue
 instance GShow f => Show (AG f a) where
     showsPrec pr (AG a) = gshowsPrec pr a
 
-instance KnownReified uni => Show (SomeHeadIn uni) where
-    show someHead = withNamedHeadIn someHead showType
+instance KnownHeads uni => Show (SomeHeadIn uni) where
+    show = showSomeHead
 
 instance (GShow uni, Closed uni, uni `Everywhere` Show) => GShow (ValueOf uni) where
     gshowsPrec = showsPrec
@@ -765,11 +729,8 @@ instance (GEq uni, Closed uni, uni `Everywhere` Eq) => GEq (ValueOf uni) where
         guard $ bring (Proxy @Eq) uni1 (x1 == x2)
         Just Refl
 
-instance KnownReified uni => Eq (SomeHeadIn uni) where
-    someHead1 == someHead2 =
-        withNamedHeadIn someHead1 $ \headIn1 ->
-            withNamedHeadIn someHead2 $ \headIn2 ->
-                showType headIn1 == showType headIn2
+instance KnownHeads uni => Eq (SomeHeadIn uni) where
+    someHead1 == someHead2 = showSomeHead someHead1 == showSomeHead someHead2
 
 instance (GEq uni, Closed uni, uni `Everywhere` Eq) => Eq (ValueOf uni a) where
     (==) = defaultEq
@@ -803,3 +764,27 @@ instance NFData (SomeHeadIn uni) where
 
 instance (Closed uni, uni `Everywhere` NFData) => NFData (ValueOf uni a) where
     rnf = grnf
+
+
+data DefaultUni a where
+    DefaultUniInteger :: DefaultUni Integer
+    DefaultUniList    :: DefaultUni a -> DefaultUni [a]
+
+instance DefaultUni `Contains` Integer where
+    knownUni = DefaultUniInteger
+
+instance DefaultUni `Contains` a => DefaultUni `Contains` [a] where
+    knownUni = DefaultUniList knownUni
+
+-- type SomeHeadInDefaultUni = SomeHeadIn DefaultUni
+-- $(return [])
+
+instance KnownHeads DefaultUni where
+    data SomeHeadIn DefaultUni
+        = DefaultUniHeadInteger
+        | DefaultUniHeadList
+
+    showSomeHead DefaultUniHeadInteger = "DefaultUniHeadInteger"
+    showSomeHead DefaultUniHeadList    = "DefaultUniHeadList"
+
+    -- showSomeHead = $(makeShow ''SomeHeadInDefaultUni)
