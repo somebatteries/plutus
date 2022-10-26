@@ -70,8 +70,8 @@ library plutus-benchmark-common
 library nofib-internal
   import:          lang
 
-  if impl(ghc >=9.0)
-    buildable: False
+  -- if impl(ghc >=9.0)
+  --   buildable: False
 
   hs-source-dirs:  nofib/src
   exposed-modules:
@@ -97,8 +97,8 @@ library nofib-internal
 executable nofib-exe
   import:         lang
 
-  if impl(ghc >=9.0)
-    buildable: False
+  -- if impl(ghc >=9.0)
+  --   buildable: False
 
   main-is:        Main.hs
   hs-source-dirs: nofib/exe
@@ -118,8 +118,8 @@ executable nofib-exe
 benchmark nofib
   import:         lang
 
-  if impl(ghc >=9.0)
-    buildable: False
+  -- if impl(ghc >=9.0)
+  --   buildable: False
 
   type:           exitcode-stdio-1.0
   main-is:        BenchPlc.hs
@@ -134,8 +134,8 @@ benchmark nofib
 benchmark nofib-hs
   import:         lang
 
-  if impl(ghc >=9.0)
-    buildable: False
+  -- if impl(ghc >=9.0)
+  --   buildable: False
 
   type:           exitcode-stdio-1.0
   main-is:        BenchHaskell.hs
@@ -150,8 +150,8 @@ benchmark nofib-hs
 test-suite plutus-benchmark-nofib-tests
   import:         lang
 
-  if impl(ghc >=9.0)
-    buildable: False
+  -- if impl(ghc >=9.0)
+  --   buildable: False
 
   type:           exitcode-stdio-1.0
   main-is:        Spec.hs
@@ -171,8 +171,8 @@ test-suite plutus-benchmark-nofib-tests
 library lists-internal
   import:          lang
 
-  if impl(ghc >=9.0)
-    buildable: False
+  -- if impl(ghc >=9.0)
+  --   buildable: False
 
   hs-source-dirs:  lists/src
   exposed-modules:
@@ -197,8 +197,8 @@ library lists-internal
 executable list-sort-exe
   import:         lang
 
-  if impl(ghc >=9.0)
-    buildable: False
+  -- if impl(ghc >=9.0)
+  --   buildable: False
 
   main-is:        Main.hs
   hs-source-dirs: lists/exe
@@ -212,8 +212,8 @@ executable list-sort-exe
 benchmark lists
   import:         lang
 
-  if impl(ghc >=9.0)
-    buildable: False
+  -- if impl(ghc >=9.0)
+  --   buildable: False
 
   type:           exitcode-stdio-1.0
   main-is:        Bench.hs
@@ -227,8 +227,8 @@ benchmark lists
 test-suite plutus-benchmark-lists-tests
   import:         lang
 
-  if impl(ghc >=9.0)
-    buildable: False
+  -- if impl(ghc >=9.0)
+  --   buildable: False
 
   type:           exitcode-stdio-1.0
   main-is:        Spec.hs
