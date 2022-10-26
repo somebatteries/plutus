@@ -1,6 +1,1 @@
-[ entering runIdentity
-, exiting runIdentity
-, entering newtypeFunction
-, exiting newtypeFunction
-, entering fFoldableIdentity
-, exiting fFoldableIdentity ]
+[]

@@ -128,7 +128,7 @@ mkSimplPass flags =
             , GHC.sm_dflags = flags
             , GHC.sm_rules = False
             -- You might think you would need this, but apparently not
-            , GHC.sm_inline = False
+            , GHC.sm_inline = True
             , GHC.sm_case_case = False
             , GHC.sm_eta_expand = False
             }
@@ -467,4 +467,3 @@ makePrimitiveNameInfo names = do
         thing <- lift . lift $ GHC.lookupThing ghcName
         pure (name, thing)
     pure $ Map.fromList infos
-

@@ -5,9 +5,6 @@
       (strict) (vardecl emptyByteString (con bytestring)) (con bytestring #)
     )
     (termbind
-      (nonstrict) (vardecl emptyByteString (con bytestring)) emptyByteString
-    )
-    (termbind
       (strict)
       (vardecl monoId (fun (con bytestring) (con bytestring)))
       (lam x (con bytestring) x)

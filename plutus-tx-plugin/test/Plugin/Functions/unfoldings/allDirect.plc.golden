@@ -1,71 +1,58 @@
 (program
   (let
-    (nonrec)
+    (rec)
     (datatypebind
       (datatype
-        (tyvardecl Bool (type))
-
-        Bool_match
-        (vardecl True Bool) (vardecl False Bool)
-      )
-    )
-    (termbind
-      (strict)
-      (vardecl nandDirect (fun Bool (fun Bool Bool)))
-      (lam
-        ds
-        Bool
-        (lam
-          ds
-          Bool
-          {
-            [
-              [
-                { [ Bool_match ds ] (all dead (type) Bool) }
-                (abs dead (type) False)
-              ]
-              (abs
-                dead
-                (type)
-                {
-                  [
-                    [
-                      { [ Bool_match ds ] (all dead (type) Bool) }
-                      (abs dead (type) False)
-                    ]
-                    (abs dead (type) True)
-                  ]
-                  (all dead (type) dead)
-                }
-              )
-            ]
-            (all dead (type) dead)
-          }
-        )
-      )
-    )
-    (termbind
-      (strict)
-      (vardecl andDirect (fun Bool (fun Bool Bool)))
-      (lam
-        ds
-        Bool
-        (lam
-          ds
-          Bool
-          [ [ nandDirect [ [ nandDirect ds ] ds ] ] [ [ nandDirect ds ] ds ] ]
-        )
+        (tyvardecl List (fun (type) (type)))
+        (tyvardecl a (type))
+        Nil_match
+        (vardecl Nil [ List a ])
+        (vardecl Cons (fun a (fun [ List a ] [ List a ])))
       )
     )
     (let
-      (rec)
+      (nonrec)
       (datatypebind
         (datatype
-          (tyvardecl List (fun (type) (type)))
-          (tyvardecl a (type))
-          Nil_match
-          (vardecl Nil [ List a ])
-          (vardecl Cons (fun a (fun [ List a ] [ List a ])))
+          (tyvardecl Bool (type))
+
+          Bool_match
+          (vardecl True Bool) (vardecl False Bool)
+        )
+      )
+      (termbind
+        (strict)
+        (vardecl nandDirect (fun Bool (fun Bool Bool)))
+        (lam
+          ds
+          Bool
+          (lam
+            ds
+            Bool
+            {
+              [
+                [
+                  { [ Bool_match ds ] (all dead (type) Bool) }
+                  (abs dead (type) False)
+                ]
+                (abs
+                  dead
+                  (type)
+                  {
+                    [
+                      [
+                        { [ Bool_match ds ] (all dead (type) Bool) }
+                        (abs dead (type) False)
+                      ]
+                      (abs dead (type) True)
+                    ]
+                    (all dead (type) dead)
+                  }
+                )
+              ]
+              (all dead (type) dead)
+            }
+          )
         )
       )
       (let
@@ -93,13 +80,56 @@
                     (lam
                       h
                       a
-                      (lam
-                        t
-                        [ List a ]
-                        (abs
-                          dead
-                          (type)
-                          [ [ andDirect [ p h ] ] [ [ { allDirect a } p ] t ] ]
+                      (let
+                        (nonrec)
+                        (termbind (nonstrict) (vardecl ds Bool) [ p h ])
+                        (lam
+                          t
+                          [ List a ]
+                          (let
+                            (nonrec)
+                            (termbind
+                              (nonstrict)
+                              (vardecl ds Bool)
+                              [ [ { allDirect a } p ] t ]
+                            )
+                            (abs
+                              dead
+                              (type)
+                              {
+                                [
+                                  [
+                                    {
+                                      [ Bool_match [ [ nandDirect ds ] ds ] ]
+                                      (all dead (type) Bool)
+                                    }
+                                    (abs dead (type) False)
+                                  ]
+                                  (abs
+                                    dead
+                                    (type)
+                                    {
+                                      [
+                                        [
+                                          {
+                                            [
+                                              Bool_match
+                                              [ [ nandDirect ds ] ds ]
+                                            ]
+                                            (all dead (type) Bool)
+                                          }
+                                          (abs dead (type) False)
+                                        ]
+                                        (abs dead (type) True)
+                                      ]
+                                      (all dead (type) dead)
+                                    }
+                                  )
+                                ]
+                                (all dead (type) dead)
+                              }
+                            )
+                          )
                         )
                       )
                     )
@@ -148,28 +178,23 @@
             )
             (builtin lessThanInteger)
           )
-          (termbind
-            (strict)
-            (vardecl
-              lessThanInteger (fun (con integer) (fun (con integer) Bool))
-            )
-            (lam
-              x
-              (con integer)
-              (lam
-                y
-                (con integer)
-                [
-                  [ [ { ifThenElse Bool } [ [ lessThanInteger x ] y ] ] True ]
-                  False
-                ]
-              )
-            )
-          )
           [
             [
               { allDirect (con integer) }
-              (lam ds (con integer) [ [ lessThanInteger ds ] (con integer 5) ])
+              (lam
+                ds
+                (con integer)
+                [
+                  [
+                    [
+                      { ifThenElse Bool }
+                      [ [ lessThanInteger ds ] (con integer 5) ]
+                    ]
+                    True
+                  ]
+                  False
+                ]
+              )
             ]
             [
               { build (con integer) }

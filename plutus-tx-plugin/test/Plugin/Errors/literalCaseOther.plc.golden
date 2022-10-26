@@ -1,1 +1,10 @@
-Error: Unsupported feature: Use of fromString on type other than builtin strings or bytestrings: Plugin.Errors.Spec.AType
+(program
+  1.0.0
+  [
+    [
+      (force (delay (lam AType_i0 (lam AType_match_i0 (lam x_i0 AType_i3)))))
+      (delay (lam case_AType_i0 case_AType_i1))
+    ]
+    (lam x_i0 x_i1)
+  ]
+)

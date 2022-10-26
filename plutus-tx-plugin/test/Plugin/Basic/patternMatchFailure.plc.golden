@@ -1,1 +1,99 @@
-Error: Unsupported feature: Type constructor: GHC.Prim.Char#
+(program
+  1.0.0
+  [
+    [
+      [
+        (force
+          (delay
+            (lam
+              Just_i0
+              (lam
+                Nothing_i0
+                (lam
+                  Maybe_match_i0
+                  [
+                    (lam
+                      addInteger_i0
+                      (lam
+                        ds_i0
+                        (lam
+                          ds_i0
+                          (force
+                            [
+                              [
+                                (force [ (force Maybe_match_i4) ds_i2 ])
+                                (lam
+                                  x_i0
+                                  (delay
+                                    (force
+                                      [
+                                        [
+                                          (force
+                                            [ (force Maybe_match_i5) x_i1 ]
+                                          )
+                                          (lam
+                                            x_i0
+                                            (delay
+                                              (force
+                                                [
+                                                  [
+                                                    (force
+                                                      [
+                                                        (force Maybe_match_i6)
+                                                        ds_i3
+                                                      ]
+                                                    )
+                                                    (lam
+                                                      x_i0
+                                                      (delay
+                                                        [
+                                                          (force Just_i9)
+                                                          [
+                                                            [
+                                                              addInteger_i6 x_i2
+                                                            ]
+                                                            x_i1
+                                                          ]
+                                                        ]
+                                                      )
+                                                    )
+                                                  ]
+                                                  (delay (force Nothing_i7))
+                                                ]
+                                              )
+                                            )
+                                          )
+                                        ]
+                                        (delay (force Nothing_i6))
+                                      ]
+                                    )
+                                  )
+                                )
+                              ]
+                              (delay (force Nothing_i5))
+                            ]
+                          )
+                        )
+                      )
+                    )
+                    (builtin addInteger)
+                  ]
+                )
+              )
+            )
+          )
+        )
+        (delay
+          (lam
+            arg_0_i0
+            (delay
+              (lam case_Just_i0 (lam case_Nothing_i0 [ case_Just_i2 arg_0_i3 ]))
+            )
+          )
+        )
+      ]
+      (delay (delay (lam case_Just_i0 (lam case_Nothing_i0 case_Nothing_i1))))
+    ]
+    (delay (lam x_i0 x_i1))
+  ]
+)

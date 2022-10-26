@@ -11,50 +11,8 @@
     )
     (termbind
       (strict)
-      (vardecl
-        fMonadMaybe_c
-        (all
-          a
-          (type)
-          (all b (type) (fun [ Maybe a ] (fun (fun a [ Maybe b ]) [ Maybe b ])))
-        )
-      )
-      (abs
-        a
-        (type)
-        (abs
-          b
-          (type)
-          (lam
-            ds
-            [ Maybe a ]
-            (lam
-              k
-              (fun a [ Maybe b ])
-              {
-                [
-                  [
-                    { [ { Maybe_match a } ds ] (all dead (type) [ Maybe b ]) }
-                    (lam x a (abs dead (type) [ k x ]))
-                  ]
-                  (abs dead (type) { Nothing b })
-                ]
-                (all dead (type) dead)
-              }
-            )
-          )
-        )
-      )
-    )
-    (termbind
-      (strict)
       (vardecl addInteger (fun (con integer) (fun (con integer) (con integer))))
       (builtin addInteger)
-    )
-    (termbind
-      (strict)
-      (vardecl addInteger (fun (con integer) (fun (con integer) (con integer))))
-      (lam x (con integer) (lam y (con integer) [ [ addInteger x ] y ]))
     )
     (lam
       ds
@@ -62,21 +20,47 @@
       (lam
         ds
         [ Maybe (con integer) ]
-        [
-          [ { { fMonadMaybe_c (con integer) } (con integer) } ds ]
-          (lam
-            x
-            (con integer)
+        {
+          [
             [
-              [ { { fMonadMaybe_c (con integer) } (con integer) } ds ]
+              {
+                [ { Maybe_match (con integer) } ds ]
+                (all dead (type) [ Maybe (con integer) ])
+              }
               (lam
-                y
+                x
                 (con integer)
-                [ { Just (con integer) } [ [ addInteger x ] y ] ]
+                (abs
+                  dead
+                  (type)
+                  {
+                    [
+                      [
+                        {
+                          [ { Maybe_match (con integer) } ds ]
+                          (all dead (type) [ Maybe (con integer) ])
+                        }
+                        (lam
+                          x
+                          (con integer)
+                          (abs
+                            dead
+                            (type)
+                            [ { Just (con integer) } [ [ addInteger x ] x ] ]
+                          )
+                        )
+                      ]
+                      (abs dead (type) { Nothing (con integer) })
+                    ]
+                    (all dead (type) dead)
+                  }
+                )
               )
             ]
-          )
-        ]
+            (abs dead (type) { Nothing (con integer) })
+          ]
+          (all dead (type) dead)
+        }
       )
     )
   )

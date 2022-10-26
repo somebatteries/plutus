@@ -11,8 +11,8 @@
     )
     (termbind (strict) (vardecl unitval (con unit)) (con unit ()))
     (termbind
-      (nonstrict)
-      (vardecl fToDataBool [ (lam a (type) (fun a (con data))) Bool ])
+      (strict)
+      (vardecl fToDataBool_ctoBuiltinData (fun Bool (con data)))
       (lam
         ds
         Bool
@@ -42,13 +42,6 @@
         }
       )
     )
-    (termbind
-      (nonstrict)
-      (vardecl
-        fToDataInteger [ (lam a (type) (fun a (con data))) (con integer) ]
-      )
-      (lam i (con integer) [ (builtin iData) i ])
-    )
     (datatypebind
       (datatype (tyvardecl Unit (type))  Unit_match (vardecl Unit Unit))
     )
@@ -56,8 +49,8 @@
       (strict) (vardecl reconstructCaseError (con string)) (con string "PT1")
     )
     (termbind
-      (nonstrict)
-      (vardecl fUnsafeFromDataBool [ (lam a (type) (fun (con data) a)) Bool ])
+      (strict)
+      (vardecl fUnsafeFromDataBool_cunsafeFromBuiltinData (fun (con data) Bool))
       (lam
         d
         (con data)
@@ -443,110 +436,56 @@
               )
             )
           )
-          (let
-            (nonrec)
-            (termbind
-              (strict)
-              (vardecl
-                dUnsafeFromData [ (lam a (type) (fun (con data) a)) Bool ]
+          (lam
+            d
+            (con data)
+            (let
+              (nonrec)
+              (termbind
+                (strict)
+                (vardecl
+                  tup [ [ (con pair) (con integer) ] [ (con list) (con data) ] ]
+                )
+                [ (builtin unConstrData) d ]
               )
-              fUnsafeFromDataBool
-            )
-            (termbind
-              (strict)
-              (vardecl
-                dUnsafeFromData [ (lam a (type) (fun (con data) a)) Bool ]
+              (termbind
+                (nonstrict)
+                (vardecl t [ (con list) (con data) ])
+                [
+                  {
+                    { (builtin sndPair) (con integer) }
+                    [ (con list) (con data) ]
+                  }
+                  tup
+                ]
               )
-              fUnsafeFromDataBool
-            )
-            (lam
-              d
-              (con data)
-              (let
-                (nonrec)
-                (termbind
-                  (strict)
-                  (vardecl
-                    tup
-                    [ [ (con pair) (con integer) ] [ (con list) (con data) ] ]
-                  )
-                  [ (builtin unConstrData) d ]
-                )
-                (termbind
-                  (nonstrict)
-                  (vardecl t [ (con list) (con data) ])
-                  [
-                    {
-                      { (builtin sndPair) (con integer) }
-                      [ (con list) (con data) ]
-                    }
-                    tup
-                  ]
-                )
-                (termbind
-                  (nonstrict)
-                  (vardecl t [ (con list) (con data) ])
-                  [ { (builtin tailList) (con data) } t ]
-                )
-                (termbind
-                  (strict)
-                  (vardecl index (con integer))
-                  [
-                    {
-                      { (builtin fstPair) (con integer) }
-                      [ (con list) (con data) ]
-                    }
-                    tup
-                  ]
-                )
+              (termbind
+                (nonstrict)
+                (vardecl t [ (con list) (con data) ])
+                [ { (builtin tailList) (con data) } t ]
+              )
+              (termbind
+                (strict)
+                (vardecl index (con integer))
+                [
+                  {
+                    { (builtin fstPair) (con integer) }
+                    [ (con list) (con data) ]
+                  }
+                  tup
+                ]
+              )
+              [
                 [
                   [
                     [
-                      [
-                        {
-                          (builtin ifThenElse)
-                          (fun
-                            (con unit)
-                            [ [ [ Tuple3 Bool ] (con integer) ] Bool ]
-                          )
-                        }
-                        [ [ (builtin equalsInteger) index ] (con integer 0) ]
-                      ]
-                      (lam
-                        ds
-                        (con unit)
-                        (let
-                          (nonrec)
-                          (termbind
-                            (strict)
-                            (vardecl arg (con data))
-                            [ { (builtin headList) (con data) } t ]
-                          )
-                          (termbind
-                            (strict)
-                            (vardecl arg (con data))
-                            [ { (builtin headList) (con data) } t ]
-                          )
-                          (termbind
-                            (strict)
-                            (vardecl arg (con data))
-                            [
-                              { (builtin headList) (con data) }
-                              [ { (builtin tailList) (con data) } t ]
-                            ]
-                          )
-                          [
-                            [
-                              [
-                                { { { Tuple3 Bool } (con integer) } Bool }
-                                [ dUnsafeFromData arg ]
-                              ]
-                              [ (builtin unIData) arg ]
-                            ]
-                            [ dUnsafeFromData arg ]
-                          ]
+                      {
+                        (builtin ifThenElse)
+                        (fun
+                          (con unit) [ [ [ Tuple3 Bool ] (con integer) ] Bool ]
                         )
-                      )
+                      }
+                      [ [ (builtin equalsInteger) index ] (con integer 0) ]
                     ]
                     (lam
                       ds
@@ -555,209 +494,136 @@
                         (nonrec)
                         (termbind
                           (strict)
-                          (vardecl thunk (con unit))
-                          (let
-                            (nonrec)
-                            (termbind
-                              (strict)
-                              (vardecl wild Unit)
-                              [
-                                [
-                                  { (builtin trace) Unit } reconstructCaseError
-                                ]
-                                Unit
-                              ]
-                            )
-                            unitval
-                          )
+                          (vardecl arg (con data))
+                          [ { (builtin headList) (con data) } t ]
                         )
-                        (error [ [ [ Tuple3 Bool ] (con integer) ] Bool ])
+                        (termbind
+                          (strict)
+                          (vardecl arg (con data))
+                          [ { (builtin headList) (con data) } t ]
+                        )
+                        (termbind
+                          (strict)
+                          (vardecl arg (con data))
+                          [
+                            { (builtin headList) (con data) }
+                            [ { (builtin tailList) (con data) } t ]
+                          ]
+                        )
+                        [
+                          [
+                            [
+                              { { { Tuple3 Bool } (con integer) } Bool }
+                              [ fUnsafeFromDataBool_cunsafeFromBuiltinData arg ]
+                            ]
+                            [ (builtin unIData) arg ]
+                          ]
+                          [ fUnsafeFromDataBool_cunsafeFromBuiltinData arg ]
+                        ]
                       )
                     )
                   ]
-                  unitval
+                  (lam
+                    ds
+                    (con unit)
+                    (let
+                      (nonrec)
+                      (termbind
+                        (strict)
+                        (vardecl thunk (con unit))
+                        (let
+                          (nonrec)
+                          (termbind
+                            (strict)
+                            (vardecl wild Unit)
+                            [
+                              [ { (builtin trace) Unit } reconstructCaseError ]
+                              Unit
+                            ]
+                          )
+                          unitval
+                        )
+                      )
+                      (error [ [ [ Tuple3 Bool ] (con integer) ] Bool ])
+                    )
+                  )
                 ]
-              )
+                unitval
+              ]
             )
           )
         ]
       ]
       [
+        [ (builtin constrData) (con integer 1) ]
         [
           [
-            (let
-              (nonrec)
-              (typebind
-                (tyvardecl b (type))
-                [ Maybe [ [ [ Tuple3 Bool ] (con integer) ] Bool ] ]
-              )
-              (lam
-                dToData
-                [ (lam a (type) (fun a (con data))) (con integer) ]
-                (lam
-                  dToData
-                  [ (lam a (type) (fun a (con data))) b ]
-                  (lam
-                    ds
-                    [ [ Either (con integer) ] b ]
-                    [
+            { (builtin mkCons) (con data) }
+            [
+              [ (builtin constrData) (con integer 0) ]
+              [
+                [
+                  { (builtin mkCons) (con data) }
+                  (let
+                    (nonrec)
+                    (termbind
+                      (strict)
+                      (vardecl w [ [ [ Tuple3 Bool ] (con integer) ] Bool ])
                       [
-                        {
-                          [ { { Either_match (con integer) } b } ds ] (con data)
-                        }
-                        (lam
-                          arg
-                          (con integer)
-                          [
-                            [ (builtin constrData) (con integer 0) ]
-                            [
-                              [
-                                { (builtin mkCons) (con data) } [ dToData arg ]
-                              ]
-                              [ (builtin mkNilData) unitval ]
-                            ]
-                          ]
-                        )
-                      ]
-                      (lam
-                        arg
-                        b
                         [
-                          [ (builtin constrData) (con integer 1) ]
-                          [
-                            [ { (builtin mkCons) (con data) } [ dToData arg ] ]
-                            [ (builtin mkNilData) unitval ]
-                          ]
+                          [ { { { Tuple3 Bool } (con integer) } Bool } True ]
+                          (con integer 1)
                         ]
-                      )
-                    ]
-                  )
-                )
-              )
-            )
-            fToDataInteger
-          ]
-          [
-            (let
-              (nonrec)
-              (typebind
-                (tyvardecl a (type)) [ [ [ Tuple3 Bool ] (con integer) ] Bool ]
-              )
-              (lam
-                dToData
-                [ (lam a (type) (fun a (con data))) a ]
-                (lam
-                  ds
-                  [ Maybe a ]
-                  {
+                        False
+                      ]
+                    )
                     [
-                      [
-                        {
-                          [ { Maybe_match a } ds ] (all dead (type) (con data))
-                        }
+                      {
+                        [ { { { Tuple3_match Bool } (con integer) } Bool } w ]
+                        (con data)
+                      }
+                      (lam
+                        ww
+                        Bool
                         (lam
-                          arg
-                          a
-                          (abs
-                            dead
-                            (type)
+                          ww
+                          (con integer)
+                          (lam
+                            ww
+                            Bool
                             [
                               [ (builtin constrData) (con integer 0) ]
                               [
                                 [
                                   { (builtin mkCons) (con data) }
-                                  [ dToData arg ]
+                                  [ fToDataBool_ctoBuiltinData ww ]
                                 ]
-                                [ (builtin mkNilData) unitval ]
+                                [
+                                  [
+                                    { (builtin mkCons) (con data) }
+                                    [ (builtin iData) ww ]
+                                  ]
+                                  [
+                                    [
+                                      { (builtin mkCons) (con data) }
+                                      [ fToDataBool_ctoBuiltinData ww ]
+                                    ]
+                                    [ (builtin mkNilData) unitval ]
+                                  ]
+                                ]
                               ]
                             ]
                           )
                         )
-                      ]
-                      (abs
-                        dead
-                        (type)
-                        [
-                          [ (builtin constrData) (con integer 1) ]
-                          [ (builtin mkNilData) unitval ]
-                        ]
                       )
                     ]
-                    (all dead (type) dead)
-                  }
-                )
-              )
-            )
-            (let
-              (nonrec)
-              (termbind
-                (strict)
-                (vardecl w [ (lam a (type) (fun a (con data))) Bool ])
-                fToDataBool
-              )
-              (termbind
-                (strict)
-                (vardecl w [ (lam a (type) (fun a (con data))) (con integer) ])
-                fToDataInteger
-              )
-              (termbind
-                (strict)
-                (vardecl w [ (lam a (type) (fun a (con data))) Bool ])
-                fToDataBool
-              )
-              (lam
-                w
-                [ [ [ Tuple3 Bool ] (con integer) ] Bool ]
-                [
-                  {
-                    [ { { { Tuple3_match Bool } (con integer) } Bool } w ]
-                    (con data)
-                  }
-                  (lam
-                    ww
-                    Bool
-                    (lam
-                      ww
-                      (con integer)
-                      (lam
-                        ww
-                        Bool
-                        [
-                          [ (builtin constrData) (con integer 0) ]
-                          [
-                            [ { (builtin mkCons) (con data) } [ w ww ] ]
-                            [
-                              [ { (builtin mkCons) (con data) } [ w ww ] ]
-                              [
-                                [ { (builtin mkCons) (con data) } [ w ww ] ]
-                                [ (builtin mkNilData) unitval ]
-                              ]
-                            ]
-                          ]
-                        ]
-                      )
-                    )
                   )
                 ]
-              )
-            )
-          ]
-        ]
-        [
-          {
-            { Right (con integer) }
-            [ Maybe [ [ [ Tuple3 Bool ] (con integer) ] Bool ] ]
-          }
-          [
-            { Just [ [ [ Tuple3 Bool ] (con integer) ] Bool ] }
-            [
-              [
-                [ { { { Tuple3 Bool } (con integer) } Bool } True ]
-                (con integer 1)
+                [ (builtin mkNilData) unitval ]
               ]
-              False
             ]
           ]
+          [ (builtin mkNilData) unitval ]
         ]
       ]
     ]

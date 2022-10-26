@@ -3,14 +3,6 @@
     (nonrec)
     (datatypebind
       (datatype
-        (tyvardecl UTuple2 (fun (type) (fun (type) (type))))
-        (tyvardecl a (type)) (tyvardecl b (type))
-        UTuple2_match
-        (vardecl UTuple2 (fun a (fun b [ [ UTuple2 a ] b ])))
-      )
-    )
-    (datatypebind
-      (datatype
         (tyvardecl
           UTuple5
           (fun
@@ -38,11 +30,6 @@
       (strict)
       (vardecl addInteger (fun (con integer) (fun (con integer) (con integer))))
       (builtin addInteger)
-    )
-    (termbind
-      (strict)
-      (vardecl addInteger (fun (con integer) (fun (con integer) (con integer))))
-      (lam x (con integer) (lam y (con integer) [ [ addInteger x ] y ]))
     )
     (termbind
       (strict)
@@ -121,137 +108,14 @@
         ]
       )
     )
-    (termbind
-      (strict)
-      (vardecl
-        unboxedTuples2Tuple
-        (fun
-          [
-            [
-              UTuple2
-              [
-                [
-                  [ [ [ UTuple5 (con integer) ] (con integer) ] (con integer) ]
-                  (con integer)
-                ]
-                (con integer)
-              ]
-            ]
-            [
-              [
-                [ [ [ UTuple5 (con integer) ] (con integer) ] (con integer) ]
-                (con integer)
-              ]
-              (con integer)
-            ]
-          ]
-          (con integer)
-        )
-      )
-      (lam
-        ds
-        [
-          [
-            UTuple2
-            [
-              [
-                [ [ [ UTuple5 (con integer) ] (con integer) ] (con integer) ]
-                (con integer)
-              ]
-              (con integer)
-            ]
-          ]
-          [
-            [
-              [ [ [ UTuple5 (con integer) ] (con integer) ] (con integer) ]
-              (con integer)
-            ]
-            (con integer)
-          ]
-        ]
-        [
-          {
-            [
-              {
-                {
-                  UTuple2_match
-                  [
-                    [
-                      [
-                        [ [ UTuple5 (con integer) ] (con integer) ]
-                        (con integer)
-                      ]
-                      (con integer)
-                    ]
-                    (con integer)
-                  ]
-                }
-                [
-                  [
-                    [
-                      [ [ UTuple5 (con integer) ] (con integer) ] (con integer)
-                    ]
-                    (con integer)
-                  ]
-                  (con integer)
-                ]
-              }
-              ds
-            ]
-            (con integer)
-          }
-          (lam
-            i
-            [
-              [
-                [ [ [ UTuple5 (con integer) ] (con integer) ] (con integer) ]
-                (con integer)
-              ]
-              (con integer)
-            ]
-            (lam
-              j
-              [
-                [
-                  [ [ [ UTuple5 (con integer) ] (con integer) ] (con integer) ]
-                  (con integer)
-                ]
-                (con integer)
-              ]
-              [ [ addInteger [ unboxedTuple i ] ] [ unboxedTuple j ] ]
-            )
-          )
-        ]
-      )
-    )
     (lam
       x
       (con integer)
       [
-        unboxedTuples2Tuple
         [
+          addInteger
           [
-            {
-              {
-                UTuple2
-                [
-                  [
-                    [
-                      [ [ UTuple5 (con integer) ] (con integer) ] (con integer)
-                    ]
-                    (con integer)
-                  ]
-                  (con integer)
-                ]
-              }
-              [
-                [
-                  [ [ [ UTuple5 (con integer) ] (con integer) ] (con integer) ]
-                  (con integer)
-                ]
-                (con integer)
-              ]
-            }
+            unboxedTuple
             [
               [
                 [
@@ -278,6 +142,9 @@
               x
             ]
           ]
+        ]
+        [
+          unboxedTuple
           [
             [
               [

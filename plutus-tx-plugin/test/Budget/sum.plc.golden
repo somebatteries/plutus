@@ -132,29 +132,29 @@
             )
           )
           [
-            (let
-              (nonrec)
-              (termbind
-                (strict)
-                (vardecl dAdditiveMonoid [ AdditiveMonoid (con integer) ])
-                [
-                  [
-                    { CConsAdditiveMonoid (con integer) }
-                    (lam
-                      x
-                      (con integer)
-                      (lam y (con integer) [ [ (builtin addInteger) x ] y ])
-                    )
-                  ]
-                  (con integer 0)
-                ]
-              )
+            [
               [
-                [
-                  {
-                    { fFoldableNil_cfoldMap [ (lam a (type) a) (con integer) ] }
-                    (con integer)
-                  }
+                {
+                  { fFoldableNil_cfoldMap [ (lam a (type) a) (con integer) ] }
+                  (con integer)
+                }
+                (let
+                  (nonrec)
+                  (termbind
+                    (strict)
+                    (vardecl v [ AdditiveMonoid (con integer) ])
+                    [
+                      [
+                        { CConsAdditiveMonoid (con integer) }
+                        (lam
+                          x
+                          (con integer)
+                          (lam y (con integer) [ [ (builtin addInteger) x ] y ])
+                        )
+                      ]
+                      (con integer 0)
+                    ]
+                  )
                   [
                     [
                       { CConsMonoid [ (lam a (type) a) (con integer) ] }
@@ -168,10 +168,7 @@
                             [
                               [
                                 {
-                                  [
-                                    { AdditiveMonoid_match (con integer) }
-                                    dAdditiveMonoid
-                                  ]
+                                  [ { AdditiveMonoid_match (con integer) } v ]
                                   [
                                     (lam a (type) (fun a (fun a a)))
                                     (con integer)
@@ -195,9 +192,7 @@
                     ]
                     [
                       {
-                        [
-                          { AdditiveMonoid_match (con integer) } dAdditiveMonoid
-                        ]
+                        [ { AdditiveMonoid_match (con integer) } v ]
                         (con integer)
                       }
                       (lam
@@ -207,10 +202,10 @@
                       )
                     ]
                   ]
-                ]
-                (lam v (con integer) v)
+                )
               ]
-            )
+              (lam v (con integer) v)
+            ]
             [
               [
                 (let

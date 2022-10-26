@@ -1,15 +1,11 @@
 (program
   (let
     (nonrec)
+    (termbind (strict) (vardecl x (con integer)) (con integer 1))
     (termbind
       (strict)
       (vardecl addInteger (fun (con integer) (fun (con integer) (con integer))))
       (builtin addInteger)
-    )
-    (termbind
-      (strict)
-      (vardecl addInteger (fun (con integer) (fun (con integer) (con integer))))
-      (lam x (con integer) (lam y (con integer) [ [ addInteger x ] y ]))
     )
     (let
       (rec)
@@ -101,7 +97,7 @@
           [
             [
               { { mapDirect (con integer) } (con integer) }
-              [ addInteger (con integer 1) ]
+              (lam y (con integer) [ [ addInteger x ] y ])
             ]
             [
               { build (con integer) }

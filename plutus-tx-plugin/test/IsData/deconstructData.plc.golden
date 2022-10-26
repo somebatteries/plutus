@@ -12,6 +12,14 @@
         (vardecl Tuple2 (fun a (fun b [ [ Tuple2 a ] b ])))
       )
     )
+    (datatypebind
+      (datatype
+        (tyvardecl Maybe (fun (type) (type)))
+        (tyvardecl a (type))
+        Maybe_match
+        (vardecl Just (fun a [ Maybe a ])) (vardecl Nothing [ Maybe a ])
+      )
+    )
     (termbind
       (strict)
       (vardecl
@@ -34,14 +42,6 @@
       (strict)
       (vardecl equalsInteger (fun (con integer) (fun (con integer) (con bool))))
       (builtin equalsInteger)
-    )
-    (datatypebind
-      (datatype
-        (tyvardecl Maybe (fun (type) (type)))
-        (tyvardecl a (type))
-        Maybe_match
-        (vardecl Just (fun a [ Maybe a ])) (vardecl Nothing [ Maybe a ])
-      )
     )
     (termbind
       (strict)
@@ -323,30 +323,6 @@
       )
     )
     (termbind
-      (nonstrict)
-      (vardecl
-        fFromDataTuple2
-        (all
-          a
-          (type)
-          (all
-            b
-            (type)
-            (fun
-              [ (lam a (type) (fun (con data) [ Maybe a ])) a ]
-              (fun
-                [ (lam a (type) (fun (con data) [ Maybe a ])) b ]
-                [
-                  (lam a (type) (fun (con data) [ Maybe a ])) [ [ Tuple2 a ] b ]
-                ]
-              )
-            )
-          )
-        )
-      )
-      fFromDataTuple2_cfromBuiltinData
-    )
-    (termbind
       (strict)
       (vardecl unsafeDataAsI (fun (con data) (con integer)))
       (builtin unIData)
@@ -381,50 +357,16 @@
         ]
       )
     )
-    (termbind
-      (nonstrict)
-      (vardecl
-        fFromDataInteger
-        [ (lam a (type) (fun (con data) [ Maybe a ])) (con integer) ]
-      )
-      fFromDataInteger_cfromBuiltinData
-    )
-    (termbind
-      (nonstrict)
-      (vardecl
-        dFromData
-        [
-          (lam a (type) (fun (con data) [ Maybe a ]))
-          [ [ Tuple2 (con integer) ] (con integer) ]
-        ]
-      )
-      [
-        [ { { fFromDataTuple2 (con integer) } (con integer) } fFromDataInteger ]
-        fFromDataInteger
-      ]
-    )
-    (termbind
-      (strict)
-      (vardecl
-        fromBuiltinData
-        (all
-          a
-          (type)
-          (fun
-            [ (lam a (type) (fun (con data) [ Maybe a ])) a ]
-            (fun (con data) [ Maybe a ])
-          )
-        )
-      )
-      (abs a (type) (lam v [ (lam a (type) (fun (con data) [ Maybe a ])) a ] v))
-    )
     (lam
       ds
       (con data)
       [
         [
-          { fromBuiltinData [ [ Tuple2 (con integer) ] (con integer) ] }
-          dFromData
+          [
+            { { fFromDataTuple2_cfromBuiltinData (con integer) } (con integer) }
+            fFromDataInteger_cfromBuiltinData
+          ]
+          fFromDataInteger_cfromBuiltinData
         ]
         ds
       ]

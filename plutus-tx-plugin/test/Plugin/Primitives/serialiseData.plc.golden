@@ -6,11 +6,6 @@
       (vardecl serialiseData (fun (con data) (con bytestring)))
       (builtin serialiseData)
     )
-    (termbind
-      (nonstrict)
-      (vardecl serialiseData (fun (con data) (con bytestring)))
-      serialiseData
-    )
     serialiseData
   )
 )

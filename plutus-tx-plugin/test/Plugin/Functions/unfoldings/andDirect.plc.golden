@@ -53,7 +53,34 @@
         (lam
           ds
           Bool
-          [ [ nandDirect [ [ nandDirect ds ] ds ] ] [ [ nandDirect ds ] ds ] ]
+          {
+            [
+              [
+                {
+                  [ Bool_match [ [ nandDirect ds ] ds ] ] (all dead (type) Bool)
+                }
+                (abs dead (type) False)
+              ]
+              (abs
+                dead
+                (type)
+                {
+                  [
+                    [
+                      {
+                        [ Bool_match [ [ nandDirect ds ] ds ] ]
+                        (all dead (type) Bool)
+                      }
+                      (abs dead (type) False)
+                    ]
+                    (abs dead (type) True)
+                  ]
+                  (all dead (type) dead)
+                }
+              )
+            ]
+            (all dead (type) dead)
+          }
         )
       )
     )

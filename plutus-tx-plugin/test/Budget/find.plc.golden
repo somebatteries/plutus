@@ -119,69 +119,19 @@
           (nonrec)
           (datatypebind
             (datatype
-              (tyvardecl Maybe (fun (type) (type)))
-              (tyvardecl a (type))
-              Maybe_match
-              (vardecl Just (fun a [ Maybe a ])) (vardecl Nothing [ Maybe a ])
-            )
-          )
-          (datatypebind
-            (datatype
               (tyvardecl Bool (type))
 
               Bool_match
               (vardecl True Bool) (vardecl False Bool)
             )
           )
-          (termbind
-            (strict)
-            (vardecl x [ List (con integer) ])
-            [
-              [
-                (let
-                  (nonrec)
-                  (typebind (tyvardecl a (type)) [ List (con integer) ])
-                  (lam
-                    c
-                    (fun (con integer) (fun a a))
-                    (lam
-                      n
-                      a
-                      [
-                        [ c (con integer 1) ]
-                        [
-                          [ c (con integer 2) ]
-                          [
-                            [ c (con integer 3) ]
-                            [
-                              [ c (con integer 4) ]
-                              [
-                                [ c (con integer 5) ]
-                                [
-                                  [ c (con integer 6) ]
-                                  [
-                                    [ c (con integer 7) ]
-                                    [
-                                      [ c (con integer 8) ]
-                                      [
-                                        [ c (con integer 9) ]
-                                        [ [ c (con integer 10) ] n ]
-                                      ]
-                                    ]
-                                  ]
-                                ]
-                              ]
-                            ]
-                          ]
-                        ]
-                      ]
-                    )
-                  )
-                )
-                { Cons (con integer) }
-              ]
-              { Nil (con integer) }
-            ]
+          (datatypebind
+            (datatype
+              (tyvardecl Maybe (fun (type) (type)))
+              (tyvardecl a (type))
+              Maybe_match
+              (vardecl Just (fun a [ Maybe a ])) (vardecl Nothing [ Maybe a ])
+            )
           )
           [
             [
@@ -261,7 +211,52 @@
                 }
               )
             ]
-            x
+            [
+              [
+                (let
+                  (nonrec)
+                  (typebind (tyvardecl a (type)) [ List (con integer) ])
+                  (lam
+                    c
+                    (fun (con integer) (fun a a))
+                    (lam
+                      n
+                      a
+                      [
+                        [ c (con integer 1) ]
+                        [
+                          [ c (con integer 2) ]
+                          [
+                            [ c (con integer 3) ]
+                            [
+                              [ c (con integer 4) ]
+                              [
+                                [ c (con integer 5) ]
+                                [
+                                  [ c (con integer 6) ]
+                                  [
+                                    [ c (con integer 7) ]
+                                    [
+                                      [ c (con integer 8) ]
+                                      [
+                                        [ c (con integer 9) ]
+                                        [ [ c (con integer 10) ] n ]
+                                      ]
+                                    ]
+                                  ]
+                                ]
+                              ]
+                            ]
+                          ]
+                        ]
+                      ]
+                    )
+                  )
+                )
+                { Cons (con integer) }
+              ]
+              { Nil (con integer) }
+            ]
           ]
         )
       )

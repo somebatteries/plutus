@@ -188,28 +188,6 @@
       )
     )
     (termbind
-      (nonstrict)
-      (vardecl
-        fUnsafeFromDataTuple2
-        (all
-          a
-          (type)
-          (all
-            b
-            (type)
-            (fun
-              [ (lam a (type) (fun (con data) a)) a ]
-              (fun
-                [ (lam a (type) (fun (con data) a)) b ]
-                [ (lam a (type) (fun (con data) a)) [ [ Tuple2 a ] b ] ]
-              )
-            )
-          )
-        )
-      )
-      fUnsafeFromDataTuple2_cunsafeFromBuiltinData
-    )
-    (termbind
       (strict)
       (vardecl unsafeDataAsI (fun (con data) (con integer)))
       (builtin unIData)
@@ -217,26 +195,18 @@
     (termbind
       (nonstrict)
       (vardecl
-        fUnsafeFromDataInteger
-        [ (lam a (type) (fun (con data) a)) (con integer) ]
-      )
-      unsafeDataAsI
-    )
-    (termbind
-      (nonstrict)
-      (vardecl
         dUnsafeFromData
-        [
-          (lam a (type) (fun (con data) a))
-          [ [ Tuple2 (con integer) ] (con integer) ]
-        ]
+        (fun (con data) [ [ Tuple2 (con integer) ] (con integer) ])
       )
       [
         [
-          { { fUnsafeFromDataTuple2 (con integer) } (con integer) }
-          fUnsafeFromDataInteger
+          {
+            { fUnsafeFromDataTuple2_cunsafeFromBuiltinData (con integer) }
+            (con integer)
+          }
+          unsafeDataAsI
         ]
-        fUnsafeFromDataInteger
+        unsafeDataAsI
       ]
     )
     (datatypebind
@@ -356,55 +326,14 @@
         )
       )
     )
-    (termbind
-      (nonstrict)
-      (vardecl
-        fUnsafeFromDataMaybe
-        (all
-          a
-          (type)
-          (fun
-            [ (lam a (type) (fun (con data) a)) a ]
-            [ (lam a (type) (fun (con data) a)) [ Maybe a ] ]
-          )
-        )
-      )
-      fUnsafeFromDataMaybe_cunsafeFromBuiltinData
-    )
-    (termbind
-      (nonstrict)
-      (vardecl
-        dUnsafeFromData
-        [
-          (lam a (type) (fun (con data) a))
-          [ Maybe [ [ Tuple2 (con integer) ] (con integer) ] ]
-        ]
-      )
-      [
-        { fUnsafeFromDataMaybe [ [ Tuple2 (con integer) ] (con integer) ] }
-        dUnsafeFromData
-      ]
-    )
-    (termbind
-      (strict)
-      (vardecl
-        unsafeFromBuiltinData
-        (all
-          a
-          (type)
-          (fun [ (lam a (type) (fun (con data) a)) a ] (fun (con data) a))
-        )
-      )
-      (abs a (type) (lam v [ (lam a (type) (fun (con data) a)) a ] v))
-    )
     (lam
       ds
       (con data)
       [
         [
           {
-            unsafeFromBuiltinData
-            [ Maybe [ [ Tuple2 (con integer) ] (con integer) ] ]
+            fUnsafeFromDataMaybe_cunsafeFromBuiltinData
+            [ [ Tuple2 (con integer) ] (con integer) ]
           }
           dUnsafeFromData
         ]

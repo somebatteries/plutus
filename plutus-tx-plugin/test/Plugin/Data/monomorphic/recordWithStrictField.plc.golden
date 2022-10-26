@@ -21,18 +21,13 @@
         )
       )
     )
-    (termbind
-      (strict)
-      (vardecl strictField (fun RecordWithStrictField RecordNewtype))
-      (lam
-        ds
-        RecordWithStrictField
-        [
-          { [ RecordWithStrictField_match ds ] RecordNewtype }
-          (lam ds MyMonoRecord (lam dt (con integer) [ RecordNewtype dt ]))
-        ]
-      )
+    (lam
+      ds
+      RecordWithStrictField
+      [
+        { [ RecordWithStrictField_match ds ] RecordNewtype }
+        (lam ds MyMonoRecord (lam dt (con integer) [ RecordNewtype dt ]))
+      ]
     )
-    strictField
   )
 )

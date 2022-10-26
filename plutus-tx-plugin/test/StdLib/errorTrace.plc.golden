@@ -15,28 +15,17 @@
       (builtin trace)
     )
     (termbind (strict) (vardecl unitval (con unit)) (con unit ()))
-    (termbind
-      (strict)
-      (vardecl traceError (all a (type) (fun (con string) a)))
-      (abs
-        a
-        (type)
-        (lam
-          str
-          (con string)
-          [
-            { error a }
-            (let
-              (nonrec)
-              (termbind
-                (strict) (vardecl wild Unit) [ [ { trace Unit } str ] Unit ]
-              )
-              unitval
-            )
-          ]
+    [
+      { error (con integer) }
+      (let
+        (nonrec)
+        (termbind
+          (strict)
+          (vardecl wild Unit)
+          [ [ { trace Unit } (con string "") ] Unit ]
         )
+        unitval
       )
-    )
-    [ { traceError (con integer) } (con string "") ]
+    ]
   )
 )

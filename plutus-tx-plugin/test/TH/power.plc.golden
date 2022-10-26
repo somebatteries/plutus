@@ -8,13 +8,6 @@
       )
       (builtin multiplyInteger)
     )
-    (termbind
-      (strict)
-      (vardecl
-        multiplyInteger (fun (con integer) (fun (con integer) (con integer)))
-      )
-      (lam x (con integer) (lam y (con integer) [ [ multiplyInteger x ] y ]))
-    )
     (lam
       ds
       (con integer)

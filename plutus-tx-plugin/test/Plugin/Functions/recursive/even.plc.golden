@@ -21,30 +21,10 @@
     )
     (termbind
       (strict)
-      (vardecl equalsInteger (fun (con integer) (fun (con integer) Bool)))
-      (lam
-        x
-        (con integer)
-        (lam
-          y
-          (con integer)
-          [ [ [ { ifThenElse Bool } [ [ equalsInteger x ] y ] ] True ] False ]
-        )
-      )
-    )
-    (termbind
-      (strict)
       (vardecl
         subtractInteger (fun (con integer) (fun (con integer) (con integer)))
       )
       (builtin subtractInteger)
-    )
-    (termbind
-      (strict)
-      (vardecl
-        subtractInteger (fun (con integer) (fun (con integer) (con integer)))
-      )
-      (lam x (con integer) (lam y (con integer) [ [ subtractInteger x ] y ]))
     )
     (let
       (rec)
@@ -65,7 +45,19 @@
               [
                 [
                   {
-                    [ Bool_match [ [ equalsInteger n ] (con integer 0) ] ]
+                    [
+                      Bool_match
+                      [
+                        [
+                          [
+                            { ifThenElse Bool }
+                            [ [ equalsInteger n ] (con integer 0) ]
+                          ]
+                          True
+                        ]
+                        False
+                      ]
+                    ]
                     (all dead (type) Bool)
                   }
                   (abs dead (type) True)
@@ -77,7 +69,19 @@
                     [
                       [
                         {
-                          [ Bool_match [ [ equalsInteger n ] (con integer 0) ] ]
+                          [
+                            Bool_match
+                            [
+                              [
+                                [
+                                  { ifThenElse Bool }
+                                  [ [ equalsInteger n ] (con integer 0) ]
+                                ]
+                                True
+                              ]
+                              False
+                            ]
+                          ]
                           (all dead (type) Bool)
                         }
                         (abs dead (type) False)

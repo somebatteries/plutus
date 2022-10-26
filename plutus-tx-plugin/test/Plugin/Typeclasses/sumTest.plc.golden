@@ -178,51 +178,6 @@
           (let
             (nonrec)
             (termbind
-              (nonstrict)
-              (vardecl
-                fFoldableNil
-                [
-                  (lam
-                    t
-                    (fun (type) (type))
-                    (all
-                      m
-                      (type)
-                      (all
-                        a
-                        (type)
-                        (fun [ Monoid m ] (fun (fun a m) (fun [ t a ] m)))
-                      )
-                    )
-                  )
-                  List
-                ]
-              )
-              fFoldableNil_cfoldMap
-            )
-            (termbind
-              (strict)
-              (vardecl
-                build
-                (all
-                  a
-                  (type)
-                  (fun
-                    (all b (type) (fun (fun a (fun b b)) (fun b b))) [ List a ]
-                  )
-                )
-              )
-              (abs
-                a
-                (type)
-                (lam
-                  g
-                  (all b (type) (fun (fun a (fun b b)) (fun b b)))
-                  [ [ { g [ List a ] } { Cons a } ] { Nil a } ]
-                )
-              )
-            )
-            (termbind
               (strict)
               (vardecl
                 p1AdditiveMonoid
@@ -303,78 +258,35 @@
             (termbind
               (strict)
               (vardecl
-                sum
+                build
                 (all
-                  t
-                  (fun (type) (type))
-                  (all
-                    a
-                    (type)
-                    (fun
-                      [
-                        (lam
-                          t
-                          (fun (type) (type))
-                          (all
-                            m
-                            (type)
-                            (all
-                              a
-                              (type)
-                              (fun [ Monoid m ] (fun (fun a m) (fun [ t a ] m)))
-                            )
-                          )
-                        )
-                        t
-                      ]
-                      (fun [ AdditiveMonoid a ] (fun [ t a ] a))
-                    )
+                  a
+                  (type)
+                  (fun
+                    (all b (type) (fun (fun a (fun b b)) (fun b b))) [ List a ]
                   )
                 )
               )
               (abs
-                t
-                (fun (type) (type))
-                (abs
-                  a
-                  (type)
-                  (lam
-                    dFoldable
-                    [
-                      (lam
-                        t
-                        (fun (type) (type))
-                        (all
-                          m
-                          (type)
-                          (all
-                            a
-                            (type)
-                            (fun [ Monoid m ] (fun (fun a m) (fun [ t a ] m)))
-                          )
-                        )
-                      )
-                      t
-                    ]
-                    (lam
-                      dAdditiveMonoid
-                      [ AdditiveMonoid a ]
-                      [
-                        [
-                          { { dFoldable [ (lam a (type) a) a ] } a }
-                          [ { fMonoidSum a } dAdditiveMonoid ]
-                        ]
-                        (lam v a v)
-                      ]
-                    )
-                  )
+                a
+                (type)
+                (lam
+                  g
+                  (all b (type) (fun (fun a (fun b b)) (fun b b)))
+                  [ [ { g [ List a ] } { Cons a } ] { Nil a } ]
                 )
               )
             )
             [
               [
-                [ { { sum List } (con integer) } fFoldableNil ]
-                fAdditiveMonoidInteger
+                [
+                  {
+                    { fFoldableNil_cfoldMap [ (lam a (type) a) (con integer) ] }
+                    (con integer)
+                  }
+                  [ { fMonoidSum (con integer) } fAdditiveMonoidInteger ]
+                ]
+                (lam v (con integer) v)
               ]
               [
                 { build (con integer) }

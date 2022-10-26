@@ -21,13 +21,6 @@
       )
       (termbind
         (strict)
-        (vardecl
-          addInteger (fun (con integer) (fun (con integer) (con integer)))
-        )
-        (lam x (con integer) (lam y (con integer) [ [ addInteger x ] y ]))
-      )
-      (termbind
-        (strict)
         (vardecl lengthStrict (all a (type) (fun [ List a ] (con integer))))
         (abs
           a

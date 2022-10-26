@@ -3,6 +3,14 @@
     (nonrec)
     (datatypebind
       (datatype
+        (tyvardecl Tuple2 (fun (type) (fun (type) (type))))
+        (tyvardecl a (type)) (tyvardecl b (type))
+        Tuple2_match
+        (vardecl Tuple2 (fun a (fun b [ [ Tuple2 a ] b ])))
+      )
+    )
+    (datatypebind
+      (datatype
         (tyvardecl Maybe (fun (type) (type)))
         (tyvardecl a (type))
         Maybe_match
@@ -11,58 +19,8 @@
     )
     (termbind
       (strict)
-      (vardecl
-        fMonadMaybe_c
-        (all
-          a
-          (type)
-          (all b (type) (fun [ Maybe a ] (fun (fun a [ Maybe b ]) [ Maybe b ])))
-        )
-      )
-      (abs
-        a
-        (type)
-        (abs
-          b
-          (type)
-          (lam
-            ds
-            [ Maybe a ]
-            (lam
-              k
-              (fun a [ Maybe b ])
-              {
-                [
-                  [
-                    { [ { Maybe_match a } ds ] (all dead (type) [ Maybe b ]) }
-                    (lam x a (abs dead (type) [ k x ]))
-                  ]
-                  (abs dead (type) { Nothing b })
-                ]
-                (all dead (type) dead)
-              }
-            )
-          )
-        )
-      )
-    )
-    (datatypebind
-      (datatype
-        (tyvardecl Tuple2 (fun (type) (fun (type) (type))))
-        (tyvardecl a (type)) (tyvardecl b (type))
-        Tuple2_match
-        (vardecl Tuple2 (fun a (fun b [ [ Tuple2 a ] b ])))
-      )
-    )
-    (termbind
-      (strict)
       (vardecl addInteger (fun (con integer) (fun (con integer) (con integer))))
       (builtin addInteger)
-    )
-    (termbind
-      (strict)
-      (vardecl addInteger (fun (con integer) (fun (con integer) (con integer))))
-      (lam x (con integer) (lam y (con integer) [ [ addInteger x ] y ]))
     )
     (lam
       ds
@@ -70,44 +28,66 @@
       (lam
         ds
         [ Maybe (con integer) ]
-        [
+        {
           [
-            {
-              { fMonadMaybe_c [ [ Tuple2 (con integer) ] (con integer) ] }
-              (con integer)
-            }
-            ds
-          ]
-          (lam
-            ds
-            [ [ Tuple2 (con integer) ] (con integer) ]
             [
               {
-                [ { { Tuple2_match (con integer) } (con integer) } ds ]
-                [ Maybe (con integer) ]
+                [
+                  { Maybe_match [ [ Tuple2 (con integer) ] (con integer) ] } ds
+                ]
+                (all dead (type) [ Maybe (con integer) ])
               }
               (lam
                 x
-                (con integer)
-                (lam
-                  x
-                  (con integer)
+                [ [ Tuple2 (con integer) ] (con integer) ]
+                (abs
+                  dead
+                  (type)
                   [
-                    [ { { fMonadMaybe_c (con integer) } (con integer) } ds ]
+                    {
+                      [ { { Tuple2_match (con integer) } (con integer) } x ]
+                      [ Maybe (con integer) ]
+                    }
                     (lam
-                      y
+                      x
                       (con integer)
-                      [
-                        { Just (con integer) }
-                        [ [ addInteger [ [ addInteger x ] x ] ] y ]
-                      ]
+                      (lam
+                        x
+                        (con integer)
+                        {
+                          [
+                            [
+                              {
+                                [ { Maybe_match (con integer) } ds ]
+                                (all dead (type) [ Maybe (con integer) ])
+                              }
+                              (lam
+                                x
+                                (con integer)
+                                (abs
+                                  dead
+                                  (type)
+                                  [
+                                    { Just (con integer) }
+                                    [ [ addInteger [ [ addInteger x ] x ] ] x ]
+                                  ]
+                                )
+                              )
+                            ]
+                            (abs dead (type) { Nothing (con integer) })
+                          ]
+                          (all dead (type) dead)
+                        }
+                      )
                     )
                   ]
                 )
               )
             ]
-          )
-        ]
+            (abs dead (type) { Nothing (con integer) })
+          ]
+          (all dead (type) dead)
+        }
       )
     )
   )

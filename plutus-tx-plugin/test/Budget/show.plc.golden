@@ -2726,7 +2726,7 @@
                               )
                               (termbind
                                 (strict)
-                                (vardecl x (con integer))
+                                (vardecl f (con integer))
                                 [
                                   [
                                     { (builtin trace) (con integer) }
@@ -3032,7 +3032,7 @@
                                 ]
                               )
                               [
-                                [ (builtin multiplyInteger) x ] (con integer 2)
+                                [ (builtin multiplyInteger) f ] (con integer 2)
                               ]
                             )
                           )
