@@ -681,8 +681,8 @@ compileExpr e = withContextM 2 (sdToTxt $ "Compiling expr:" GHC.<+> GHC.ppr e) $
         -- C# is just a wrapper around a literal
         GHC.Var (GHC.idDetails -> GHC.DataConWorkId dc) `GHC.App` arg | dc == GHC.charDataCon -> compileExpr arg
 
-        -- void# - Surprisingly, `Void#` is actually more like `Unit` than `Void`, so we represent it as such.
-        GHC.Var n | n == GHC.voidPrimId || n == GHC.voidArgId -> pure (PIR.mkConstant AnnOther ())
+        -- Unboxed unit, (##).
+        GHC.Var (GHC.idDetails -> GHC.DataConWorkId dc) | dc == GHC.unboxedUnitDataCon -> pure (PIR.mkConstant AnnOther ())
 
         -- Ignore the magic 'noinline' function, it's the identity but has no unfolding.
         -- See Note [noinline hack]

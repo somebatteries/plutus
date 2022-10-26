@@ -120,6 +120,7 @@ compileTyCon :: forall uni fun m ann. CompilingDefault uni fun m ann => GHC.TyCo
 compileTyCon tc
     | tc == GHC.intTyCon = throwPlain $ UnsupportedError "Int: use Integer instead"
     | tc == GHC.intPrimTyCon = throwPlain $ UnsupportedError "Int#: unboxed integers are not supported"
+    | tc == GHC.unboxedUnitTyCon = pure (PIR.mkTyBuiltin @_ @() AnnOther)
     | otherwise = do
 
     let tcName = GHC.getName tc
