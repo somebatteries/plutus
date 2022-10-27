@@ -1,14 +1,16 @@
 -- editorconfig-checker-disable-file
-{-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PolyKinds             #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE TypeOperators         #-}
-{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE DataKinds                #-}
+{-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE MultiParamTypeClasses    #-}
+{-# LANGUAGE PolyKinds                #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE TypeFamilies             #-}
+{-# LANGUAGE TypeOperators            #-}
+{-# LANGUAGE UndecidableInstances     #-}
 
 module PlutusCore.Builtin.Polymorphism
-    ( Opaque (..)
+    ( AllArguments
+    , Opaque (..)
     , SomeConstant (..)
     , TyNameRep (..)
     , TyVarRep
@@ -22,10 +24,15 @@ import PlutusCore.Builtin.HasConstant
 import PlutusCore.Core
 import PlutusCore.Evaluation.Machine.ExMemory
 
-import Data.Kind qualified as GHC (Type)
+import Data.Kind qualified as GHC
 import GHC.Ix
 import GHC.TypeLits
 import Universe
+
+type AllArguments :: forall k. (GHC.Type -> GHC.Constraint) -> k -> GHC.Constraint
+type family AllArguments constr a where
+    AllArguments constr (f x) = (AllArguments constr f, constr x)
+    AllArguments _      _     = ()
 
 {- Note [Motivation for polymorphic built-in functions]
 We need to support polymorphism for built-in functions for these reasons:
@@ -185,7 +192,7 @@ type NoStandalonePolymorphicDataErrMsg =
     'Text "  variables with either ‘SomeConstant’ or ‘Opaque’ depending on whether its the" ':$$:
     'Text "  type of an argument or the type of the result, respectively"
 
-instance TypeError NoStandalonePolymorphicDataErrMsg => uni `Contains` TyVarRep where
+instance TypeError NoStandalonePolymorphicDataErrMsg => uni `Contains` TyVarRep name where
     knownUni = underTypeError
 
 type NoConstraintsErrMsg =

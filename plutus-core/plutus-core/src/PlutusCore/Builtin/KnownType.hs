@@ -18,7 +18,6 @@ module PlutusCore.Builtin.KnownType
     ( KnownTypeError
     , throwKnownTypeErrorWithCause
     , KnownBuiltinTypeIn
-    , KnownBuiltinType
     , MakeKnownM (..)
     , ReadKnownM
     , liftReadKnownM
@@ -51,12 +50,7 @@ import Universe
 
 -- | A constraint for \"@a@ is a 'ReadKnownIn' and 'MakeKnownIn' by means of being included
 -- in @uni@\".
-type KnownBuiltinTypeIn uni val a =
-    (HasConstantIn uni val, Pretty (SomeTypeIn uni), GEq uni, uni `Contains` a)
-
--- | A constraint for \"@a@ is a 'ReadKnownIn' and 'MakeKnownIn' by means of being included
--- in @UniOf term@\".
-type KnownBuiltinType val a = KnownBuiltinTypeIn (UniOf val) val a
+type KnownBuiltinTypeIn uni val a = (HasConstantIn uni val, AllArguments (Contains uni) a)
 
 {- Note [Performance of ReadKnownIn and MakeKnownIn instances]
 It's critically important that 'readKnown' runs in the concrete 'Either' rather than a general
@@ -249,14 +243,14 @@ throwKnownTypeErrorWithCause cause = \case
     KnownTypeEvaluationFailure     -> throwingWithCause _EvaluationFailure () $ Just cause
 
 typeMismatchError
-    :: Pretty (SomeTypeIn uni)
-    => uni (Esc a)
-    -> uni (Esc b)
+    :: Pretty (Some uni)
+    => uni a
+    -> uni b
     -> UnliftingError
 typeMismatchError uniExp uniAct = fromString $ concat
     [ "Type mismatch: "
-    , "expected: " ++ display (SomeTypeIn uniExp)
-    , "; actual: " ++ display (SomeTypeIn uniAct)
+    , "expected: " ++ display (Some uniExp)
+    , "; actual: " ++ display (Some uniAct)
     ]
 -- Just for tidier Core to get generated, we don't care about performance here, since it's just a
 -- failure message and evaluation is about to be shut anyway.
@@ -343,11 +337,14 @@ liftReadKnownM (Right x)  = MakeKnownSuccess x
 
 -- See Note [Unlifting values of built-in types].
 -- | Convert a constant embedded into a PLC term to the corresponding Haskell value.
-readKnownConstant :: forall val a. KnownBuiltinType val a => val -> ReadKnownM a
+readKnownConstant
+    :: forall val a.
+       (Pretty (Some (UniOf val)), GEq (UniOf val), HasConstant val, UniOf val `Contains` a)
+    => val -> ReadKnownM a
 -- Note [Performance of ReadKnownIn and MakeKnownIn instances]
 readKnownConstant val = asConstant val >>= oneShot \case
     Some (ValueOf uniAct x) -> do
-        let uniExp = knownUni @_ @(UniOf val) @a
+        let uniExp = knownUni @(UniOf val) @a
         -- 'geq' matches on its first argument first, so we make the type tag that will be known
         -- statically (because this function will be inlined) go first in order for GHC to
         -- optimize some of the matching away.
@@ -362,7 +359,7 @@ class uni ~ UniOf val => MakeKnownIn uni val a where
     -- | Convert a Haskell value to the corresponding PLC val.
     -- The inverse of 'readKnown'.
     makeKnown :: a -> MakeKnownM val
-    default makeKnown :: KnownBuiltinType val a => a -> MakeKnownM val
+    default makeKnown :: (HasConstant val, uni `Contains` a) => a -> MakeKnownM val
     -- Everything on evaluation path has to be strict in production, so in theory we don't need to
     -- force anything here. In practice however all kinds of weird things happen in tests and @val@
     -- can be non-strict enough to cause trouble here, so we're forcing the argument. Looking at the
@@ -382,7 +379,9 @@ class uni ~ UniOf val => ReadKnownIn uni val a where
     -- | Convert a PLC val to the corresponding Haskell value.
     -- The inverse of 'makeKnown'.
     readKnown :: val -> ReadKnownM a
-    default readKnown :: KnownBuiltinType val a => val -> ReadKnownM a
+    default readKnown
+        :: (Pretty (Some (UniOf val)), GEq (UniOf val), HasConstant val, UniOf val `Contains` a)
+        => val -> ReadKnownM a
     -- If 'inline' is not used, proper inlining does not happen for whatever reason.
     readKnown = inline readKnownConstant
     {-# INLINE readKnown #-}

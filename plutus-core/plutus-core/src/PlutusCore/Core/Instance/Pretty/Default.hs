@@ -21,14 +21,15 @@ import Universe
 instance Pretty ann => Pretty (Kind ann) where
     pretty = prettyClassicDef
 
-instance (PrettyClassic tyname, Pretty (SomeTypeIn uni), Pretty ann) =>
+instance (PrettyClassic tyname, Pretty (SomeHead uni), Pretty ann) =>
             Pretty (Type tyname uni ann) where
     pretty = prettyClassicDef
 
 instance
         ( PrettyClassic tyname
         , PrettyClassic name
-        , Pretty (SomeTypeIn uni)
+        , Pretty (SomeHead uni)
+        , Pretty (Some uni)
         , Closed uni, uni `Everywhere` PrettyConst
         , Pretty fun
         , Pretty ann
@@ -38,7 +39,8 @@ instance
 instance
         ( PrettyClassic tyname
         , PrettyClassic name
-        , Pretty (SomeTypeIn uni)
+        , Pretty (SomeHead uni)
+        , Pretty (Some uni)
         , Closed uni, uni `Everywhere` PrettyConst
         , Pretty fun
         , Pretty ann

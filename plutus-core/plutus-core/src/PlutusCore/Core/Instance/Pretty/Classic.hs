@@ -32,7 +32,7 @@ instance Pretty ann => PrettyBy (PrettyConfigClassic configName) (Kind ann) wher
             sexp "fun" (consAnnIf config ann
                 [prettyBy config k, prettyBy config k'])
 
-instance (PrettyClassicBy configName tyname, Pretty (SomeTypeIn uni), Pretty ann) =>
+instance (PrettyClassicBy configName tyname, Pretty (SomeHead uni), Pretty ann) =>
         PrettyBy (PrettyConfigClassic configName) (Type tyname uni ann) where
     prettyBy config = \case
         TyApp ann t t'     ->
@@ -59,7 +59,8 @@ instance (PrettyClassicBy configName tyname, Pretty (SomeTypeIn uni), Pretty ann
 instance
         ( PrettyClassicBy configName tyname
         , PrettyClassicBy configName name
-        , Pretty (SomeTypeIn uni)
+        , Pretty (SomeHead uni)
+        , Pretty (Some uni)
         , Closed uni, uni `Everywhere` PrettyConst
         , Pretty fun
         , Pretty ann
@@ -91,8 +92,8 @@ instance
         Unwrap ann t ->
             sexp "unwrap" (consAnnIf config ann [prettyBy config t])
       where
-        prettyTypeOf :: Pretty (SomeTypeIn t) => Some (ValueOf t) -> Doc dann
-        prettyTypeOf (Some (ValueOf uni _ )) = pretty $ SomeTypeIn uni
+        prettyTypeOf :: Pretty (Some t) => Some (ValueOf t) -> Doc dann
+        prettyTypeOf (Some (ValueOf uni _ )) = pretty $ Some uni
 
 instance (PrettyClassicBy configName (Term tyname name uni fun ann), Pretty ann) =>
         PrettyBy (PrettyConfigClassic configName) (Program tyname name uni fun ann) where

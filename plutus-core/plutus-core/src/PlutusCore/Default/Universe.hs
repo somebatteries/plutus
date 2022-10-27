@@ -1,11 +1,6 @@
 -- editorconfig-checker-disable-file
 -- | The universe used by default and its instances.
 
-{-# OPTIONS -fno-warn-missing-pattern-synonym-signatures #-}
--- on 9.2.4 this is the flag that suppresses the above
--- warning
-{-# OPTIONS -Wno-missing-signatures #-}
-
 {-# LANGUAGE BlockArguments        #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleInstances     #-}
@@ -30,10 +25,7 @@
 
 module PlutusCore.Default.Universe
     ( DefaultUni (..)
-    , pattern DefaultUniList
-    , pattern DefaultUniPair
     , module Export  -- Re-exporting universes infrastructure for convenience.
-    , noMoreTypeFunctions
     ) where
 
 import PlutusCore.Builtin
@@ -43,11 +35,11 @@ import PlutusCore.Evaluation.Result
 
 import Control.Applicative
 import Data.Bits (toIntegralSized)
-import Data.ByteString qualified as BS
+import Data.ByteString (ByteString)
 import Data.Int
 import Data.IntCast (intCastEq)
 import Data.Proxy
-import Data.Text qualified as Text
+import Data.Text (Text)
 import Data.Word
 import GHC.Exts (inline, oneShot)
 import Text.Pretty
@@ -92,61 +84,46 @@ feature and have meta-constructors as built-in functions.
 -- See Note [Representing polymorphism].
 -- | The universe used by default.
 data DefaultUni a where
-    DefaultUniInteger    :: DefaultUni (Esc Integer)
-    DefaultUniByteString :: DefaultUni (Esc BS.ByteString)
-    DefaultUniString     :: DefaultUni (Esc Text.Text)
-    DefaultUniUnit       :: DefaultUni (Esc ())
-    DefaultUniBool       :: DefaultUni (Esc Bool)
-    DefaultUniProtoList  :: DefaultUni (Esc [])
-    DefaultUniProtoPair  :: DefaultUni (Esc (,))
-    DefaultUniApply      :: !(DefaultUni (Esc f)) -> !(DefaultUni (Esc a)) -> DefaultUni (Esc (f a))
-    DefaultUniData       :: DefaultUni (Esc Data)
-
--- GHC infers crazy types for these two and the straightforward ones break pattern matching,
--- so we just leave GHC with its craziness.
-pattern DefaultUniList uniA =
-    DefaultUniProtoList `DefaultUniApply` uniA
-pattern DefaultUniPair uniA uniB =
-    DefaultUniProtoPair `DefaultUniApply` uniA `DefaultUniApply` uniB
+    DefaultUniInteger    :: DefaultUni Integer
+    DefaultUniByteString :: DefaultUni ByteString
+    DefaultUniString     :: DefaultUni Text
+    DefaultUniUnit       :: DefaultUni ()
+    DefaultUniBool       :: DefaultUni Bool
+    DefaultUniList       :: DefaultUni a -> DefaultUni [a]
+    DefaultUniPair       :: DefaultUni a -> DefaultUni b -> DefaultUni (a, b)
+    DefaultUniData       :: DefaultUni Data
 
 deriveGEq ''DefaultUni
 deriveGCompare ''DefaultUni
 
--- | For pleasing the coverage checker.
-noMoreTypeFunctions :: DefaultUni (Esc (f :: a -> b -> c -> d)) -> any
-noMoreTypeFunctions (f `DefaultUniApply` _) = noMoreTypeFunctions f
-
-instance ToKind DefaultUni where
-    toSingKind DefaultUniInteger        = knownKind
-    toSingKind DefaultUniByteString     = knownKind
-    toSingKind DefaultUniString         = knownKind
-    toSingKind DefaultUniUnit           = knownKind
-    toSingKind DefaultUniBool           = knownKind
-    toSingKind DefaultUniProtoList      = knownKind
-    toSingKind DefaultUniProtoPair      = knownKind
-    toSingKind (DefaultUniApply uniF _) = case toSingKind uniF of _ `SingKindArrow` cod -> cod
-    toSingKind DefaultUniData           = knownKind
-
-instance HasUniApply DefaultUni where
-    uniApply = DefaultUniApply
-
-    matchUniApply (DefaultUniApply f a) _ h = h f a
-    matchUniApply _                     z _ = z
+-- instance ToKind DefaultUni where
+--     toSingKind DefaultUniInteger        = knownKind
+--     toSingKind DefaultUniByteString     = knownKind
+--     toSingKind DefaultUniString         = knownKind
+--     toSingKind DefaultUniUnit           = knownKind
+--     toSingKind DefaultUniBool           = knownKind
+--     toSingKind DefaultUniProtoList      = knownKind
+--     toSingKind DefaultUniProtoPair      = knownKind
+--     toSingKind (DefaultUniApply uniF _) = case toSingKind uniF of _ `SingKindArrow` cod -> cod
+--     toSingKind DefaultUniData           = knownKind
 
 deriving stock instance Show (DefaultUni a)
 instance GShow DefaultUni where gshowsPrec = showsPrec
 
 instance HasRenderContext config => PrettyBy config (DefaultUni a) where
     prettyBy = inContextM $ \case
-        DefaultUniInteger         -> "integer"
-        DefaultUniByteString      -> "bytestring"
-        DefaultUniString          -> "string"
-        DefaultUniUnit            -> "unit"
-        DefaultUniBool            -> "bool"
-        DefaultUniProtoList       -> "list"
-        DefaultUniProtoPair       -> "pair"
-        DefaultUniApply uniF uniA -> uniF `juxtPrettyM` uniA
-        DefaultUniData            -> "data"
+        DefaultUniInteger        -> "integer"
+        DefaultUniByteString     -> "bytestring"
+        DefaultUniString         -> "string"
+        DefaultUniUnit           -> "unit"
+        DefaultUniBool           -> "bool"
+        DefaultUniList uniA      ->
+            sequenceDocM ToTheRight juxtFixity $ \prettyEl ->
+                "list" <+> prettyEl uniA
+        DefaultUniPair uniA uniB ->
+            sequenceDocM ToTheRight juxtFixity $ \prettyEl ->
+                "pair" <+> prettyEl uniA <+> prettyEl uniB
+        DefaultUniData           -> "data"
 
 -- | This always pretty-prints parens around type applications (e.g. @(list bool)@) and
 -- doesn't pretty-print them otherwise (e.g. @integer@).
@@ -155,29 +132,86 @@ instance HasRenderContext config => PrettyBy config (DefaultUni a) where
 -- shown. We are planning to change the classic syntax to remove this silliness.
 instance Pretty (DefaultUni a) where
     pretty = prettyBy $ RenderContext ToTheRight juxtFixity
-instance Pretty (SomeTypeIn DefaultUni) where
-    pretty (SomeTypeIn uni) = pretty uni
+instance Pretty (Some DefaultUni) where
+    pretty (Some uni) = pretty uni
 
-instance DefaultUni `Contains` Integer       where knownUni = DefaultUniInteger
-instance DefaultUni `Contains` BS.ByteString where knownUni = DefaultUniByteString
-instance DefaultUni `Contains` Text.Text     where knownUni = DefaultUniString
-instance DefaultUni `Contains` ()            where knownUni = DefaultUniUnit
-instance DefaultUni `Contains` Bool          where knownUni = DefaultUniBool
-instance DefaultUni `Contains` []            where knownUni = DefaultUniProtoList
-instance DefaultUni `Contains` (,)           where knownUni = DefaultUniProtoPair
-instance DefaultUni `Contains` Data          where knownUni = DefaultUniData
+instance DefaultUni `Contains` Integer where
+    knownUni = DefaultUniInteger
+instance DefaultUni `Contains` ByteString where
+    knownUni = DefaultUniByteString
+instance DefaultUni `Contains` Text where
+    knownUni = DefaultUniString
+instance DefaultUni `Contains` () where
+    knownUni = DefaultUniUnit
+instance DefaultUni `Contains` Bool where
+    knownUni = DefaultUniBool
+instance DefaultUni `Contains` a => DefaultUni `Contains` [a] where
+    knownUni = DefaultUniList knownUni
+instance (DefaultUni `Contains` a, DefaultUni `Contains` b) => DefaultUni `Contains` (a, b) where
+    knownUni = DefaultUniPair knownUni knownUni
+instance DefaultUni `Contains` Data where
+    knownUni = DefaultUniData
 
-instance (DefaultUni `Contains` f, DefaultUni `Contains` a) => DefaultUni `Contains` f a where
-    knownUni = knownUni `DefaultUniApply` knownUni
+data instance SomeHead DefaultUni
+    = DefaultUniHeadInteger
+    | DefaultUniHeadByteString
+    | DefaultUniHeadText
+    | DefaultUniHeadUnit
+    | DefaultUniHeadBool
+    | DefaultUniHeadList
+    | DefaultUniHeadPair
+    | DefaultUniHeadData
 
-instance KnownBuiltinTypeAst DefaultUni Integer       => KnownTypeAst DefaultUni Integer
-instance KnownBuiltinTypeAst DefaultUni BS.ByteString => KnownTypeAst DefaultUni BS.ByteString
-instance KnownBuiltinTypeAst DefaultUni Text.Text     => KnownTypeAst DefaultUni Text.Text
-instance KnownBuiltinTypeAst DefaultUni ()            => KnownTypeAst DefaultUni ()
-instance KnownBuiltinTypeAst DefaultUni Bool          => KnownTypeAst DefaultUni Bool
-instance KnownBuiltinTypeAst DefaultUni [a]           => KnownTypeAst DefaultUni [a]
-instance KnownBuiltinTypeAst DefaultUni (a, b)        => KnownTypeAst DefaultUni (a, b)
-instance KnownBuiltinTypeAst DefaultUni Data          => KnownTypeAst DefaultUni Data
+instance KnownHead DefaultUni Integer where
+    knownHead _ = DefaultUniHeadInteger
+    showHead _ = "DefaultUniHeadInteger"
+
+instance KnownHead DefaultUni ByteString where
+    knownHead _ = DefaultUniHeadByteString
+    showHead _ = "DefaultUniHeadByteString"
+
+instance KnownHead DefaultUni Text where
+    knownHead _ = DefaultUniHeadText
+    showHead _ = "DefaultUniHeadText"
+
+instance KnownHead DefaultUni () where
+    knownHead _ = DefaultUniHeadUnit
+    showHead _ = "DefaultUniHeadUnit"
+
+instance KnownHead DefaultUni Bool where
+    knownHead _ = DefaultUniHeadBool
+    showHead _ = "DefaultUniHeadBool"
+
+instance KnownHead DefaultUni [] where
+    knownHead _ = DefaultUniHeadList
+    showHead _ = "DefaultUniHeadList"
+
+instance KnownHead DefaultUni (,) where
+    knownHead _ = DefaultUniHeadPair
+    showHead _ = "DefaultUniHeadPair"
+
+instance KnownHead DefaultUni Data where
+    knownHead _ = DefaultUniHeadData
+    showHead _ = "DefaultUniHeadData"
+
+instance EveryKnownHead DefaultUni where
+    withKnownHead DefaultUniHeadInteger    r = r @_ @Integer    HeadProxy
+    withKnownHead DefaultUniHeadByteString r = r @_ @ByteString HeadProxy
+    withKnownHead DefaultUniHeadText       r = r @_ @Text       HeadProxy
+    withKnownHead DefaultUniHeadUnit       r = r @_ @()         HeadProxy
+    withKnownHead DefaultUniHeadBool       r = r @_ @Bool       HeadProxy
+    withKnownHead DefaultUniHeadList       r = r @_ @[]         HeadProxy
+    withKnownHead DefaultUniHeadPair       r = r @_ @(,)        HeadProxy
+    withKnownHead DefaultUniHeadData       r = r @_ @Data       HeadProxy
+
+instance KnownBuiltinTypeAst DefaultUni Integer    => KnownTypeAst DefaultUni Integer
+instance KnownBuiltinTypeAst DefaultUni ByteString => KnownTypeAst DefaultUni ByteString
+instance KnownBuiltinTypeAst DefaultUni Text       => KnownTypeAst DefaultUni Text
+instance KnownBuiltinTypeAst DefaultUni ()         => KnownTypeAst DefaultUni ()
+instance KnownBuiltinTypeAst DefaultUni Bool       => KnownTypeAst DefaultUni Bool
+instance KnownBuiltinTypeAst DefaultUni [a]        => KnownTypeAst DefaultUni [a]
+instance KnownBuiltinTypeAst DefaultUni (a, b)     => KnownTypeAst DefaultUni (a, b)
+instance KnownBuiltinTypeAst DefaultUni Data       => KnownTypeAst DefaultUni Data
 
 {- Note [Constraints of ReadKnownIn and MakeKnownIn instances]
 For a monomorphic data type @X@ one only needs to add a @HasConstantIn DefaultUni term@ constraint
@@ -214,28 +248,24 @@ It's some pretty annoying boilerplate and for now we've decided it's not worth i
 -}
 
 -- See Note [Constraints of ReadKnownIn and MakeKnownIn instances].
-instance HasConstantIn DefaultUni term => MakeKnownIn DefaultUni term Integer
-instance HasConstantIn DefaultUni term => MakeKnownIn DefaultUni term BS.ByteString
-instance HasConstantIn DefaultUni term => MakeKnownIn DefaultUni term Text.Text
-instance HasConstantIn DefaultUni term => MakeKnownIn DefaultUni term ()
-instance HasConstantIn DefaultUni term => MakeKnownIn DefaultUni term Bool
-instance HasConstantIn DefaultUni term => MakeKnownIn DefaultUni term Data
-instance (HasConstantIn DefaultUni term, DefaultUni `Contains` [a]) =>
-    MakeKnownIn DefaultUni term [a]
-instance (HasConstantIn DefaultUni term, DefaultUni `Contains` (a, b)) =>
-    MakeKnownIn DefaultUni term (a, b)
+instance KnownBuiltinTypeIn DefaultUni term Integer    => MakeKnownIn DefaultUni term Integer
+instance KnownBuiltinTypeIn DefaultUni term ByteString => MakeKnownIn DefaultUni term ByteString
+instance KnownBuiltinTypeIn DefaultUni term Text       => MakeKnownIn DefaultUni term Text
+instance KnownBuiltinTypeIn DefaultUni term ()         => MakeKnownIn DefaultUni term ()
+instance KnownBuiltinTypeIn DefaultUni term Bool       => MakeKnownIn DefaultUni term Bool
+instance KnownBuiltinTypeIn DefaultUni term Data       => MakeKnownIn DefaultUni term Data
+instance KnownBuiltinTypeIn DefaultUni term [a]        => MakeKnownIn DefaultUni term [a]
+instance KnownBuiltinTypeIn DefaultUni term (a, b)     => MakeKnownIn DefaultUni term (a, b)
 
 -- See Note [Constraints of ReadKnownIn and MakeKnownIn instances].
-instance HasConstantIn DefaultUni term => ReadKnownIn DefaultUni term Integer
-instance HasConstantIn DefaultUni term => ReadKnownIn DefaultUni term BS.ByteString
-instance HasConstantIn DefaultUni term => ReadKnownIn DefaultUni term Text.Text
-instance HasConstantIn DefaultUni term => ReadKnownIn DefaultUni term ()
-instance HasConstantIn DefaultUni term => ReadKnownIn DefaultUni term Bool
-instance HasConstantIn DefaultUni term => ReadKnownIn DefaultUni term Data
-instance (HasConstantIn DefaultUni term, DefaultUni `Contains` [a]) =>
-    ReadKnownIn DefaultUni term [a]
-instance (HasConstantIn DefaultUni term, DefaultUni `Contains` (a, b)) =>
-    ReadKnownIn DefaultUni term (a, b)
+instance KnownBuiltinTypeIn DefaultUni term Integer    => ReadKnownIn DefaultUni term Integer
+instance KnownBuiltinTypeIn DefaultUni term ByteString => ReadKnownIn DefaultUni term ByteString
+instance KnownBuiltinTypeIn DefaultUni term Text       => ReadKnownIn DefaultUni term Text
+instance KnownBuiltinTypeIn DefaultUni term ()         => ReadKnownIn DefaultUni term ()
+instance KnownBuiltinTypeIn DefaultUni term Bool       => ReadKnownIn DefaultUni term Bool
+instance KnownBuiltinTypeIn DefaultUni term Data       => ReadKnownIn DefaultUni term Data
+instance KnownBuiltinTypeIn DefaultUni term [a]        => ReadKnownIn DefaultUni term [a]
+instance KnownBuiltinTypeIn DefaultUni term (a, b)     => ReadKnownIn DefaultUni term (a, b)
 
 -- If this tells you an instance is missing, add it right above, following the pattern.
 instance TestTypesFromTheUniverseAreAllKnown DefaultUni
@@ -335,8 +365,8 @@ See Note [Stable encoding of PLC]
 instance Closed DefaultUni where
     type DefaultUni `Everywhere` constr =
         ( constr `Permits` Integer
-        , constr `Permits` BS.ByteString
-        , constr `Permits` Text.Text
+        , constr `Permits` ByteString
+        , constr `Permits` Text
         , constr `Permits` ()
         , constr `Permits` Bool
         , constr `Permits` []
@@ -346,46 +376,41 @@ instance Closed DefaultUni where
 
     -- See Note [Stable encoding of tags].
     -- IF YOU'RE GETTING A WARNING HERE, DON'T FORGET TO AMEND 'withDecodedUni' RIGHT BELOW.
-    encodeUni DefaultUniInteger           = [0]
-    encodeUni DefaultUniByteString        = [1]
-    encodeUni DefaultUniString            = [2]
-    encodeUni DefaultUniUnit              = [3]
-    encodeUni DefaultUniBool              = [4]
-    encodeUni DefaultUniProtoList         = [5]
-    encodeUni DefaultUniProtoPair         = [6]
-    encodeUni (DefaultUniApply uniF uniA) = 7 : encodeUni uniF ++ encodeUni uniA
-    encodeUni DefaultUniData              = [8]
+    encodeUni DefaultUniInteger          = [0]
+    encodeUni DefaultUniByteString       = [1]
+    encodeUni DefaultUniString           = [2]
+    encodeUni DefaultUniUnit             = [3]
+    encodeUni DefaultUniBool             = [4]
+    encodeUni (DefaultUniList uniA)      = [7, 5] ++ encodeUni uniA
+    encodeUni (DefaultUniPair uniA uniB) = [7, 7, 6] ++ encodeUni uniA ++ encodeUni uniB
+    encodeUni DefaultUniData             = [8]
 
-    -- See Note [Decoding universes].
-    -- See Note [Stable encoding of tags].
-    withDecodedUni k = peelUniTag >>= \case
-        0 -> k DefaultUniInteger
-        1 -> k DefaultUniByteString
-        2 -> k DefaultUniString
-        3 -> k DefaultUniUnit
-        4 -> k DefaultUniBool
-        5 -> k DefaultUniProtoList
-        6 -> k DefaultUniProtoPair
-        7 ->
-            withDecodedUni @DefaultUni $ \uniF ->
-                withDecodedUni @DefaultUni $ \uniA ->
-                    withApplicable uniF uniA $
-                        k $ uniF `DefaultUniApply` uniA
-        8 -> k DefaultUniData
-        _ -> empty
+    -- -- See Note [Decoding universes].
+    -- -- See Note [Stable encoding of tags].
+    -- withDecodedUni k = peelUniTag >>= \case
+    --     0 -> k DefaultUniInteger
+    --     1 -> k DefaultUniByteString
+    --     2 -> k DefaultUniString
+    --     3 -> k DefaultUniUnit
+    --     4 -> k DefaultUniBool
+    --     5 -> k DefaultUniProtoList
+    --     6 -> k DefaultUniProtoPair
+    --     7 ->
+    --         withDecodedUni @DefaultUni $ \uniF ->
+    --             withDecodedUni @DefaultUni $ \uniA ->
+    --                 withApplicable uniF uniA $
+    --                     k $ uniF `DefaultUniApply` uniA
+    --     8 -> k DefaultUniData
+    --     _ -> empty
 
     bring
         :: forall constr a r proxy. DefaultUni `Everywhere` constr
-        => proxy constr -> DefaultUni (Esc a) -> (constr a => r) -> r
-    bring _ DefaultUniInteger    r = r
-    bring _ DefaultUniByteString r = r
-    bring _ DefaultUniString     r = r
-    bring _ DefaultUniUnit       r = r
-    bring _ DefaultUniBool       r = r
-    bring p (DefaultUniProtoList `DefaultUniApply` uniA) r =
-        bring p uniA r
-    bring p (DefaultUniProtoPair `DefaultUniApply` uniA `DefaultUniApply` uniB) r =
-        bring p uniA $ bring p uniB r
-    bring _ (f `DefaultUniApply` _ `DefaultUniApply` _ `DefaultUniApply` _) _ =
-        noMoreTypeFunctions f
-    bring _ DefaultUniData r = r
+        => proxy constr -> DefaultUni a -> (constr a => r) -> r
+    bring _ DefaultUniInteger          r = r
+    bring _ DefaultUniByteString       r = r
+    bring _ DefaultUniString           r = r
+    bring _ DefaultUniUnit             r = r
+    bring _ DefaultUniBool             r = r
+    bring p (DefaultUniList uniA)      r = bring p uniA r
+    bring p (DefaultUniPair uniA uniB) r = bring p uniA $ bring p uniB r
+    bring _ DefaultUniData             r = r

@@ -24,7 +24,7 @@ import Universe
 
 instance
         ( PrettyClassicBy configName name
-        , Pretty (SomeTypeIn uni)
+        , Pretty (Some uni)
         , Closed uni, uni `Everywhere` PrettyConst, Pretty fun
         , Pretty ann
         ) => PrettyBy (PrettyConfigClassic configName) (Term name uni fun ann) where
@@ -51,8 +51,8 @@ instance
             sexp "force" (consAnnIf config ann
                 [prettyBy config term])
       where
-        prettyTypeOf :: Pretty (SomeTypeIn t) => Some (ValueOf t) -> Doc dann
-        prettyTypeOf (Some (ValueOf uni _ )) = pretty $ SomeTypeIn uni
+        prettyTypeOf :: Pretty (Some t) => Some (ValueOf t) -> Doc dann
+        prettyTypeOf (Some (ValueOf uni _ )) = pretty $ Some uni
 
 instance (PrettyClassicBy configName (Term name uni fun ann), Pretty ann) =>
         PrettyBy (PrettyConfigClassic configName) (Program name uni fun ann) where

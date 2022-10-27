@@ -19,6 +19,12 @@
 
 module Universe.Core
     ( Some (..)
+    , GShow (..)
+    , gshow
+    , GEq (..)
+    , deriveGEq
+    , deriveGCompare
+    , (:~:) (..)
     , module Universe.Core
     ) where
 

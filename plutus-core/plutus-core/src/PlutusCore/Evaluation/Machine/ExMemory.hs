@@ -183,7 +183,7 @@ instance (ExMemoryUsage a, ExMemoryUsage b) => ExMemoryUsage (a, b) where
     memoryUsage (a, b) = 1 <> memoryUsage a <> memoryUsage b
     {-# INLINE memoryUsage #-}
 
-instance ExMemoryUsage (SomeHeadIn uni) where
+instance ExMemoryUsage (SomeHead uni) where
   memoryUsage _ = 1
   {-# INLINE memoryUsage #-}
 

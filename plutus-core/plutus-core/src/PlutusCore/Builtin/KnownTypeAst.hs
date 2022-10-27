@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes      #-}
 {-# LANGUAGE ConstraintKinds          #-}
 {-# LANGUAGE DataKinds                #-}
 {-# LANGUAGE DefaultSignatures        #-}
@@ -28,7 +29,6 @@ import PlutusCore.Builtin.KnownKind
 import PlutusCore.Builtin.Polymorphism
 import PlutusCore.Core
 import PlutusCore.Evaluation.Result
-import PlutusCore.MkPlc hiding (error)
 import PlutusCore.Name
 
 import Data.Kind qualified as GHC (Constraint, Type)
@@ -162,8 +162,10 @@ type family ElaborateBuiltin a where
     ElaborateBuiltin (f x) = ElaborateBuiltin f `TyAppRep` x
     ElaborateBuiltin f     = BuiltinHead f
 
--- | A constraint for \"@a@ is a 'KnownTypeAst' by means of being included in @uni@\".
-type KnownBuiltinTypeAst uni a = KnownTypeAst uni (ElaborateBuiltin a)
+mkTyBuiltin
+    :: forall a (x :: a) uni ann. KnownTypeAst uni (ElaborateBuiltin x)
+    => ann -> Type TyName uni ann
+mkTyBuiltin ann = ann <$ toTypeAst (Proxy @(ElaborateBuiltin x))
 
 type KnownTypeAst :: forall a. (GHC.Type -> GHC.Type) -> a -> GHC.Constraint
 class KnownTypeAst uni x where
@@ -184,9 +186,12 @@ class KnownTypeAst uni x where
 
     -- | The type representing @a@ used on the PLC side.
     toTypeAst :: proxy x -> Type TyName uni ()
-    default toTypeAst :: KnownBuiltinTypeAst uni x => proxy x -> Type TyName uni ()
-    toTypeAst _ = toTypeAst $ Proxy @(ElaborateBuiltin x)
+    default toTypeAst :: KnownTypeAst uni (ElaborateBuiltin x) => proxy x -> Type TyName uni ()
+    toTypeAst _ = mkTyBuiltin @_ @x ()
     {-# INLINE toTypeAst #-}
+
+-- | A constraint for \"@a@ is a 'KnownTypeAst' by means of being included in @uni@\".
+type KnownBuiltinTypeAst uni a = AllArguments (KnownTypeAst uni) a
 
 instance KnownTypeAst uni a => KnownTypeAst uni (EvaluationResult a) where
     type IsBuiltin (EvaluationResult a) = 'False
@@ -225,11 +230,11 @@ toTyNameAst _ =
         (Unique . fromIntegral $ natVal @uniq Proxy)
 {-# INLINE toTyNameAst #-}
 
-instance uni `Contains` f => KnownTypeAst uni (BuiltinHead f) where
+instance KnownHead uni f => KnownTypeAst uni (BuiltinHead f) where
     type IsBuiltin (BuiltinHead f) = 'True
     type ToHoles (BuiltinHead f) = '[]
     type ToBinds (BuiltinHead f) = '[]
-    toTypeAst _ = mkTyBuiltin @_ @f ()
+    toTypeAst _ = TyBuiltin () . knownHead $ HeadProxy @_ @_ @f
     {-# INLINE toTypeAst #-}
 
 instance (KnownTypeAst uni a, KnownTypeAst uni b) => KnownTypeAst uni (a -> b) where

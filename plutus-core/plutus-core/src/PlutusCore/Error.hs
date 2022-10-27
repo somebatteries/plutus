@@ -117,7 +117,15 @@ data Error uni fun ann
     | FreeVariableErrorE FreeVariableError
     deriving stock (Eq, Generic, Functor)
     deriving anyclass (NFData)
-deriving stock instance (Show fun, Show ann, Closed uni, Everywhere uni Show, GShow uni, Show ParserError) => Show (Error uni fun ann)
+deriving stock instance
+    ( Show fun
+    , Show ann
+    , EveryKnownHead uni
+    , Closed uni
+    , uni `Everywhere` Show
+    , GShow uni
+    , Show ParserError
+    ) => Show (Error uni fun ann)
 
 instance Pretty SourcePos where
     pretty = pretty . sourcePosPretty
@@ -156,7 +164,7 @@ instance ( Pretty ann
 
 instance
         ( Pretty term
-        , Pretty (SomeTypeIn uni)
+        , Pretty (SomeHead uni)
         , Closed uni, uni `Everywhere` PrettyConst
         , Pretty fun
         , Pretty ann
@@ -206,7 +214,8 @@ instance
         ]
 
 instance
-        ( Pretty (SomeTypeIn uni)
+        ( Pretty (SomeHead uni)
+        , Pretty (Some uni)
         , Closed uni, uni `Everywhere` PrettyConst
         , Pretty fun
         , Pretty ann

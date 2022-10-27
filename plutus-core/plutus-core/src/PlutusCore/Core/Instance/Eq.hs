@@ -22,11 +22,11 @@ import PlutusCore.Rename.Monad
 
 import Universe
 
-instance (GEq uni, Eq ann) => Eq (Type TyName uni ann) where
+instance (EveryKnownHead uni, GEq uni, Eq ann) => Eq (Type TyName uni ann) where
     ty1 == ty2 = runEqRename @TypeRenaming $ eqTypeM ty1 ty2
 
 instance
-        ( GEq uni, Closed uni, uni `Everywhere` Eq, Eq fun, Eq ann
+        ( EveryKnownHead uni, GEq uni, Closed uni, uni `Everywhere` Eq, Eq fun, Eq ann
         ) => Eq (Term TyName Name uni fun ann) where
     term1 == term2 = runEqRename $ eqTermM term1 term2
 
@@ -36,19 +36,19 @@ instance
 -- Note that we ignore the name part in case of the nameddebruijn
 -- If a user wants to ignore annotations he must prior do `void <$> term`, to throw away any annotations.
 deriving stock instance
-   (GEq uni, Closed uni, uni `Everywhere` Eq, Eq fun, Eq ann) =>
+   (EveryKnownHead uni, GEq uni, Closed uni, uni `Everywhere` Eq, Eq fun, Eq ann) =>
    Eq (Term NamedTyDeBruijn NamedDeBruijn uni fun ann)
 
 deriving stock instance
-   (GEq uni, Closed uni, uni `Everywhere` Eq, Eq fun, Eq ann) =>
+   (EveryKnownHead uni, GEq uni, Closed uni, uni `Everywhere` Eq, Eq fun, Eq ann) =>
    Eq (Term TyDeBruijn DeBruijn uni fun ann)
 
 deriving stock instance
-   (GEq uni, Closed uni, uni `Everywhere` Eq, Eq ann) =>
+   (EveryKnownHead uni, GEq uni, Closed uni, uni `Everywhere` Eq, Eq ann) =>
    Eq (Type NamedTyDeBruijn uni ann)
 
 deriving stock instance
-   (GEq uni, Closed uni, uni `Everywhere` Eq, Eq ann) =>
+   (EveryKnownHead uni, GEq uni, Closed uni, uni `Everywhere` Eq, Eq ann) =>
    Eq (Type TyDeBruijn uni ann)
 
 deriving stock instance (GEq uni, Closed uni, uni `Everywhere` Eq, Eq fun, Eq ann,
@@ -62,7 +62,9 @@ type EqRenameOf ren a = HasUniques a => a -> a -> EqRename ren
 -- See Note [Side tracking]
 -- See Note [No catch-all].
 -- | Check equality of two 'Type's.
-eqTypeM :: (HasRenaming ren TypeUnique, GEq uni, Eq ann) => EqRenameOf ren (Type tyname uni ann)
+eqTypeM
+    :: (HasRenaming ren TypeUnique, EveryKnownHead uni, GEq uni, Eq ann)
+    => EqRenameOf ren (Type tyname uni ann)
 eqTypeM (TyVar ann1 name1) (TyVar ann2 name2) = do
     eqM ann1 ann2
     eqNameM name1 name2
@@ -103,7 +105,7 @@ eqTypeM TyBuiltin{} _ = empty
 -- See Note [No catch-all].
 -- | Check equality of two 'Term's.
 eqTermM
-    :: (GEq uni, Closed uni, uni `Everywhere` Eq, Eq fun, Eq ann)
+    :: (EveryKnownHead uni, GEq uni, Closed uni, uni `Everywhere` Eq, Eq fun, Eq ann)
     => EqRenameOf ScopedRenaming (Term tyname name uni fun ann)
 eqTermM (LamAbs ann1 name1 ty1 body1) (LamAbs ann2 name2 ty2 body2) = do
     eqM ann1 ann2

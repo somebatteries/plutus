@@ -48,7 +48,7 @@ instance PrettyBy (PrettyConfigReadable configName) (Kind a) where
 
 instance
         ( PrettyReadableBy configName tyname
-        , Pretty (SomeTypeIn uni)
+        , Pretty (SomeHead uni)
         ) => PrettyBy (PrettyConfigReadable configName) (Type tyname uni a) where
     prettyBy = inContextM $ \case
         TyApp _ fun arg           -> fun `juxtPrettyM` arg
@@ -68,7 +68,7 @@ instance
 instance
         ( PrettyReadableBy configName tyname
         , PrettyReadableBy configName name
-        , Pretty (SomeTypeIn uni)
+        , Pretty (SomeHead uni)
         , Closed uni, uni `Everywhere` PrettyConst
         , Pretty fun
         ) => PrettyBy (PrettyConfigReadable configName) (Term tyname name uni fun a) where

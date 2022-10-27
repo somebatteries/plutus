@@ -33,7 +33,7 @@ class HasConstant term where
 type HasConstantIn uni term = (UniOf term ~ uni, HasConstant term)
 
 -- | Wrap a Haskell value (given its explicit type tag) as a @term@.
-fromValueOf :: HasConstant term => UniOf term (Esc a) -> a -> term
+fromValueOf :: HasConstant term => UniOf term a -> a -> term
 fromValueOf uni = fromConstant . someValueOf uni
 {-# INLINE fromValueOf #-}
 

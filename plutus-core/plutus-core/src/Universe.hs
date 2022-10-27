@@ -3,3 +3,4 @@ module Universe
    ) where
 
 import Universe.Core as Export
+import Universe.Head as Export
