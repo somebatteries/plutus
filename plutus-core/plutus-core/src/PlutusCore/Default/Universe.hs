@@ -36,6 +36,7 @@ import PlutusCore.Evaluation.Result
 import Control.Applicative
 import Data.Bits (toIntegralSized)
 import Data.ByteString (ByteString)
+import Data.Functor
 import Data.Int
 import Data.IntCast (intCastEq)
 import Data.Proxy
@@ -384,24 +385,30 @@ instance Closed DefaultUni where
     encodeUni (DefaultUniList uniA)      = [7, 5] ++ encodeUni uniA
     encodeUni (DefaultUniPair uniA uniB) = [7, 7, 6] ++ encodeUni uniA ++ encodeUni uniB
     encodeUni DefaultUniData             = [8]
+    {-# INLINE encodeUni #-}
 
-    -- -- See Note [Decoding universes].
-    -- -- See Note [Stable encoding of tags].
-    -- withDecodedUni k = peelUniTag >>= \case
-    --     0 -> k DefaultUniInteger
-    --     1 -> k DefaultUniByteString
-    --     2 -> k DefaultUniString
-    --     3 -> k DefaultUniUnit
-    --     4 -> k DefaultUniBool
-    --     5 -> k DefaultUniProtoList
-    --     6 -> k DefaultUniProtoPair
-    --     7 ->
-    --         withDecodedUni @DefaultUni $ \uniF ->
-    --             withDecodedUni @DefaultUni $ \uniA ->
-    --                 withApplicable uniF uniA $
-    --                     k $ uniF `DefaultUniApply` uniA
-    --     8 -> k DefaultUniData
-    --     _ -> empty
+    -- See Note [Decoding universes].
+    -- See Note [Stable encoding of tags].
+    decodeUni = peelUniTag >>= \case
+        0 -> pure $ Some DefaultUniInteger
+        1 -> pure $ Some DefaultUniByteString
+        2 -> pure $ Some DefaultUniString
+        3 -> pure $ Some DefaultUniUnit
+        4 -> pure $ Some DefaultUniBool
+        7 -> peelUniTag >>= \case
+            5 -> do
+                Some uniA <- decodeUni
+                pure . Some $ DefaultUniList uniA
+            7 -> peelUniTag >>= \case
+                6 -> do
+                    Some uniA <- decodeUni
+                    Some uniB <- decodeUni
+                    pure . Some $ DefaultUniPair uniA uniB
+                _ -> empty
+            _ -> empty
+        8 -> pure $ Some DefaultUniData
+        _ -> empty
+    {-# INLINE decodeUni #-}
 
     bring
         :: forall constr a r proxy. DefaultUni `Everywhere` constr
@@ -414,3 +421,4 @@ instance Closed DefaultUni where
     bring p (DefaultUniList uniA)      r = bring p uniA r
     bring p (DefaultUniPair uniA uniB) r = bring p uniA $ bring p uniB r
     bring _ DefaultUniData             r = r
+    {-# INLINE bring #-}

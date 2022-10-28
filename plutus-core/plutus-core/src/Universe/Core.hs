@@ -426,16 +426,17 @@ someValue = someValueOf knownUni
 -- someValueType :: Some (ValueOf uni) -> SomeTypeIn uni
 -- someValueType (Some (ValueOf tag _)) = SomeTypeIn tag
 
--- -- | A monad to decode types from a universe in.
--- -- We use a monad for decoding, because parsing arguments of polymorphic built-in types can peel off
--- -- an arbitrary amount of type tags from the input list of tags and so we have state, which is
--- -- convenient to handle with, well, 'StateT'.
--- newtype DecodeUniM a = DecodeUniM
---     { unDecodeUniM :: StateT [Int] Maybe a
---     } deriving newtype (Functor, Applicative, Alternative, Monad, MonadPlus, MonadFail)
+-- | A monad to decode types from a universe in.
+-- We use a monad for decoding, because parsing arguments of polymorphic built-in types can peel off
+-- an arbitrary amount of type tags from the input list of tags and so we have state, which is
+-- convenient to handle with, well, 'StateT'.
+newtype DecodeUniM a = DecodeUniM
+    { unDecodeUniM :: StateT [Int] Maybe a
+    } deriving newtype (Functor, Applicative, Alternative, Monad, MonadPlus, MonadFail)
 
--- runDecodeUniM :: [Int] -> DecodeUniM a -> Maybe (a, [Int])
--- runDecodeUniM is (DecodeUniM a) = runStateT a is
+runDecodeUniM :: [Int] -> DecodeUniM a -> Maybe (a, [Int])
+runDecodeUniM is (DecodeUniM a) = runStateT a is
+{-# INLINE runDecodeUniM #-}
 
 -- | A universe is 'Closed', if it's known how to constrain every type from the universe and
 -- every type can be encoded to / decoded from a sequence of integer tags.
@@ -457,8 +458,8 @@ class Closed uni where
     -- The opposite of 'decodeUni'.
     encodeUni :: uni a -> [Int]
 
-    -- -- | Decode a type and feed it to the continuation.
-    -- withDecodedUni :: (forall k (a :: k). Typeable k => uni a -> DecodeUniM r) -> DecodeUniM r
+    -- | Decode a type and feed it to the continuation.
+    decodeUni :: DecodeUniM (Some uni)
 
     -- | Bring a @constr a@ instance in scope, provided @a@ is a type from the universe and
     -- @constr@ holds for any type from the universe.
@@ -471,15 +472,16 @@ class Closed uni where
 --     (x, []) <- runDecodeUniM is $ withDecodedUni $ pure . SomeTypeIn . Kinded
 --     pure x
 
--- -- >>> runDecodeUniM [1,2,3] peelUniTag
--- -- Just (1,[2,3])
--- -- >>> runDecodeUniM [] peelUniTag
--- -- Nothing
--- -- | Peel off a tag from the input list of type tags.
--- peelUniTag :: DecodeUniM Int
--- peelUniTag = DecodeUniM $ do
---     i:is <- get
---     i <$ put is
+-- | Peel off a tag from the input list of type tags.
+--
+-- >>> runDecodeUniM [1,2,3] peelUniTag
+-- Just (1,[2,3])
+-- >>> runDecodeUniM [] peelUniTag
+-- Nothing
+peelUniTag :: DecodeUniM Int
+peelUniTag = DecodeUniM $ do
+    i:is <- get
+    i <$ put is
 
 -- It's not possible to return a @forall@ from a type family, let alone compute a proper
 -- quantified context, hence the boilerplate and a finite number of supported cases.
