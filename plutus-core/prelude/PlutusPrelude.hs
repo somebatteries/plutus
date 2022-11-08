@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE PatternSynonyms       #-}
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
@@ -88,6 +89,7 @@ module PlutusPrelude
     , Default (def)
     -- * Lists
     , zipExact
+    , zipExactNE
     ) where
 
 import Control.Applicative (Alternative (..), liftA2)
@@ -229,3 +231,6 @@ zipExact [] []         = Just []
 zipExact [a] [b]       = Just [(a,b)]
 zipExact (a:as) (b:bs) = (:) (a, b) <$> zipExact as bs
 zipExact _ _           = Nothing
+
+zipExactNE :: NonEmpty a -> NonEmpty b -> Maybe (NonEmpty (a,b))
+zipExactNE (a:|as) (b:|bs) = (:|) (a, b) <$> zipExact as bs

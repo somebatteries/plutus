@@ -173,7 +173,7 @@ typeCheckAgainst p plcTerm = do
     idFun <- liftQuote $ runDefT () $ do
         ty <- Lift.typeRep p
         pure $ TyInst () PLC.idFun ty
-    let applied = Apply () idFun term
+    let applied = PIR.apply () idFun term
     -- Here we use a 'Default' builtin version, because the typechecker needs
     -- to be handed a builtin version (implementation detail).
     -- See Note [Versioned builtins]

@@ -77,7 +77,8 @@ instance
     prettyBy = inContextM $ \case
         Constant _ con         -> unitDocM $ pretty con
         Builtin _ bi           -> unitDocM $ pretty bi
-        Apply _ fun arg        -> fun `juxtPrettyM` arg
+        Apply _ fun args ->
+            infixDocM juxtFixity $ \prettyL prettyR -> hsep (prettyL fun : fmap prettyR (toList args))
         Var _ name             -> prettyM name
         TyAbs _ name kind body ->
             typeBinderDocM $ \prettyBinding prettyBody ->
@@ -85,10 +86,10 @@ instance
         TyInst _ fun ty        ->
             compoundDocM juxtFixity $ \prettyIn ->
                 prettyIn ToTheLeft juxtFixity fun <+> braces (prettyIn ToTheRight botFixity ty)
-        LamAbs _ name ty body  ->
+        LamAbs _ vars body  ->
             compoundDocM binderFixity $ \prettyIn ->
                 let prettyBot x = prettyIn ToTheRight botFixity x
-                in "\\" <> parens (prettyBot name <+> ":" <+> prettyBot ty) <+> "->" <+> prettyBot body
+                in "\\" <> hsep (fmap (\(name, ty) -> parens (prettyBot name <+> ":" <+> prettyBot ty)) (toList vars)) <+> "->" <+> prettyBot body
         Unwrap _ term          ->
             sequenceDocM ToTheRight juxtFixity $ \prettyEl ->
                 "unwrap" <+> prettyEl term

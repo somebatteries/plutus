@@ -18,27 +18,20 @@
       ds
       MyMonoData
       [
-        [
-          [
-            { [ MyMonoData_match ds ] (con integer) }
-            (lam
-              default_arg0
-              (con integer)
-              (lam
-                default_arg1
-                (con integer)
-                [
-                  {
-                    [ Unit_match { (abs e (type) (error e)) Unit } ]
-                    (con integer)
-                  }
-                  { (abs e (type) (error e)) (con integer) }
-                ]
-              )
-            )
-          ]
-          (lam a (con integer) a)
-        ]
+        { [ MyMonoData_match ds ] (con integer) }
+        (lam
+          default_arg0
+          (con integer)
+          (lam
+            default_arg1
+            (con integer)
+            [
+              { [ Unit_match { (abs e (type) (error e)) Unit } ] (con integer) }
+              { (abs e (type) (error e)) (con integer) }
+            ]
+          )
+        )
+        (lam a (con integer) a)
         (lam
           default_arg0
           (con integer)

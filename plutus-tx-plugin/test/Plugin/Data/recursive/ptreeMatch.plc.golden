@@ -20,10 +20,8 @@
         ds
         [ B (con integer) ]
         [
-          [
-            { [ { B_match (con integer) } ds ] (con integer) }
-            (lam a (con integer) a)
-          ]
+          { [ { B_match (con integer) } ds ] (con integer) }
+          (lam a (con integer) a)
           (lam
             ds [ B [ [ Tuple2 (con integer) ] (con integer) ] ] (con integer 2)
           )

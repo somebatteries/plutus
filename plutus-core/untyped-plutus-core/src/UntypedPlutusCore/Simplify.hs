@@ -6,6 +6,7 @@ import UntypedPlutusCore.Core.Type
 import UntypedPlutusCore.Transform.CaseReduce
 import UntypedPlutusCore.Transform.ForceDelay
 import UntypedPlutusCore.Transform.Inline
+import UntypedPlutusCore.Transform.Multify
 
 import Control.Monad
 import Data.List
@@ -14,6 +15,7 @@ import PlutusCore.Name
 import PlutusCore.Quote
 
 import Control.Lens.TH
+import Data.Function ((&))
 
 data SimplifyOpts name a = SimplifyOpts { _soMaxSimplifierIterations  :: Int, _soInlineHints :: InlineHints name a }
   deriving stock (Show)
@@ -47,4 +49,9 @@ simplifyTerm opts = simplifyNTimes (_soMaxSimplifierIterations opts)
         simplifyNTimes n = foldl' (>=>) pure (map simplifyStep [1 .. n])
         -- generate simplification step
         simplifyStep :: Int -> Term name uni fun a -> m (Term name uni fun a)
-        simplifyStep _ term = inline (_soInlineHints opts) (caseReduce $ forceDelayCancel term)
+        simplifyStep _ term = term
+            & forceDelayCancel
+            & caseReduce
+            -- TODO: this is maximally aggressive
+            & multify
+            & inline (_soInlineHints opts)

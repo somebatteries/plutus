@@ -49,6 +49,7 @@ import PlutusCore
 import PlutusCore.Data
 import PlutusCore.Default
 import PlutusCore.Generators.NEAT.Common
+import PlutusCore.MkPlc hiding (error)
 import Text.Printf
 
 import PlutusCore.Generators.NEAT.Type
@@ -246,9 +247,9 @@ convertTerm _tns ns _ty (VarG i) =
 convertTerm tns ns (TyFunG ty1 ty2) (LamAbsG tm) = do
   ns' <- extNameState ns
   ty1' <- convertType tns (Type ()) ty1
-  LamAbs () (nameOf ns' FZ) ty1' <$> convertTerm tns ns' ty2 tm
+  lamAbs () (nameOf ns' FZ) ty1' <$> convertTerm tns ns' ty2 tm
 convertTerm tns ns ty2 (ApplyG tm1 tm2 ty1) =
-  Apply () <$> convertTerm tns ns (TyFunG ty1 ty2) tm1 <*> convertTerm tns ns ty1 tm2
+  apply () <$> convertTerm tns ns (TyFunG ty1 ty2) tm1 <*> convertTerm tns ns ty1 tm2
 convertTerm tns ns (TyForallG k ty) (TyAbsG tm) = do
   tns' <- extTyNameState tns
   TyAbs () (tynameOf tns' FZ) k <$> convertTerm tns' ns ty tm

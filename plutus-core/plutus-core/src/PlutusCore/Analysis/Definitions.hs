@@ -138,7 +138,9 @@ termDefs
     -> m ()
 termDefs = cata $ \case
     VarF ann n         -> addUsage n ann TermScope
-    LamAbsF ann n ty t -> addDef n ann TermScope >> typeDefs ty >> t
+    LamAbsF ann vars t -> do
+      for_ vars $ \(n, ty) -> addDef n ann TermScope >> typeDefs ty
+      t
     IWrapF _ pat arg t -> typeDefs pat >> typeDefs arg >> t
     TyAbsF ann tn _ t  -> addDef tn ann TypeScope >> t
     TyInstF _ t ty     -> t >> typeDefs ty

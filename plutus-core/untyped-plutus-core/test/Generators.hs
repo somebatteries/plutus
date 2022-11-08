@@ -22,6 +22,7 @@ import UntypedPlutusCore.Core.Type (Program (Program),
                                     Term (Apply, Builtin, Constant, Delay, Error, Force, LamAbs, Var))
 import UntypedPlutusCore.Parser (SourcePos, parseProgram, parseTerm)
 
+import Data.List.NonEmpty qualified as NE
 import Data.Text (Text)
 import Data.Text qualified as T
 
@@ -46,15 +47,15 @@ compareName = (==) `on` _nameText
 compareTerm
     :: (GEq uni, Closed uni, uni `Everywhere` Eq, Eq fun, Eq a)
     => Term Name uni fun a -> Term Name uni fun a -> Bool
-compareTerm (Var _ n) (Var _ n')              = compareName n n'
-compareTerm (LamAbs _ n t) (LamAbs _ n' t')   = compareName n n' && compareTerm t t'
-compareTerm (Apply _ t t'') (Apply _ t' t''') = compareTerm t t' && compareTerm t'' t'''
-compareTerm (Force _ t ) (Force _ t')         = compareTerm t t'
-compareTerm (Delay _ t ) (Delay _ t')         = compareTerm t t'
-compareTerm (Constant _ x) (Constant _ y)     = x == y
-compareTerm (Builtin _ bi) (Builtin _ bi')    = bi == bi'
-compareTerm (Error _ ) (Error _ )             = True
-compareTerm _ _                               = False
+compareTerm (Var _ n) (Var _ n')                  = compareName n n'
+compareTerm (LamAbs _ vars t) (LamAbs _ vars' t') = and (NE.zipWith compareName vars vars') && compareTerm t t'
+compareTerm (Apply _ t args) (Apply _ t' args')   = compareTerm t t' && and (NE.zipWith compareTerm args args')
+compareTerm (Force _ t ) (Force _ t')             = compareTerm t t'
+compareTerm (Delay _ t ) (Delay _ t')             = compareTerm t t'
+compareTerm (Constant _ x) (Constant _ y)         = x == y
+compareTerm (Builtin _ bi) (Builtin _ bi')        = bi == bi'
+compareTerm (Error _ ) (Error _ )                 = True
+compareTerm _ _                                   = False
 
 compareProgram
     :: (GEq uni, Closed uni, uni `Everywhere` Eq, Eq fun, Eq a)

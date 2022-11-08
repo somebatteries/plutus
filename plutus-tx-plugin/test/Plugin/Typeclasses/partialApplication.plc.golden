@@ -47,46 +47,41 @@
           (con integer)
           {
             [
-              [
-                {
+              {
+                [
+                  Bool_match
                   [
-                    Bool_match
                     [
-                      [
-                        [ { ifThenElse Bool } [ [ equalsInteger eta ] eta ] ]
-                        True
-                      ]
-                      False
+                      [ { ifThenElse Bool } [ [ equalsInteger eta ] eta ] ] True
                     ]
+                    False
                   ]
-                  (all dead (type) Ordering)
-                }
-                (abs dead (type) EQ)
-              ]
+                ]
+                (all dead (type) Ordering)
+              }
+              (abs dead (type) EQ)
               (abs
                 dead
                 (type)
                 {
                   [
-                    [
-                      {
+                    {
+                      [
+                        Bool_match
                         [
-                          Bool_match
                           [
                             [
-                              [
-                                { ifThenElse Bool }
-                                [ [ lessThanEqualsInteger eta ] eta ]
-                              ]
-                              True
+                              { ifThenElse Bool }
+                              [ [ lessThanEqualsInteger eta ] eta ]
                             ]
-                            False
+                            True
                           ]
+                          False
                         ]
-                        (all dead (type) Ordering)
-                      }
-                      (abs dead (type) LT)
-                    ]
+                      ]
+                      (all dead (type) Ordering)
+                    }
+                    (abs dead (type) LT)
                     (abs dead (type) GT)
                   ]
                   (all dead (type) dead)

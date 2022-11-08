@@ -37,7 +37,7 @@ viewApp :: Term tyname name uni fun ann
         -> Maybe (Term tyname name uni fun ann, [Either (Type tyname uni ann) (Term tyname name uni fun ann)])
 viewApp t = go t []
   where
-    go (Apply _ t s)  args = go t (Right s : args)
+    go (Apply _ t as) args = go t (fmap Right (toList as) ++ args)
     go (TyInst _ t a) args = go t (Left a : args)
     go t args              = if null args then Nothing else Just (t, args)
 
@@ -51,8 +51,8 @@ viewTyAbs _         = Nothing
 -- | Split a term abstraction into it's possible components.
 viewLam :: Term tyname name uni fun ann -> Maybe ([VarDecl tyname name uni ()], Term tyname name uni fun ann)
 viewLam t@LamAbs{} = Just (go t)
-  where go (LamAbs _ n t b) = first ((VarDecl () n (void t)):) $ go b
-        go t                = ([], t)
+  where go (LamAbs _ vars b) = first (fmap (\(n, t) -> VarDecl () n (void t)) (toList vars) ++) $ go b
+        go t                 = ([], t)
 viewLam _          = Nothing
 
 -- | Split a let into a sequence of lets and its remaining body

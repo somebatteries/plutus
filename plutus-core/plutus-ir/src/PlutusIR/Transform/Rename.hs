@@ -29,6 +29,7 @@ import PlutusCore.Rename.Internal qualified as PLC
 
 import Control.Monad.Reader
 import Control.Monad.Trans.Cont (ContT (..))
+import Data.List.NonEmpty qualified as NE
 
 {- Note [Renaming of mutually recursive bindings]
 The 'RenameM' monad is a newtype wrapper around @ReaderT renaming Quote@, so in order to bring
@@ -360,11 +361,14 @@ renameTermM = \case
     TyAbs x name kind body ->
         PLC.withFreshenedName name $ \nameFr ->
             TyAbs x nameFr kind <$> renameTermM body
-    LamAbs x name ty body ->
-        PLC.withFreshenedName name $ \nameFr ->
-            LamAbs x nameFr <$> PLC.renameTypeM ty <*> renameTermM body
-    Apply x fun arg ->
-        Apply x <$> renameTermM fun <*> renameTermM arg
+    LamAbs x vars body ->
+        -- TODO: gross
+        PLC.withFreshenedNames (fmap fst vars) $ \names' -> do
+            tys' <- traverse PLC.renameTypeM (fmap snd vars)
+            body' <- renameTermM body
+            pure $ LamAbs x (NE.zip names' tys') body'
+    Apply x fun args ->
+        Apply x <$> renameTermM fun <*> traverse renameTermM args
     Constant x con ->
         pure $ Constant x con
     Builtin x bi ->

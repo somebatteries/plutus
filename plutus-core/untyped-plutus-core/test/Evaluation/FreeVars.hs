@@ -121,7 +121,7 @@ unit = mkConstant @() () ()
 
 -- a helper to intro a lam, debruijn binders are always 0-indexed
 mkLam :: (t ~ UPLC.Term DeBruijn DefaultUni DefaultFun ()) => t -> t
-mkLam = LamAbs () (DeBruijn 0)
+mkLam = LamAbs () (pure $ DeBruijn 0)
 
 -- a sufficient large debruijn index for testing
 outOfScope :: UPLC.Term DeBruijn DefaultUni DefaultFun ()
@@ -160,7 +160,8 @@ testDischargeFree = testCase "discharge" $ do
     -- y is discharged from the env
     -- outOfScope is free so it is left alone
     -- dis( y:unit |- \x-> x y outOfScope) ) === (\x -> x unit outOfScope)
-    dis (VLamAbs (fakeNameDeBruijn $ DeBruijn 0)
+    dis (VLam 1 (pure $ fakeNameDeBruijn $ DeBruijn 0)
+         (Env.cons (VCon $ someValue ()) Env.empty)
          (n
          (mkIterApp ()
            (Var () (DeBruijn 1))
@@ -169,7 +170,6 @@ testDischargeFree = testCase "discharge" $ do
            ]
          )
          )
-         (Env.cons (VCon $ someValue ()) Env.empty)
         )
         @?= n (mkLam $ mkIterApp ()
                           (Var () (DeBruijn 1))

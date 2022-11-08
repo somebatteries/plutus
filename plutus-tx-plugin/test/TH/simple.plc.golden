@@ -12,9 +12,7 @@
     (lam
       ds
       Bool
-      [
-        [ { [ Bool_match ds ] (con integer) } (con integer 1) ] (con integer 2)
-      ]
+      [ { [ Bool_match ds ] (con integer) } (con integer 1) (con integer 2) ]
     )
   )
 )

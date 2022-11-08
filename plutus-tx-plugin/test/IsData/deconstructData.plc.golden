@@ -139,54 +139,46 @@
                     (vardecl nilCase [ Maybe [ [ Tuple2 a ] b ] ])
                     {
                       [
-                        [
-                          {
-                            [
-                              { Maybe_match a }
-                              [ dFromData [ { head (con data) } l ] ]
-                            ]
-                            (all dead (type) [ Maybe [ [ Tuple2 a ] b ] ])
-                          }
-                          (lam
-                            ipv
-                            a
-                            (abs
-                              dead
-                              (type)
-                              {
-                                [
+                        {
+                          [
+                            { Maybe_match a }
+                            [ dFromData [ { head (con data) } l ] ]
+                          ]
+                          (all dead (type) [ Maybe [ [ Tuple2 a ] b ] ])
+                        }
+                        (lam
+                          ipv
+                          a
+                          (abs
+                            dead
+                            (type)
+                            {
+                              [
+                                {
                                   [
-                                    {
-                                      [
-                                        { Maybe_match b }
-                                        [ dFromData [ { head (con data) } l ] ]
-                                      ]
-                                      (all
-                                        dead (type) [ Maybe [ [ Tuple2 a ] b ] ]
-                                      )
-                                    }
-                                    (lam
-                                      ipv
-                                      b
-                                      (abs
-                                        dead
-                                        (type)
-                                        [
-                                          { Just [ [ Tuple2 a ] b ] }
-                                          [ [ { { Tuple2 a } b } ipv ] ipv ]
-                                        ]
-                                      )
-                                    )
+                                    { Maybe_match b }
+                                    [ dFromData [ { head (con data) } l ] ]
                                   ]
+                                  (all dead (type) [ Maybe [ [ Tuple2 a ] b ] ])
+                                }
+                                (lam
+                                  ipv
+                                  b
                                   (abs
-                                    dead (type) { Nothing [ [ Tuple2 a ] b ] }
+                                    dead
+                                    (type)
+                                    [
+                                      { Just [ [ Tuple2 a ] b ] }
+                                      [ [ { { Tuple2 a } b } ipv ] ipv ]
+                                    ]
                                   )
-                                ]
-                                (all dead (type) dead)
-                              }
-                            )
+                                )
+                                (abs dead (type) { Nothing [ [ Tuple2 a ] b ] })
+                              ]
+                              (all dead (type) dead)
+                            }
                           )
-                        ]
+                        )
                         (abs dead (type) { Nothing [ [ Tuple2 a ] b ] })
                       ]
                       (all dead (type) dead)

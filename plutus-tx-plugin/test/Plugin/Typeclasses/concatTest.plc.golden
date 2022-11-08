@@ -91,10 +91,8 @@
                       [ List a ]
                       {
                         [
-                          [
-                            { [ { Nil_match a } eta ] (all dead (type) m) }
-                            (abs dead (type) [ { mempty m } dMonoid ])
-                          ]
+                          { [ { Nil_match a } eta ] (all dead (type) m) }
+                          (abs dead (type) [ { mempty m } dMonoid ])
                           (lam
                             x
                             a

@@ -183,11 +183,11 @@ treeNode = runQuote $ normalizeTypesIn =<< do
     Normalized forestA <- normalizeType $ TyApp () forest vA
     return
         . TyAbs () a (Type ())
-        . LamAbs () x vA
-        . LamAbs () fr forestA
+        . lamAbs () x vA
+        . lamAbs () fr forestA
         . wrapTree [vA]
         . TyAbs () r (Type ())
-        . LamAbs () f (mkIterTyFun () [vA, forestA] vR)
+        . lamAbs () f (mkIterTyFun () [vA, forestA] vR)
         $ mkIterApp () (Var () f)
             [ Var () x
             , Var () fr
@@ -213,8 +213,8 @@ forestNil = runQuote $ normalizeTypesIn =<< do
         . TyAbs () a (Type ())
         . wrapForest [vA]
         . TyAbs () r (Type ())
-        . LamAbs () z vR
-        . LamAbs () f (mkIterTyFun () [treeA, forestA] vR)
+        . lamAbs () z vR
+        . lamAbs () f (mkIterTyFun () [treeA, forestA] vR)
         $ Var () z
 
 -- |
@@ -237,12 +237,12 @@ forestCons = runQuote $ normalizeTypesIn =<< do
     Normalized forestA <- normalizeType $ TyApp () forest vA
     return
         . TyAbs () a (Type ())
-        . LamAbs () tr treeA
-        . LamAbs () fr forestA
+        . lamAbs () tr treeA
+        . lamAbs () fr forestA
         . wrapForest [vA]
         . TyAbs () r (Type ())
-        . LamAbs () z vR
-        . LamAbs () f (mkIterTyFun () [treeA, forestA] vR)
+        . lamAbs () z vR
+        . lamAbs () f (mkIterTyFun () [treeA, forestA] vR)
         $ mkIterApp () (Var () f)
             [ Var () tr
             , Var () fr

@@ -38,18 +38,21 @@ module PlutusCore.MkPlc
     , mkIterTyForall
     , mkIterTyLam
     , mkIterApp
+    , mkMultiApp
     , mkIterTyFun
     , mkIterLamAbs
+    , mkMultiLamAbs
     , mkIterInst
     , mkIterTyAbs
     , mkIterTyApp
     , mkIterKindArrow
     ) where
 
+import Data.List.NonEmpty qualified as NE
 import PlutusPrelude
 import Prelude hiding (error)
 
-import PlutusCore.Core
+import PlutusCore.Core.Type
 
 import Universe
 
@@ -58,7 +61,9 @@ class TermLike term tyname name uni fun | term -> tyname name uni fun where
     var      :: ann -> name -> term ann
     tyAbs    :: ann -> tyname -> Kind ann -> term ann -> term ann
     lamAbs   :: ann -> name -> Type tyname uni ann -> term ann -> term ann
+    multiLamAbs   :: ann -> NE.NonEmpty (name, Type tyname uni ann) -> term ann -> term ann
     apply    :: ann -> term ann -> term ann -> term ann
+    multiApply    :: ann -> term ann -> NE.NonEmpty (term ann) -> term ann
     constant :: ann -> Some (ValueOf uni) -> term ann
     builtin  :: ann -> fun -> term ann
     tyInst   :: ann -> term ann -> Type tyname uni ann -> term ann
@@ -103,8 +108,10 @@ mkConstant ann = constant ann . someValue
 instance TermLike (Term tyname name uni fun) tyname name uni fun where
     var      = Var
     tyAbs    = TyAbs
-    lamAbs   = LamAbs
-    apply    = Apply
+    lamAbs a n ty = LamAbs a (NE.singleton (n, ty))
+    multiLamAbs   = LamAbs
+    apply a f arg = Apply a f (NE.singleton arg)
+    multiApply    = Apply
     constant = Constant
     builtin  = Builtin
     tyInst   = TyInst
@@ -118,8 +125,8 @@ embed :: TermLike term tyname name uni fun => Term tyname name uni fun ann -> te
 embed = \case
     Var a n           -> var a n
     TyAbs a tn k t    -> tyAbs a tn k (embed t)
-    LamAbs a n ty t   -> lamAbs a n ty (embed t)
-    Apply a t1 t2     -> apply a (embed t1) (embed t2)
+    LamAbs a vars t   -> multiLamAbs a vars (embed t)
+    Apply a t1 t2     -> multiApply a (embed t1) (fmap embed t2)
     Constant a c      -> constant a c
     Builtin a bi      -> builtin a bi
     TyInst a t ty     -> tyInst a (embed t) ty
@@ -218,6 +225,17 @@ mkIterApp
     -> term ann -- ^ @[f x0 ... xn ]@
 mkIterApp ann = foldl' (apply ann)
 
+-- | Make an iterated application.
+mkMultiApp
+    :: TermLike term tyname name uni fun
+    => ann
+    -> term ann -- ^ @f@
+    -> [term ann] -- ^@[ x0 ... xn ]@
+    -> term ann -- ^ @[f x0 ... xn ]@
+mkMultiApp ann fun args = case NE.nonEmpty args of
+    Just args' -> multiApply ann fun args'
+    Nothing    -> fun
+
 -- | Make an iterated instantiation.
 mkIterInst
     :: TermLike term tyname name uni fun
@@ -235,6 +253,20 @@ mkIterLamAbs
     -> term ann
 mkIterLamAbs args body =
     foldr (\(VarDecl ann name ty) acc -> lamAbs ann name ty acc) body args
+
+-- | Lambda abstract a list of names.
+mkMultiLamAbs
+    :: TermLike term tyname name uni fun
+    => [VarDecl tyname name uni ann]
+    -> term ann
+    -> term ann
+mkMultiLamAbs args body = case NE.nonEmpty args of
+    Just vds ->
+        let
+            ann = _varDeclAnn $ NE.head vds
+            vars = fmap (\(VarDecl _ n ty) -> (n, ty)) vds
+        in multiLamAbs ann vars body
+    Nothing -> body
 
 -- | Type abstract a list of names.
 mkIterTyAbs

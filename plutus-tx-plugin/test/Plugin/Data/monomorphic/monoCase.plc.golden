@@ -15,13 +15,9 @@
       ds
       MyMonoData
       [
-        [
-          [
-            { [ MyMonoData_match ds ] (con integer) }
-            (lam ds (con integer) (lam b (con integer) b))
-          ]
-          (lam a (con integer) a)
-        ]
+        { [ MyMonoData_match ds ] (con integer) }
+        (lam ds (con integer) (lam b (con integer) b))
+        (lam a (con integer) a)
         (lam a (con integer) a)
       ]
     )

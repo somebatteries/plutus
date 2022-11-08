@@ -12,6 +12,7 @@ import PlutusTx.PIRTypes
 
 import GHC.Plugins qualified as GHC
 
+import PlutusCore.MkPlc qualified as PLC
 import PlutusIR qualified as PIR
 
 import Control.Monad.Reader
@@ -81,7 +82,7 @@ mkLamAbsScoped ::
     GHC.Var ->
     m (PIRTerm uni fun) ->
     m (PIRTerm uni fun)
-mkLamAbsScoped v body = withVarScoped v $ \(PIR.VarDecl _ n t) -> PIR.LamAbs AnnOther n t <$> body
+mkLamAbsScoped v body = withVarScoped v $ \(PIR.VarDecl _ n t) -> PLC.lamAbs AnnOther n t <$> body
 
 mkIterLamAbsScoped :: CompilingDefault uni fun m ann => [GHC.Var] -> m (PIRTerm uni fun) -> m (PIRTerm uni fun)
 mkIterLamAbsScoped vars body = foldr (\v acc -> mkLamAbsScoped v acc) body vars

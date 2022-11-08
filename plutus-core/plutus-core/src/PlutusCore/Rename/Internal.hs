@@ -19,6 +19,7 @@ import PlutusCore.Quote
 import PlutusCore.Rename.Monad as Export
 
 import Control.Monad.Reader
+import Data.List.NonEmpty qualified as NE
 
 -- | A wrapper for signifying that the value inside of it satisfies global uniqueness.
 --
@@ -91,13 +92,17 @@ renameTypeM ty@TyBuiltin{}              = pure ty
 renameTermM
     :: (HasUniques (Term tyname name uni fun ann), MonadQuote m, MonadReader ScopedRenaming m)
     => Term tyname name uni fun ann -> m (Term tyname name uni fun ann)
-renameTermM (LamAbs ann name ty body)  =
-    withFreshenedName name $ \nameFr -> LamAbs ann nameFr <$> renameTypeM ty <*> renameTermM body
+renameTermM (LamAbs ann vars body)  =
+    -- TODO: gross
+    withFreshenedNames (fmap fst vars) $ \names' -> do
+        tys' <- traverse renameTypeM (fmap snd vars)
+        body' <- renameTermM body
+        pure $ LamAbs ann (NE.zip names' tys') body'
 renameTermM (TyAbs ann name kind body) =
     withFreshenedName name $ \nameFr -> TyAbs ann nameFr kind <$> renameTermM body
 renameTermM (IWrap ann pat arg term)   =
     IWrap ann <$> renameTypeM pat <*> renameTypeM arg <*> renameTermM term
-renameTermM (Apply ann fun arg)        = Apply ann <$> renameTermM fun <*> renameTermM arg
+renameTermM (Apply ann fun args)        = Apply ann <$> renameTermM fun <*> traverse renameTermM args
 renameTermM (Unwrap ann term)          = Unwrap ann <$> renameTermM term
 renameTermM (Error ann ty)             = Error ann <$> renameTypeM ty
 renameTermM (TyInst ann term ty)       = TyInst ann <$> renameTermM term <*> renameTypeM ty

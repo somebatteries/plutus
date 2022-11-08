@@ -72,9 +72,9 @@ mkShad = runQuote $ do
     return
         . TyAbs () a (Type ())
         . IWrap () shadF (TyVar () a)
-        . LamAbs () x (TyVar () a)
+        . lamAbs () x (TyVar () a)
         . TyAbs () f (KindArrow () (Type ()) $ Type ())
-        . LamAbs () y (TyApp () (TyVar () f) $ TyVar () a)
+        . lamAbs () y (TyApp () (TyVar () f) $ TyVar () a)
         $ mkConstant @Integer () 0
 
 -- |
@@ -123,6 +123,6 @@ runRecUnit = runQuote $ do
     ru <- freshName "ru"
     return
         . TyAbs () a (Type ())
-        . LamAbs () ru recUnit
-        . Apply () (TyInst () (Unwrap () $ Var () ru) $ TyVar () a)
+        . lamAbs () ru recUnit
+        . apply () (TyInst () (Unwrap () $ Var () ru) $ TyVar () a)
         $ Var () ru

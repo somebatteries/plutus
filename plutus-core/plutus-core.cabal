@@ -6,8 +6,6 @@ license-files:
   LICENSE
   NOTICE
 
-maintainer:         michael.peyton-jones@iohk.io
-author:             Plutus Core Team
 synopsis:           Language library for Plutus Core
 description:        Pretty-printer, parser, and typechecker for Plutus Core.
 category:           Language, Plutus
@@ -271,6 +269,7 @@ library
     UntypedPlutusCore.Transform.CaseReduce
     UntypedPlutusCore.Transform.ForceDelay
     UntypedPlutusCore.Transform.Inline
+    UntypedPlutusCore.Transform.Multify
 
   -- Bound on cardano-crypto-class for the fixed SECP primitives
   build-depends:
@@ -311,6 +310,7 @@ library
     , monoidal-containers
     , mtl
     , multiset
+    , nonempty-vector
     , nothunks                    >=0.1.1
     , parser-combinators          >=0.4.0
     , prettyprinter               >=1.1.0.1

@@ -9,6 +9,7 @@ import PlutusIR
 import PlutusIR.Transform.Rename ()
 import PlutusIR.Transform.Substitute
 
+import PlutusCore.MkPlc
 import PlutusCore.Quote
 
 import Control.Lens hiding (Strict)
@@ -83,10 +84,10 @@ strictifyBindingWithUnit = \case
         -- We use an empty product as our unit here
         let unitTy = TySum ann [TyProd ann []]
             unitval = Constr ann unitTy 0 []
-            forced = Apply ann (Var ann name) unitval
+            forced = apply ann (Var ann name) unitval
 
         -- See Note [Compiling non-strict bindings]
         modify $ Map.insert name forced
 
-        pure $ TermBind x Strict (VarDecl x' name (TyFun ann unitTy ty)) (LamAbs ann argName unitTy rhs)
+        pure $ TermBind x Strict (VarDecl x' name (TyFun ann unitTy ty)) (lamAbs ann argName unitTy rhs)
     x -> pure x

@@ -62,10 +62,10 @@ termMapNames f = go
         -- This is all a bit clunky because of the type-changing, I'm not sure of a nicer way to do it
         go :: Term name uni fun ann -> Term name' uni fun ann
         go = \case
-            LamAbs ann name body -> LamAbs ann (f name) (go body)
+            LamAbs ann vars body -> LamAbs ann (fmap f vars) (go body)
             Var ann name         -> Var ann (f name)
 
-            Apply ann t1 t2      -> Apply ann (go t1) (go t2)
+            Apply ann t1 t2      -> Apply ann (go t1) (fmap go t2)
             Delay ann t          -> Delay ann (go t)
             Force ann t          -> Force ann (go t)
             Constr ann i es      -> Constr ann i (fmap go es)

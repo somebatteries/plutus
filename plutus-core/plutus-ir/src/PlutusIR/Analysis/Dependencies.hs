@@ -27,6 +27,7 @@ import Data.Set qualified as Set
 import Data.List.NonEmpty qualified as NE
 
 import Data.Foldable
+import Data.Traversable (for)
 
 type StrictnessMap = Map.Map PLC.Unique Strictness
 type DepState = StrictnessMap
@@ -215,12 +216,13 @@ termDeps = \case
         bodyGraph <- termDeps t
         pure . G.overlays . NE.toList $ bodyGraph NE.<| bGraphs
     Var _ n -> currentDependsOn [n ^. PLC.theUnique]
-    LamAbs _ n ty t -> do
-        -- Record that lambda-bound variables are strict
-        modify (Map.insert (n ^. PLC.theUnique) Strict)
+    LamAbs _ vars t -> do
+        allTyDs <- for vars $ \(n, ty) -> do
+            -- Record that lambda-bound variables are strict
+            modify (Map.insert (n ^. PLC.theUnique) Strict)
+            typeDeps ty
         tds <- termDeps t
-        tyds <- typeDeps ty
-        pure $ G.overlays [tds, tyds]
+        pure $ G.overlays (tds:toList allTyDs)
     x -> do
         tds <- traverse termDeps (x ^.. termSubterms)
         tyds <- traverse typeDeps (x ^.. termSubtypes)

@@ -1,3 +1,4 @@
+-- editorconfig-checker-disable-file
 {-# LANGUAGE DerivingStrategies    #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE LambdaCase            #-}
@@ -28,10 +29,12 @@ import PlutusCore.DeBruijn.Internal
 import PlutusCore.Name
 import PlutusCore.Quote
 import UntypedPlutusCore.Core
+import UntypedPlutusCore.MkUPlc qualified as UPLC
 
 import Control.Lens hiding (Index, Level, index)
 import Control.Monad.Except
 import Control.Monad.Reader
+import Data.List.NonEmpty
 
 {- Note [Comparison with typed deBruijn conversion]
 This module is just a boring port of the typed version.
@@ -78,11 +81,15 @@ deBruijnTermWithM h = go
        -- variable case
        Var ann n -> Var ann <$> nameToDeBruijn h n
        -- binder cases
-       LamAbs ann n t -> declareUnique n $ do
-           n' <- nameToDeBruijn h n
-           withScope $ LamAbs ann n' <$> go t
+       LamAbs ann vars t -> handleVars (toList vars) []
+          where
+            handleVars [] newVars = UPLC.mkMultiLamAbs (fmap (\n -> UVarDecl ann n) $ Prelude.reverse newVars) <$> go t
+            handleVars (n:vs) vars' = declareUnique n $ do
+                n' <- nameToDeBruijn h n
+                withScope $ do
+                  handleVars vs (n':vars')
        -- boring recursive cases
-       Apply ann t1 t2 -> Apply ann <$> go t1 <*> go t2
+       Apply ann t1 t2 -> Apply ann <$> go t1 <*> traverse go t2
        Delay ann t -> Delay ann <$> go t
        Force ann t -> Force ann <$> go t
        Constr ann i es -> Constr ann i <$> traverse go es
@@ -104,13 +111,16 @@ unDeBruijnTermWithM h = go
         -- variable case
         Var ann n -> Var ann <$> deBruijnToName h n
         -- binder cases
-        LamAbs ann n t ->
+        LamAbs ann vars t -> handleVars (toList vars) []
+          where
+            handleVars [] newVars = UPLC.mkMultiLamAbs (fmap (\n -> UVarDecl ann n) $ Prelude.reverse newVars) <$> go t
             -- See NOTE: [DeBruijn indices of Binders]
-            declareBinder $ do
-              n' <- deBruijnToName h $ set index deBruijnInitIndex n
-              withScope $ LamAbs ann n' <$> go t
+            handleVars (n:vs) vars' = declareBinder $ do
+                n' <- deBruijnToName h $ set index deBruijnInitIndex n
+                withScope $ do
+                  handleVars vs (n':vars')
         -- boring recursive cases
-        Apply ann t1 t2 -> Apply ann <$> go t1 <*> go t2
+        Apply ann t1 t2 -> Apply ann <$> go t1 <*> traverse go t2
         Delay ann t -> Delay ann <$> go t
         Force ann t -> Force ann <$> go t
         Constr ann i es -> Constr ann i <$> traverse go es

@@ -99,8 +99,8 @@ selfApply = runQuote $ do
     x <- freshName "x"
     return
         . TyAbs () a (Type ())
-        . LamAbs () x (TyVar () a)
-        . Apply () (Var () x)
+        . lamAbs () x (TyVar () a)
+        . apply () (Var () x)
         $ Var () x
 
 -- | For checking that attempting to reference a type variable whose name got shadowed results in a
@@ -118,8 +118,8 @@ mismatchTyName =
 mismatchName :: Term TyName Name DefaultUni fun ()
 mismatchName =
     let toName txt = Name txt (Unique 0) in
-        LamAbs () (toName "x") (mkTyBuiltin @_ @Integer ())
-      . LamAbs () (toName "y") (mkTyBuiltin @_ @Integer ())
+        lamAbs () (toName "x") (mkTyBuiltin @_ @Integer ())
+      . lamAbs () (toName "y") (mkTyBuiltin @_ @Integer ())
       $ Var () (toName "x")
 
 test_typecheckIllTyped :: TestTree

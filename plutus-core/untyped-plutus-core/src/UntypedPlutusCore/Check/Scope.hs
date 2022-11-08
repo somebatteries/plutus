@@ -10,6 +10,7 @@ import UntypedPlutusCore.DeBruijn as UPLC
 
 import Control.Monad.Error.Lens
 import Control.Monad.Except
+import Data.Foldable (for_)
 
 {- | A pass to check that the input term:
 1) does not contain free variables and
@@ -41,13 +42,14 @@ checkScope = go 0
             -- var index must be LEQ to the current level
             unless (i > 0 && fromIntegral i <= lvl) $
                 throwing _FreeVariableError $ FreeIndex i
-        LamAbs _ binder t  -> do
-            let bIx = binder^.index
-            -- binder index must be equal to 0
-            unless (bIx == 0) $
-                throwing _FreeVariableError $ FreeIndex bIx
-            go (lvl+1) t
-        Apply _ t1 t2 -> go lvl t1 >> go lvl t2
+        LamAbs _ vars t  -> do
+            for_ vars $ \var -> do
+                let bIx = var^.index
+                -- binder index must be equal to 0
+                unless (bIx == 0) $
+                    throwing _FreeVariableError $ FreeIndex bIx
+            go (lvl+(fromIntegral $ length vars)) t
+        Apply _ t1 t2 -> go lvl t1 >> mapM_ (go lvl) t2
         Force _ t     -> go lvl t
         Delay _ t     -> go lvl t
         _             -> pure ()

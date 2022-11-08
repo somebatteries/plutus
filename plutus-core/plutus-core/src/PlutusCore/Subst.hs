@@ -156,11 +156,10 @@ termSubstClosedTerm
     -> Term tyname name uni fun a
 termSubstClosedTerm varFor new = go where
     go = \case
-         Var    a var         -> if var == varFor then new else Var a var
-         LamAbs a var ty body -> LamAbs a var ty (goUnder var body)
-         t                    -> t & over termSubterms go
-    goUnder var term = if var == varFor then term else go term
-
+         Var    a var       -> if var == varFor then new else Var a var
+         LamAbs a vars body -> LamAbs a vars (goUnder (fmap fst vars) body)
+         t                  -> t & over termSubterms go
+    goUnder vars term = if any (\var -> var == varFor) vars then term else go term
 -- Free variables
 
 -- | Get all the free term variables in a term.
@@ -170,7 +169,8 @@ fvTerm = fvTermCtx mempty
 fvTermCtx :: Ord name => Set.Set name -> Traversal' (Term tyname name uni fun ann) name
 fvTermCtx bound f = \case
     Var a n         -> Var a <$> (if Set.member n bound then pure n else f n)
-    LamAbs a n ty t -> LamAbs a n ty <$> fvTermCtx (Set.insert n bound) f t
+    LamAbs a vars t -> LamAbs a vars <$> fvTermCtx extended f t
+      where extended = Prelude.foldr Set.insert bound (fmap fst vars)
     t               -> (termSubterms . fvTermCtx bound) f t
 
 -- | Get all the free type variables in a term.

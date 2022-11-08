@@ -21,6 +21,7 @@ module PlutusCore.Generators.Hedgehog.AST
 import PlutusPrelude
 
 import PlutusCore
+import PlutusCore.MkPlc
 import PlutusCore.Subst
 
 import Control.Lens (coerced)
@@ -117,8 +118,8 @@ genTerm = simpleRecursive nonRecursive recursive where
     varGen = Var () <$> genName
     absGen = TyAbs () <$> genTyName <*> genKind <*> genTerm
     instGen = TyInst () <$> genTerm <*> genType
-    lamGen = LamAbs () <$> genName <*> genType <*> genTerm
-    applyGen = Apply () <$> genTerm <*> genTerm
+    lamGen = lamAbs () <$> genName <*> genType <*> genTerm
+    applyGen = apply () <$> genTerm <*> genTerm
     unwrapGen = Unwrap () <$> genTerm
     wrapGen = IWrap () <$> genType <*> genType <*> genTerm
     errorGen = Error () <$> genType

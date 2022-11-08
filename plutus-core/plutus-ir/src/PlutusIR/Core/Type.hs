@@ -38,6 +38,7 @@ import PlutusCore.Flat ()
 import PlutusCore.MkPlc (Def (..), TermLike (..), TyVarDecl (..), VarDecl (..))
 import PlutusCore.Name qualified as PLC
 
+import Data.List.NonEmpty qualified as NE
 import Data.Text qualified as T
 
 -- Datatypes
@@ -119,8 +120,8 @@ data Term tyname name uni fun a =
                           Let a Recursivity (NonEmpty (Binding tyname name uni fun a)) (Term tyname name uni fun a)
                         | Var a name
                         | TyAbs a tyname (Kind a) (Term tyname name uni fun a)
-                        | LamAbs a name (Type tyname uni a) (Term tyname name uni fun a)
-                        | Apply a (Term tyname name uni fun a) (Term tyname name uni fun a)
+                        | LamAbs a (NonEmpty (name, Type tyname uni a)) (Term tyname name uni fun a)
+                        | Apply a (Term tyname name uni fun a) (NonEmpty (Term tyname name uni fun a))
                         | Constant a (PLC.Some (PLC.ValueOf uni))
                         | Builtin a fun
                         | TyInst a (Term tyname name uni fun a) (Type tyname uni a)
@@ -147,8 +148,10 @@ instance HasConstant (Term tyname name uni fun ()) where
 instance TermLike (Term tyname name uni fun) tyname name uni fun where
     var      = Var
     tyAbs    = TyAbs
-    lamAbs   = LamAbs
-    apply    = Apply
+    lamAbs a n ty = LamAbs a (NE.singleton (n, ty))
+    multiLamAbs   = LamAbs
+    apply a f arg = Apply a f (NE.singleton arg)
+    multiApply    = Apply
     constant = Constant
     builtin  = Builtin
     tyInst   = TyInst
@@ -177,14 +180,14 @@ applyProgram
     => Program tyname name uni fun a
     -> Program tyname name uni fun a
     -> Program tyname name uni fun a
-applyProgram (Program a1 t1) (Program a2 t2) = Program (a1 <> a2) (Apply mempty t1 t2)
+applyProgram (Program a1 t1) (Program a2 t2) = Program (a1 <> a2) (Apply mempty t1 (pure t2))
 
 termAnn :: Term tyname name uni fun a -> a
 termAnn t = case t of
   Let a _ _ _    -> a
   Var a _        -> a
   TyAbs a _ _ _  -> a
-  LamAbs a _ _ _ -> a
+  LamAbs a _ _   -> a
   Apply a _ _    -> a
   Constant a _   -> a
   Builtin a _    -> a

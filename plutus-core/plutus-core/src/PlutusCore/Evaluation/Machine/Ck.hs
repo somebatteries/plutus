@@ -44,6 +44,7 @@ import Data.Array
 import Data.DList (DList)
 import Data.DList qualified as DList
 import Data.List.Extra ((!?))
+import Data.List.NonEmpty qualified as NE
 import Data.STRef
 import Data.Text (Text)
 import Universe
@@ -57,9 +58,10 @@ instance Show (BuiltinRuntime (CkValue uni fun)) where
 data CkValue uni fun =
     VCon (Some (ValueOf uni))
   | VTyAbs TyName (Kind ()) (Term TyName Name uni fun ())
-  | VLamAbs Name (Type TyName uni ()) (Term TyName Name uni fun ())
+  | VLamAbs (NonEmpty (Name, Type TyName uni ())) (Term TyName Name uni fun ())
   | VIWrap (Type TyName uni ()) (Type TyName uni ()) (CkValue uni fun)
   | VBuiltin (Term TyName Name uni fun ()) (BuiltinRuntime (CkValue uni fun))
+  | VPap (CkValue uni fun) (NonEmpty (CkValue uni fun))
   | VConstr (Type TyName uni ()) Int [CkValue uni fun]
     deriving stock (Show)
 
@@ -79,12 +81,13 @@ evalBuiltinApp term runtime = case runtime of
 
 ckValueToTerm :: CkValue uni fun -> Term TyName Name uni fun ()
 ckValueToTerm = \case
-    VCon val             -> Constant () val
-    VTyAbs  tn k body    -> TyAbs  () tn k body
-    VLamAbs name ty body -> LamAbs () name ty body
-    VIWrap  ty1 ty2 val  -> IWrap  () ty1 ty2 $ ckValueToTerm val
-    VBuiltin term _      -> term
-    VConstr ty i es      -> Constr () ty i (fmap ckValueToTerm es)
+    VCon val            -> Constant () val
+    VTyAbs  tn k body   -> TyAbs  () tn k body
+    VLamAbs vars body   -> LamAbs () vars body
+    VIWrap  ty1 ty2 val -> IWrap  () ty1 ty2 $ ckValueToTerm val
+    VBuiltin term _     -> term
+    VPap f args         -> Apply () (ckValueToTerm f) (fmap ckValueToTerm args)
+    VConstr ty i es     -> Constr () ty i (fmap ckValueToTerm es)
 
 data CkEnv uni fun s = CkEnv
     { ckEnvRuntime    :: BuiltinsRuntime fun (CkValue uni fun)
@@ -136,8 +139,8 @@ instance HasConstant (CkValue uni fun) where
 -- CK not CEK
 -- substitution not environments
 data Frame uni fun
-    = FrameApplyFun (CkValue uni fun)                       -- ^ @[V _]@
-    | FrameApplyArg (Term TyName Name uni fun ())           -- ^ @[_ N]@
+    = FrameEvalApp [Term TyName Name uni fun ()] [CkValue uni fun] -- ^ @[A _ ...]@
+    | FrameApplyArgs (NonEmpty (CkValue uni fun)) -- ^ @[_ V ...]@
     | FrameTyInstArg (Type TyName uni ())                   -- ^ @{_ A}@
     | FrameUnwrap                                           -- ^ @(unwrap _)@
     | FrameIWrap (Type TyName uni ()) (Type TyName uni ())  -- ^ @(iwrap A B _)@
@@ -179,11 +182,11 @@ runCkM runtime emitting a = runST $ do
     :: Ix fun
     => Context uni fun -> Term TyName Name uni fun () -> CkM uni fun s (Term TyName Name uni fun ())
 stack |> TyInst  _ fun ty        = FrameTyInstArg ty  : stack |> fun
-stack |> Apply   _ fun arg       = FrameApplyArg arg  : stack |> fun
+stack |> Apply   _ fun args      = FrameEvalApp (toList args) [] : stack |> fun
 stack |> IWrap   _ pat arg term  = FrameIWrap pat arg : stack |> term
 stack |> Unwrap  _ term          = FrameUnwrap        : stack |> term
 stack |> TyAbs   _ tn k term     = stack <| VTyAbs tn k term
-stack |> LamAbs  _ name ty body  = stack <| VLamAbs name ty body
+stack |> LamAbs  _ vars body  = stack <| VLamAbs vars body
 stack |> Builtin _ bn            = do
     runtime <- asksM $ lookupBuiltin bn . ckEnvRuntime
     stack <| VBuiltin (Builtin () bn) runtime
@@ -213,8 +216,20 @@ _     |> var@Var{}               =
     => Context uni fun -> CkValue uni fun -> CkM uni fun s (Term TyName Name uni fun ())
 []                         <| val     = pure $ ckValueToTerm val
 FrameTyInstArg ty  : stack <| fun     = instantiateEvaluate stack ty fun
-FrameApplyArg arg  : stack <| fun     = FrameApplyFun fun : stack |> arg
-FrameApplyFun fun  : stack <| arg     = applyEvaluate stack fun arg
+FrameEvalApp todo done : stack <| e =
+    let done' = e:done
+    in case todo of
+        t : todo' -> FrameEvalApp todo' done' : stack |> t
+        []         -> case reverse done' of
+            -- TODO: maybe try and make these errors impossible in the types?
+            -- Or I guesss make errors for them, but they genuinely are impossible
+            -- Or carry on in one of a few ways, but that feels bad since they're
+            -- weird cases we want to notice if they happen
+            (fun:args) -> case NE.nonEmpty args of
+                Just args' -> FrameApplyArgs args' : stack <| fun
+                Nothing    -> error "impossible: no args"
+            _          -> error "impossible: no fun"
+FrameApplyArgs args  : stack <| fun   = applyEvaluate stack fun args
 FrameIWrap pat arg : stack <| value   = stack <| VIWrap pat arg value
 FrameUnwrap        : stack <| wrapped = case wrapped of
     VIWrap _ _ term -> stack <| term
@@ -227,23 +242,11 @@ FrameConstr ty i todo done : stack <| e =
         []     -> stack <| VConstr ty i (reverse done')
 FrameCase cs : stack <| e = case e of
     VConstr _ i args -> case cs !? i of
-        Just t ->
-            let (vds, body) = splitNAryLambda t
-            in case zipExact vds args of
-                Just ps ->
-                    let substed = foldl' (\term (vd, arg) -> substituteVarDecl term vd arg) body ps
-                    in stack |> substed
-                -- TODO: proper error
-                Nothing -> throwingWithCause _MachineError (WrongNumberOfCaseArgs i) (Just t)
+        Just t  -> case NE.nonEmpty args of
+            Just args' -> FrameApplyArgs args' : stack |> t
+            Nothing    -> stack |> t
         Nothing -> throwingWithCause _MachineError (MissingCaseBranch i) (Just $ ckValueToTerm e)
     _ -> throwingWithCause _MachineError NonConstrScrutinized (Just $ ckValueToTerm e)
-
-substituteVarDecl :: Term TyName Name uni fun () -> VarDecl TyName Name uni () -> CkValue uni fun -> Term TyName Name uni fun ()
-substituteVarDecl term (VarDecl _ name _) arg = termSubstClosedTerm name (ckValueToTerm arg) term
-
-splitNAryLambda :: Term TyName Name uni fun a -> ([VarDecl TyName Name uni a], Term TyName Name uni fun a)
-splitNAryLambda (LamAbs a n ty b) = let (vds, b') = splitNAryLambda b in (VarDecl a n ty:vds, b')
-splitNAryLambda b                 = ([], b)
 
 -- | Instantiate a term with a type and proceed.
 -- In case of 'TyAbs' just ignore the type. Otherwise check if the term is builtin application
@@ -281,23 +284,50 @@ applyEvaluate
     :: Ix fun
     => Context uni fun
     -> CkValue uni fun
-    -> CkValue uni fun
+    -> NonEmpty (CkValue uni fun)
     -> CkM uni fun s (Term TyName Name uni fun ())
-applyEvaluate stack (VLamAbs name _ body) arg =
-    stack |> termSubstClosedTerm name (ckValueToTerm arg) body
-applyEvaluate stack (VBuiltin term runtime) arg = do
-    let argTerm = ckValueToTerm arg
-        term' = Apply () term argTerm
-    case runtime of
-        -- It's only possible to apply a builtin application if the builtin expects a term
-        -- argument next.
-        BuiltinExpectArgument f -> do
-            res <- evalBuiltinApp term' $ f arg
-            stack <| res
-        _ ->
-            throwingWithCause _MachineError UnexpectedBuiltinTermArgumentMachineError (Just term')
-applyEvaluate _ val _ =
-    throwingWithCause _MachineError NonFunctionalApplicationMachineError $ Just $ ckValueToTerm val
+applyEvaluate stack val@(VLamAbs vars body) args =
+    let arity = length vars
+        numArgs = length args
+    in case compare arity numArgs of
+        EQ ->
+            let
+              ps = NE.zip vars args
+              substed = foldl (\t ((n, _), v) -> termSubstClosedTerm n (ckValueToTerm v) t) body ps
+            in stack |> substed
+        LT ->
+            let
+              -- Will silently stop when it reaches the end of vars, which is what we want
+              ps = NE.zip vars args
+              substed = foldl (\t ((n, _), v) -> termSubstClosedTerm n (ckValueToTerm v) t) body ps
+            in case NE.nonEmpty (NE.drop arity args) of
+              Just args' -> FrameApplyArgs args' : stack |> substed
+              -- TODO: proper error
+              -- Should be impossible: we dropped 'arity' elements but 'arity' is less
+              -- than the length of the list
+              Nothing    -> error "impossible: no args left"
+        GT -> stack <| VPap val args
+applyEvaluate stack (VPap f args1) args2 =
+    FrameApplyArgs (args1 <> args2) : stack <| f
+applyEvaluate stack (VBuiltin term runtime) args = do
+    let argTerms = fmap ckValueToTerm args
+        term' = Apply () term argTerms
+    case args of
+        arg:|remaining ->
+            case runtime of
+                -- It's only possible to apply a builtin application if the builtin expects a term
+                -- argument next.
+                BuiltinExpectArgument f -> do
+                    res <- evalBuiltinApp term' $ f arg
+                    case NE.nonEmpty remaining of
+                        Just remaining' -> FrameApplyArgs remaining' : stack <| res
+                        Nothing         -> stack <| res
+                _ -> throwingWithCause _MachineError UnexpectedBuiltinTermArgumentMachineError (Just term')
+applyEvaluate _ val args =
+    let argTerms = fmap ckValueToTerm args
+        funTerm = ckValueToTerm val
+        term = Apply () funTerm argTerms
+    in throwingWithCause _MachineError NonFunctionalApplicationMachineError $ Just term
 
 runCk
     :: Ix fun

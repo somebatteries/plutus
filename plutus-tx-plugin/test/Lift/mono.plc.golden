@@ -32,23 +32,13 @@
       (delay
         (lam
           case_Plugin_Data_Spec_Mono1_i0
-          (lam
-            case_Plugin_Data_Spec_Mono2_i0
-            (lam
-              case_Plugin_Data_Spec_Mono3_i0
-              (case
-                x_i4
-                (lam
-                  arg2_i0
-                  (lam
-                    arg1_i0
-                    [ [ case_Plugin_Data_Spec_Mono1_i5 arg2_i2 ] arg1_i1 ]
-                  )
-                )
-                (lam arg1_i0 [ case_Plugin_Data_Spec_Mono2_i3 arg1_i1 ])
-                (lam arg1_i0 [ case_Plugin_Data_Spec_Mono3_i2 arg1_i1 ])
-              )
-            )
+          case_Plugin_Data_Spec_Mono2_i0
+          case_Plugin_Data_Spec_Mono3_i0
+          (case
+            x_i4
+            case_Plugin_Data_Spec_Mono1_i3
+            case_Plugin_Data_Spec_Mono2_i2
+            case_Plugin_Data_Spec_Mono3_i1
           )
         )
       )

@@ -33,37 +33,31 @@
               [ Maybe a ]
               {
                 [
-                  [
-                    {
-                      [ { Maybe_match (fun a b) } ds ]
-                      (all dead (type) [ Maybe b ])
-                    }
-                    (lam
-                      ipv
-                      (fun a b)
-                      (abs
-                        dead
-                        (type)
-                        {
-                          [
-                            [
-                              {
-                                [ { Maybe_match a } ds ]
-                                (all dead (type) [ Maybe b ])
-                              }
-                              (lam
-                                ipv
-                                a
-                                (abs dead (type) [ { Just b } [ ipv ipv ] ])
-                              )
-                            ]
-                            (abs dead (type) { Nothing b })
-                          ]
-                          (all dead (type) dead)
-                        }
-                      )
+                  {
+                    [ { Maybe_match (fun a b) } ds ]
+                    (all dead (type) [ Maybe b ])
+                  }
+                  (lam
+                    ipv
+                    (fun a b)
+                    (abs
+                      dead
+                      (type)
+                      {
+                        [
+                          {
+                            [ { Maybe_match a } ds ]
+                            (all dead (type) [ Maybe b ])
+                          }
+                          (lam
+                            ipv a (abs dead (type) [ { Just b } [ ipv ipv ] ])
+                          )
+                          (abs dead (type) { Nothing b })
+                        ]
+                        (all dead (type) dead)
+                      }
                     )
-                  ]
+                  )
                   (abs dead (type) { Nothing b })
                 ]
                 (all dead (type) dead)
@@ -100,10 +94,8 @@
               [ Maybe a ]
               {
                 [
-                  [
-                    { [ { Maybe_match a } ds ] (all dead (type) [ Maybe b ]) }
-                    (lam a a (abs dead (type) [ { Just b } [ f a ] ]))
-                  ]
+                  { [ { Maybe_match a } ds ] (all dead (type) [ Maybe b ]) }
+                  (lam a a (abs dead (type) [ { Just b } [ f a ] ]))
                   (abs dead (type) { Nothing b })
                 ]
                 (all dead (type) dead)
@@ -247,10 +239,8 @@
                       [ List a ]
                       {
                         [
-                          [
-                            { [ { Nil_match a } eta ] (all dead (type) m) }
-                            (abs dead (type) [ { mempty m } dMonoid ])
-                          ]
+                          { [ { Nil_match a } eta ] (all dead (type) m) }
+                          (abs dead (type) [ { mempty m } dMonoid ])
                           (lam
                             x
                             a
@@ -311,12 +301,8 @@
                       [ List a ]
                       {
                         [
-                          [
-                            {
-                              [ { Nil_match a } l ] (all dead (type) [ List b ])
-                            }
-                            (abs dead (type) { Nil b })
-                          ]
+                          { [ { Nil_match a } l ] (all dead (type) [ List b ]) }
+                          (abs dead (type) { Nil b })
                           (lam
                             x
                             a
@@ -607,22 +593,18 @@
                               [ List a ]
                               {
                                 [
-                                  [
-                                    {
-                                      [ { Nil_match a } ds ]
-                                      (all dead (type) [ f [ List b ] ])
-                                    }
-                                    (abs
-                                      dead
-                                      (type)
-                                      [
-                                        {
-                                          [ { pure f } dApplicative ] [ List b ]
-                                        }
-                                        { Nil b }
-                                      ]
-                                    )
-                                  ]
+                                  {
+                                    [ { Nil_match a } ds ]
+                                    (all dead (type) [ f [ List b ] ])
+                                  }
+                                  (abs
+                                    dead
+                                    (type)
+                                    [
+                                      { [ { pure f } dApplicative ] [ List b ] }
+                                      { Nil b }
+                                    ]
+                                  )
                                   (lam
                                     x
                                     a

@@ -93,15 +93,13 @@
                                                   ds_i0
                                                   (force
                                                     [
-                                                      [
-                                                        (force
-                                                          [
-                                                            (force Nil_match_i7)
-                                                            ds_i1
-                                                          ]
-                                                        )
-                                                        (delay (force Nil_i9))
-                                                      ]
+                                                      (force
+                                                        [
+                                                          (force Nil_match_i7)
+                                                          ds_i1
+                                                        ]
+                                                      )
+                                                      (delay (force Nil_i9))
                                                       (lam
                                                         x_i0
                                                         (lam
@@ -140,10 +138,7 @@
                           x_i0
                           (delay
                             (lam
-                              case_EmptyRose_i0
-                              (case
-                                x_i2 (lam arg1_i0 [ case_EmptyRose_i2 arg1_i1 ])
-                              )
+                              case_EmptyRose_i0 (case x_i2 case_EmptyRose_i1)
                             )
                           )
                         )
@@ -162,17 +157,7 @@
             x_i0
             (delay
               (lam
-                case_Nil_i0
-                (lam
-                  case_Cons_i0
-                  (case
-                    x_i3
-                    case_Nil_i2
-                    (lam
-                      arg2_i0 (lam arg1_i0 [ [ case_Cons_i3 arg2_i2 ] arg1_i1 ])
-                    )
-                  )
-                )
+                case_Nil_i0 case_Cons_i0 (case x_i3 case_Nil_i2 case_Cons_i1)
               )
             )
           )

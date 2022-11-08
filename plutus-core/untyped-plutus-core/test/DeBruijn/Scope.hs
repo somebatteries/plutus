@@ -63,7 +63,7 @@ failTop1 :: UPLC.Term DeBruijn DefaultUni DefaultFun ()
 failTop1 = Var () (DeBruijn 1)
 
 failApply01 :: UPLC.Term DeBruijn DefaultUni DefaultFun ()
-failApply01 = timesT 5 (Apply () (timesT 10 delayforce failTop0)) (timesT 20 delayforce failTop1)
+failApply01 = timesT 5 (apply () (timesT 10 delayforce failTop0)) (timesT 20 delayforce failTop1)
 
 -- (lam0 ...n.... (Var n+1))
 okDeep0 :: Index -> UPLC.Term DeBruijn DefaultUni DefaultFun ()

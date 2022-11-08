@@ -68,8 +68,8 @@ interNil = runQuote $ do
         . TyAbs () b (Type ())
         . wrapInterList [TyVar () a, TyVar () b]
         . TyAbs () r (Type ())
-        . LamAbs () z (TyVar () r)
-        . LamAbs () f (mkIterTyFun () [TyVar () a, TyVar () b, interlistBA] $ TyVar () r)
+        . lamAbs () z (TyVar () r)
+        . lamAbs () f (mkIterTyFun () [TyVar () a, TyVar () b, interlistBA] $ TyVar () r)
         $ Var () z
 
 interCons :: Term TyName Name uni fun ()
@@ -87,13 +87,13 @@ interCons = runQuote $ do
     return
         . TyAbs () a (Type ())
         . TyAbs () b (Type ())
-        . LamAbs () x (TyVar () a)
-        . LamAbs () y (TyVar () b)
-        . LamAbs () xs interlistBA
+        . lamAbs () x (TyVar () a)
+        . lamAbs () y (TyVar () b)
+        . lamAbs () xs interlistBA
         . wrapInterList [TyVar () a, TyVar () b]
         . TyAbs () r (Type ())
-        . LamAbs () z (TyVar () r)
-        . LamAbs () f (mkIterTyFun () [TyVar () a, TyVar () b, interlistBA] $ TyVar () r)
+        . lamAbs () z (TyVar () r)
+        . lamAbs () f (mkIterTyFun () [TyVar () a, TyVar () b, interlistBA] $ TyVar () r)
         $ mkIterApp () (Var () f)
           [ Var () x
           , Var () y
@@ -129,32 +129,32 @@ foldrInterList = runQuote $ do
             $ TyVar () r
         instedFix = mkIterInst () fix [unit, fixTyArg2]
         unwrappedXs = TyInst () (Unwrap () (Var () xs)) $ TyVar () r
-        instedRec = mkIterInst () (Apply () (Var () rec) unitval) [TyVar () b, TyVar () a]
+        instedRec = mkIterInst () (apply () (Var () rec) unitval) [TyVar () b, TyVar () a]
     return
         . TyAbs () a0 (Type ())
         . TyAbs () b0 (Type ())
         . TyAbs () r (Type ())
-        . LamAbs () f (fTy a0 b0)
-        . LamAbs () z (TyVar () r)
+        . lamAbs () f (fTy a0 b0)
+        . lamAbs () z (TyVar () r)
         $ mkIterInst ()
             ( mkIterApp () instedFix
-                [   LamAbs () rec (TyFun () unit fixTyArg2)
-                  . LamAbs () u unit
+                [   lamAbs () rec (TyFun () unit fixTyArg2)
+                  . lamAbs () u unit
                   . TyAbs () a (Type ())
                   . TyAbs () b (Type ())
-                  . LamAbs () f' (fTy a b)
-                  . LamAbs () xs (interlistOf a b)
+                  . lamAbs () f' (fTy a b)
+                  . lamAbs () xs (interlistOf a b)
                   $ mkIterApp () unwrappedXs
                       [ Var () z
-                      ,    LamAbs () x (TyVar () a)
-                         . LamAbs () y (TyVar () b)
-                         . LamAbs () xs' (interlistOf b a)
+                      ,    lamAbs () x (TyVar () a)
+                         . lamAbs () y (TyVar () b)
+                         . lamAbs () xs' (interlistOf b a)
                          $ mkIterApp () (Var () f')
                              [ Var () x
                              , Var () y
                              , mkIterApp () instedRec
-                                 [    LamAbs () y' (TyVar () b)
-                                    . LamAbs () x' (TyVar () a)
+                                 [    lamAbs () y' (TyVar () b)
+                                    . lamAbs () x' (TyVar () a)
                                     $ mkIterApp () (Var () f')
                                         [ Var () x'
                                         , Var () y'

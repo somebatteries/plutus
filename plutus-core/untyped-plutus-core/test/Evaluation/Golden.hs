@@ -1,4 +1,5 @@
 -- editorconfig-checker-disable-file
+{-# LANGUAGE OverloadedLists   #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeOperators     #-}
@@ -51,8 +52,8 @@ evenAndOdd = runQuote $ do
     let eoFunc b recc = do
           n <- freshName "n"
           pure $
-              LamAbs () n nat $
-              Apply () (Apply () (TyInst () (Unwrap () (Var () n)) bool) b) $ Var () recc
+              lamAbs () n nat $
+              apply () (apply () (TyInst () (Unwrap () (Var () n)) bool) b) $ Var () recc
 
     evenF <- FunctionDef () evenn (FunctionType () nat bool) <$> eoFunc true oddd
     oddF  <- FunctionDef () oddd  (FunctionType () nat bool) <$> eoFunc false evenn
@@ -74,9 +75,9 @@ evenAndOddList = runQuote $ do
     let eoFunc recc = do
           l <- freshName "l"
           pure $
-              LamAbs () l listNat $
-              Apply () (
-                  Apply () (TyInst () (Unwrap () (Var () l)) listNat)
+              lamAbs () l listNat $
+              apply () (
+                  apply () (TyInst () (Unwrap () (Var () l)) listNat)
                   (TyInst() nil nat))
               recc
 
@@ -84,18 +85,18 @@ evenAndOddList = runQuote $ do
         h <- freshName "head"
         t <- freshName "tail"
         eoFunc $
-            LamAbs () h nat $
-            LamAbs () t listNat $
-            Apply () (Apply () (TyInst () cons nat) (Var () h)) $
-            Apply () (Var () oddd) (Var () t)
+            lamAbs () h nat $
+            lamAbs () t listNat $
+            apply () (apply () (TyInst () cons nat) (Var () h)) $
+            apply () (Var () oddd) (Var () t)
 
     oddF <- FunctionDef () oddd (FunctionType () listNat listNat) <$> do
         h <- freshName "head"
         t <- freshName "tail"
         eoFunc $
-            LamAbs () h nat $
-            LamAbs () t listNat $
-            Apply () (Var () evenn) (Var () t)
+            lamAbs () h nat $
+            lamAbs () t listNat $
+            apply () (Var () evenn) (Var () t)
 
     getMutualFixOf () (fixN 2 fixBy) [evenF, oddF]
 
@@ -119,7 +120,7 @@ closure = runQuote $ do
     i <- freshName "i"
     j <- freshName "j"
     pure
-        . Apply () (LamAbs () i integer . LamAbs () j integer $ Var () i)
+        . apply () (lamAbs () i integer . lamAbs () j integer $ Var () i)
         $ mkConstant @Integer () 1
 
 {- Tests for evaluation of builtins.  The main point of these is to check that
@@ -175,7 +176,7 @@ iteAt = TyInst () ite
 -- [ (builtin ifThenElse) (11<=22) ] : IllTypedFails (ifThenElse isn't
 -- instantiated: type expected, term supplied.)
 iteUninstantiatedWithCond :: Term TyName Name DefaultUni DefaultFun ()
-iteUninstantiatedWithCond  = Apply () ite lteExpr
+iteUninstantiatedWithCond  = apply () ite lteExpr
 
 -- (builtin ifThenElse) (11<=22) "11 <= 22" "¬(11<=22)" : IllTypedFails (no
 -- instantiation)
@@ -188,7 +189,7 @@ iteAtInteger = iteAt integer
 
 -- [ { (builtin ifThenElse) (con integer) } (11<=22)] : WellTypedRuns
 iteAtIntegerWithCond :: Term TyName Name DefaultUni DefaultFun ()
-iteAtIntegerWithCond = Apply () iteAtInteger lteExpr
+iteAtIntegerWithCond = apply () iteAtInteger lteExpr
 
 -- [ { (builtin ifThenElse) (con integer) } "11 <= 22" "¬(11<=22)" ] :
 -- IllTypedRuns.  This is ill-typed because the first term argument is a string
@@ -230,7 +231,7 @@ iteAtString = iteAt string
 
 -- [ { (builtin ifThenElse) (con string) } (11<=22) ] : WellTypedRuns
 iteAtStringWithCond :: Term TyName Name DefaultUni DefaultFun ()
-iteAtStringWithCond = Apply () iteAtString lteExpr
+iteAtStringWithCond = apply () iteAtString lteExpr
 
 -- [ { (builtin ifThenElse) (con string) } (11<=22) 33 "abc" ] : IllTypedRuns
 -- This is ill-typed because the first branch is of type @integer@ and the second branch is of type
@@ -252,7 +253,7 @@ iteAtIntegerArrowInteger = iteAt (TyFun () integer integer)
 
 -- [ { (builtin ifThenElse) (fun (con integer) (con integer)) } (11<=22) ] : WellTypedRuns
 iteAtIntegerArrowIntegerWithCond :: Term TyName Name DefaultUni DefaultFun ()
-iteAtIntegerArrowIntegerWithCond = Apply () iteAtIntegerArrowInteger lteExpr
+iteAtIntegerArrowIntegerWithCond = apply () iteAtIntegerArrowInteger lteExpr
 
 -- [ { (builtin ifThenElse) (fun (con integer) (con integer)) } (11<=22) (11 *) (22 -)] :
 -- WellTypedRuns (returns a function of type int -> int)
@@ -260,8 +261,8 @@ iteAtIntegerArrowIntegerApplied1 ::  Term TyName Name DefaultUni DefaultFun ()
 iteAtIntegerArrowIntegerApplied1 =  mkIterApp ()
                                    iteAtIntegerArrowInteger
                                    [ lteExpr
-                                   , Apply () (Builtin () MultiplyInteger) eleven
-                                   , Apply () (Builtin () SubtractInteger) twentytwo
+                                   , apply () (Builtin () MultiplyInteger) eleven
+                                   , apply () (Builtin () SubtractInteger) twentytwo
                                    ]
 
 -- [ { (builtin ifThenElse) (fun (con integer) (con integer)) } (11<=22) (*) (-)] :
@@ -277,7 +278,7 @@ iteAtIntegerArrowIntegerApplied2 =  mkIterApp ()
 -- [ { (builtin ifThenElse) (fun (con integer) (con integer)) } (11<=22) (11 *) (22 -) 22] :
 -- WellTypedRuns (ifThenElse returns a function which is then applied to a constant).
 iteAtIntegerArrowIntegerAppliedApplied :: Term TyName Name DefaultUni DefaultFun ()
-iteAtIntegerArrowIntegerAppliedApplied =  Apply () iteAtIntegerArrowIntegerApplied1 twentytwo
+iteAtIntegerArrowIntegerAppliedApplied =  apply () iteAtIntegerArrowIntegerApplied1 twentytwo
 
 -- { (builtin ifThenElse) (lam a . a -> a) } : IllTypedRuns.
 -- Evaluation should succeed, but typechecking should fail with a kind error.
@@ -292,12 +293,12 @@ iteAtHigherKind = iteAt (TyLam () a (Type ()) aArrowA)
 -- [ { (builtin ifThenElse) (lam a . a -> a) } (11<=22) ] : IllTypedRuns
 -- (illegal kind)
 iteAtHigherKindWithCond :: Term TyName Name DefaultUni DefaultFun ()
-iteAtHigherKindWithCond = Apply () iteAtHigherKind lteExpr
+iteAtHigherKindWithCond = apply () iteAtHigherKind lteExpr
 
 -- [ {(builtin ifThenElse) (lam a . a -> a) } (11<=22) "11 <= 22" "¬(11<=22) ]" :
 -- IllTypedRuns (illegal kind)
 iteAtHigherKindFullyApplied :: Term TyName Name DefaultUni DefaultFun ()
-iteAtHigherKindFullyApplied = mkIterApp () (Apply () iteAtHigherKind lteExpr) [stringResultTrue, stringResultFalse]
+iteAtHigherKindFullyApplied = mkIterApp () (apply () iteAtHigherKind lteExpr) [stringResultTrue, stringResultFalse]
 
 -- { {(builtin ifThenElse) integer} integer } : IllTypedFails (instantiated twice).
 iteAtIntegerAtInteger :: Term TyName Name DefaultUni DefaultFun ()
@@ -318,19 +319,19 @@ mul = Builtin () MultiplyInteger
 
 -- [ [ (builtin multiplyInteger) 11 ] 22 ] : WellTypedRuns
 mulOK :: Term TyName Name DefaultUni DefaultFun ()
-mulOK = Apply () (Apply () mul eleven) twentytwo
+mulOK = apply () (apply () mul eleven) twentytwo
 
 -- [ [ { (builtin multiplyInteger) string } 11 ] 22 ]: IllTypedFails
 mulInstError1 :: Term TyName Name DefaultUni DefaultFun ()
-mulInstError1 = Apply () (Apply () (TyInst () mul string) eleven) twentytwo
+mulInstError1 = apply () (apply () (TyInst () mul string) eleven) twentytwo
 
 -- [ [ { (builtin multiplyInteger) 11 ] string } 22 ]: IllTypedFails
 mulInstError2 :: Term TyName Name DefaultUni DefaultFun ()
-mulInstError2 = Apply () (TyInst () (Apply () mul eleven) string) twentytwo
+mulInstError2 = apply () (TyInst () (apply () mul eleven) string) twentytwo
 
 -- { [ [ (builtin multiplyInteger) 11 ] 22 ] string } : IllTypedFails
 mulInstError3 :: Term TyName Name DefaultUni DefaultFun ()
-mulInstError3 = TyInst () (Apply () (Apply () mul eleven) twentytwo) string
+mulInstError3 = TyInst () (apply () (apply () mul eleven) twentytwo) string
 
 tag1 :: Term TyName Name DefaultUni DefaultFun ()
 tag1 = Constr () (TySum () [TyProd () [integer], TyProd () [string]]) 0 [mkConstant @Integer () 1]
@@ -345,29 +346,29 @@ tagProd1 = Constr () (TySum () [TyProd () [integer, integer, integer], TyProd ()
 case1 :: Term TyName Name DefaultUni DefaultFun ()
 case1 = runQuote $ do
     a <- freshName "a"
-    let branch1 = LamAbs () a integer (Var () a)
-        branch2 = LamAbs () a string (mkConstant @Integer () 2)
+    let branch1 = lamAbs () a integer (Var () a)
+        branch2 = lamAbs () a string (mkConstant @Integer () 2)
     pure $ Case () integer tag1 [branch1, branch2]
 
 case2 :: Term TyName Name DefaultUni DefaultFun ()
 case2 = runQuote $ do
     a <- freshName "a"
-    let branch1 = LamAbs () a integer (Var () a)
-        branch2 = LamAbs () a string (mkConstant @Integer () 2)
+    let branch1 = lamAbs () a integer (Var () a)
+        branch2 = lamAbs () a string (mkConstant @Integer () 2)
     pure $ Case () integer tag2 [branch1, branch2]
 
 case3 :: Term TyName Name DefaultUni DefaultFun ()
 case3 = runQuote $ do
     a <- freshName "a"
-    let branch1 = LamAbs () a integer (mkConstant @Text () "no")
-        branch2 = LamAbs () a string (Var () a)
+    let branch1 = lamAbs () a integer (mkConstant @Text () "no")
+        branch2 = lamAbs () a string (Var () a)
     pure $ Case () string tag1 [branch1, branch2]
 
 case4 :: Term TyName Name DefaultUni DefaultFun ()
 case4 = runQuote $ do
     a <- freshName "a"
-    let branch1 = LamAbs () a integer (mkConstant @Text () "no")
-        branch2 = LamAbs () a string (Var () a)
+    let branch1 = lamAbs () a integer (mkConstant @Text () "no")
+        branch2 = lamAbs () a string (Var () a)
     pure $ Case () string tag2 [branch1, branch2]
 
 caseProd1 :: Term TyName Name DefaultUni DefaultFun ()
@@ -375,12 +376,12 @@ caseProd1 = runQuote $ do
     a <- freshName "a"
     b <- freshName "b"
     c <- freshName "c"
-    let branch1 = LamAbs () a integer $ LamAbs () b integer $ LamAbs () c integer $
+    let branch1 = multiLamAbs () [ (a, integer), (b, integer), (c, integer) ] $
                     mkIterApp () (Builtin () SubtractInteger) [
                       mkIterApp () (Builtin () AddInteger) [Var () a, Var () b]
                       , Var () c
                       ]
-        branch2 = LamAbs () a string (mkConstant @Integer () 2)
+        branch2 = lamAbs () a string (mkConstant @Integer () 2)
     pure $ Case () integer tagProd1 [branch1, branch2]
 
 caseNoBranch :: Term TyName Name DefaultUni DefaultFun ()
@@ -431,9 +432,9 @@ goldenVsTypecheckedEvaluatedCK name term =
 
 namesAndTests :: [(String, Term TyName Name DefaultUni DefaultFun ())]
 namesAndTests =
-   [ ("even2", Apply () even $ metaIntegerToNat 2)
-   , ("even3", Apply () even $ metaIntegerToNat 3)
-   , ("evenList", Apply () natSum $ Apply () evenList smallNatList)
+   [ ("even2", apply () even $ metaIntegerToNat 2)
+   , ("even3", apply () even $ metaIntegerToNat 3)
+   , ("evenList", apply () natSum $ apply () evenList smallNatList)
    , ("polyError", polyError)
    , ("polyErrorInst", TyInst () polyError (mkTyBuiltin @_ @Integer ()))
    , ("closure", closure)

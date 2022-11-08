@@ -15,6 +15,7 @@ module PlutusCore.Eq
     , ScopedEqRename
     , runEqRename
     , withTwinBindings
+    , withTwinBindingsList
     , eqNameM
     , eqM
     ) where
@@ -161,6 +162,12 @@ withTwinBindings
 withTwinBindings name1 name2 k =
     withRenamedName (LR name1) (LR name2) $
     withRenamedName (RL name2) (RL name1) k
+
+-- | Record that two names map to each other.
+withTwinBindingsList
+    :: (HasRenaming ren unique, HasUnique name unique, Monad m)
+    => NonEmpty (name, name) -> RenameT (Bilateral ren) m c -> RenameT (Bilateral ren) m c
+withTwinBindingsList pairs k = foldr (\(n1, n2) act -> withTwinBindings n1 n2 act) k pairs
 
 -- See Note [Modulo alpha].
 -- | Check equality of two names.

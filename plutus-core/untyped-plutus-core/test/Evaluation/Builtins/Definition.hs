@@ -103,8 +103,8 @@ test_Id =
                               i <- freshName "i"
                               j <- freshName "j"
                               return
-                                  . LamAbs () i integer
-                                  . LamAbs () j integer
+                                  . lamAbs () i integer
+                                  . lamAbs () j integer
                                   $ Var () i
         typecheckEvaluateCekNoEmit def defaultBuiltinCostModelExt term @?= Right (EvaluationSuccess oneU)
 

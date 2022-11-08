@@ -8,16 +8,14 @@
         (case
           ds_i2
           (lam
-            arg1_i0
+            x_i0
             (delay
               (force
                 (case
                   ds_i2
                   (lam
-                    arg1_i0
-                    (delay
-                      (constr 0 [ [ (builtin addInteger) arg1_i2 ] arg1_i1 ])
-                    )
+                    y_i0
+                    (delay (constr 0 [ [ (builtin addInteger) x_i2 ] y_i1 ]))
                   )
                   (delay (constr 1))
                 )

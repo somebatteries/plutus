@@ -10,8 +10,8 @@ module PlutusIR.Transform.Beta (
 
 import PlutusIR
 
-import Control.Lens (over)
 import Data.List.NonEmpty qualified as NE
+import PlutusPrelude
 
 {- Note [Beta for types]
 We can do beta on type abstractions too, turning them into type-lets. We don't do that because
@@ -86,13 +86,29 @@ let a = x in let b = y in t
 because in order to check that `b` and `y` have the same type, we need to know that `a = x`,
 but we don't - type-lets are opaque inside their bodies.
 -}
-extractBindings :: Term tyname name uni fun a -> Maybe (NE.NonEmpty (Binding tyname name uni fun a), Term tyname name uni fun a)
+extractBindings
+  :: Term tyname name uni fun a
+  -> Maybe (NE.NonEmpty (Binding tyname name uni fun a), Term tyname name uni fun a)
 extractBindings = collectArgs []
   where
-      collectArgs argStack (Apply _ f arg) = collectArgs (arg:argStack) f
-      collectArgs argStack t               = matchArgs argStack [] t
-      matchArgs (arg:rest) acc (LamAbs a n ty body) = matchArgs rest (TermBind a Strict (VarDecl a n ty) arg:acc) body
-      matchArgs []         acc t                    =
+      collectArgs
+        :: [Term tyname name uni fun a]
+        -> Term tyname name uni fun a
+        -> Maybe (NE.NonEmpty (Binding tyname name uni fun a), Term tyname name uni fun a)
+      collectArgs argStack (Apply _ f args) = collectArgs (toList args++argStack) f
+      collectArgs argStack t                = matchArgs argStack [] t
+
+      -- TODO: this deliberately doesn't match up arguments for non-unary lambdas.
+      -- The reason for that is that we're going to (currently) turn the let bindings
+      -- back into nested unary lambdas, so matching up n-ary lambdas here would effectively
+      -- remove them from the program, which we probably don't want at this stage.
+      matchArgs
+        :: [Term tyname name uni fun a]
+        -> [Binding tyname name uni fun a]
+        -> Term tyname name uni fun a
+        -> Maybe (NE.NonEmpty (Binding tyname name uni fun a), Term tyname name uni fun a)
+      matchArgs (arg:rest) acc (LamAbs a ((n, ty) :| []) body) = matchArgs rest (TermBind a Strict (VarDecl a n ty) arg:acc) body
+      matchArgs []         acc t                       =
           case NE.nonEmpty (reverse acc) of
               Nothing   -> Nothing
               Just acc' -> Just (acc', t)

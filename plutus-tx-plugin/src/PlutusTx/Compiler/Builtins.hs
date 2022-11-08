@@ -412,4 +412,4 @@ delayedErrorFunc = do
     t <- liftQuote (freshName "thunk")
     let ty = PLC.toTypeAst $ Proxy @()
     pure $ PIR.TyAbs AnnOther n (PIR.Type AnnOther) $
-        PIR.LamAbs AnnOther t (ty $> AnnOther) $ PIR.Error AnnOther (PIR.TyVar AnnOther n)
+        PIR.lamAbs AnnOther t (ty $> AnnOther) $ PIR.Error AnnOther (PIR.TyVar AnnOther n)

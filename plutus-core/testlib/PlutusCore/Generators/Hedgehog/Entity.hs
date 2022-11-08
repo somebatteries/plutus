@@ -33,6 +33,7 @@ import PlutusCore.Generators.Hedgehog.Utils
 import PlutusCore.Builtin
 import PlutusCore.Core
 import PlutusCore.Default
+import PlutusCore.MkPlc hiding (embed)
 import PlutusCore.Name
 import PlutusCore.Pretty (PrettyConst, prettyConst)
 import PlutusCore.Quote
@@ -144,7 +145,7 @@ genIterAppValue (Denotation object embed meta scheme) = result where
     go (TypeSchemeArrow schB) term args f = do  -- Another argument is required.
         BuiltinGensT genTb <- ask
         TermOf v x <- liftT $ genTb typeRep  -- Get a Haskell and the correspoding PLC values.
-        let term' = Apply () term v          -- Apply the term to the PLC value.
+        let term' = apply () term v          -- Apply the term to the PLC value.
             args' = args . (v :)             -- Append the PLC value to the spine.
             y     = f x                      -- Apply the Haskell function to the generated argument.
         go schB term' args' y
@@ -201,7 +202,7 @@ genTerm genBase context0 depth0 = Morph.hoist runQuoteT . go context0 depth0 whe
                 -- Generate the body of the lambda abstraction adding the new variable to the context.
                 TermOf body y <- go (insertVariable name argTr x context) (depth - 1) tr
                 -- Assemble the term.
-                let term = Apply () (LamAbs () name argTy body) arg
+                let term = apply () (lamAbs () name argTy body) arg
                 return $ TermOf term y
 
 -- | Generates a 'Term' with rather small values to make out-of-bounds failures less likely.

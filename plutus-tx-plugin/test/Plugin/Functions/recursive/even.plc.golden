@@ -63,25 +63,21 @@
             )
             {
               [
-                [
-                  {
-                    [ Bool_match [ [ equalsInteger n ] (con integer 0) ] ]
-                    (all dead (type) Bool)
-                  }
-                  (abs dead (type) True)
-                ]
+                {
+                  [ Bool_match [ [ equalsInteger n ] (con integer 0) ] ]
+                  (all dead (type) Bool)
+                }
+                (abs dead (type) True)
                 (abs
                   dead
                   (type)
                   {
                     [
-                      [
-                        {
-                          [ Bool_match [ [ equalsInteger n ] (con integer 0) ] ]
-                          (all dead (type) Bool)
-                        }
-                        (abs dead (type) False)
-                      ]
+                      {
+                        [ Bool_match [ [ equalsInteger n ] (con integer 0) ] ]
+                        (all dead (type) Bool)
+                      }
+                      (abs dead (type) False)
                       (abs
                         dead
                         (type)

@@ -118,10 +118,14 @@ eqTypeM TySum{} _ = empty
 eqTermM
     :: (GEq uni, Closed uni, uni `Everywhere` Eq, Eq fun, Eq ann)
     => EqRenameOf ScopedRenaming (Term tyname name uni fun ann)
-eqTermM (LamAbs ann1 name1 ty1 body1) (LamAbs ann2 name2 ty2 body2) = do
+eqTermM (LamAbs ann1 vars1 body1) (LamAbs ann2 vars2 body2) = do
     eqM ann1 ann2
-    eqTypeM ty1 ty2
-    withTwinBindings name1 name2 $ eqTermM body1 body2
+    namePairs <- case zipExactNE vars1 vars2 of
+        Just ps -> for ps $ \((n1, ty1), (n2, ty2)) -> do
+          eqTypeM ty1 ty2
+          pure (n1, n2)
+        Nothing -> empty
+    withTwinBindingsList namePairs $ eqTermM body1 body2
 eqTermM (TyAbs ann1 name1 kind1 body1) (TyAbs ann2 name2 kind2 body2) = do
     eqM ann1 ann2
     eqM kind1 kind2
@@ -131,10 +135,12 @@ eqTermM (IWrap ann1 pat1 arg1 term1) (IWrap ann2 pat2 arg2 term2) = do
     eqTypeM pat1 pat2
     eqTypeM arg1 arg2
     eqTermM term1 term2
-eqTermM (Apply ann1 fun1 arg1) (Apply ann2 fun2 arg2) = do
+eqTermM (Apply ann1 fun1 args1) (Apply ann2 fun2 args2) = do
     eqM ann1 ann2
     eqTermM fun1 fun2
-    eqTermM arg1 arg2
+    case zipExactNE args1 args2 of
+        Just ps -> for_ ps $ \(arg1, arg2) -> eqTermM arg1 arg2
+        Nothing -> empty
 eqTermM (Unwrap ann1 term1) (Unwrap ann2 term2) = do
     eqM ann1 ann2
     eqTermM term1 term2

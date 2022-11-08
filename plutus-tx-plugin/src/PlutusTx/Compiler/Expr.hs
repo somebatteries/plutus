@@ -49,6 +49,7 @@ import PlutusIR.MkPir qualified as PIR
 import PlutusIR.Purity qualified as PIR
 
 import PlutusCore qualified as PLC
+import PlutusCore.Core qualified as PLC
 import PlutusCore.MkPlc qualified as PLC
 import PlutusCore.Pretty qualified as PP
 import PlutusCore.Subst qualified as PLC
@@ -177,7 +178,8 @@ compileAlt
     => GHC.CoreAlt -- ^ The 'CoreAlt' representing the branch itself.
     -> [GHC.Type] -- ^ The instantiated type arguments for the data constructor.
     -> m (PIRTerm uni fun, PIRTerm uni fun) -- ^ Non-delayed and delayed
-compileAlt (GHC.Alt alt vars body) instArgTys = withContextM 3 (sdToTxt $ "Creating alternative:" GHC.<+> GHC.ppr alt) $ case alt of
+compileAlt (GHC.Alt alt vars body) instArgTys =
+  withContextM 3 (sdToTxt $ "Creating alternative:" GHC.<+> GHC.ppr alt) $ case alt of
     GHC.LitAlt _  -> throwPlain $ UnsupportedError "Literal case"
     -- We just package it up as a lambda bringing all the
     -- vars into scope whose body is the body of the case alternative.
@@ -566,9 +568,9 @@ entryExitTracingInside lamName displayName = go mempty
             -> PIRTerm PLC.DefaultUni PLC.DefaultFun
             -> PLCType PLC.DefaultUni
             -> PIRTerm PLC.DefaultUni PLC.DefaultFun
-        go subst (LamAbs ann n t body) (PLC.TyFun _ _dom cod) =
+        go subst (LamAbs ann vars body) (PLC.splitFunTy -> (args, res)) | length vars <= length args =
             -- when t = \x -> body, => \x -> entryExitTracingInside body
-            LamAbs ann n t $ go subst body cod
+            LamAbs ann vars $ go subst body (PLC.mkIterTyFun ann (drop (length vars) args) res)
         go subst (TyAbs ann tn1 k body) (PLC.TyForall _ tn2 _k ty) =
             -- when t = /\x -> body, => /\x -> entryExitTracingInside body
             -- See Note [Profiling polymorphic functions]
@@ -594,13 +596,13 @@ entryExitTracing lamName displayName e ty =
         defaultUnit = PIR.Constant AnnOther (PLC.someValueOf PLC.DefaultUniUnit ())
     in
     --(trace @(() -> c) "entering f" (\() -> trace @c "exiting f" body) ())
-        PIR.Apply
+        PIR.apply
             AnnOther
             (mkTrace
                 (PLC.TyFun AnnOther defaultUnitTy ty) -- ()-> ty
                 ("entering " <> displayName)
                 -- \() -> trace @c "exiting f" e
-                (LamAbs AnnOther lamName defaultUnitTy (mkTrace ty ("exiting "<>displayName) e)))
+                (PIR.lamAbs AnnOther lamName defaultUnitTy (mkTrace ty ("exiting "<>displayName) e)))
             defaultUnit
 
 -- Expressions
@@ -633,7 +635,7 @@ compileExpr
     => GHC.CoreExpr -> m (PIRTerm uni fun)
 compileExpr e = withContextM 2 (sdToTxt $ "Compiling expr:" GHC.<+> GHC.ppr e) $ do
     -- See Note [Scopes]
-    CompileContext {ccScopes=stack,ccNameInfo=nameInfo,ccModBreaks=maybeModBreaks, ccBuiltinVer=ver} <- ask
+    CompileContext {ccScopes=stack,ccNameInfo=nameInfo,ccModBreaks=maybeModBreaks,ccBuiltinVer=ver,ccOpts=compileOpts} <- ask
 
     -- TODO: Maybe share this to avoid repeated lookups. Probably cheap, though.
     (stringTyName, sbsName) <- case (Map.lookup ''Builtins.BuiltinString nameInfo, Map.lookup 'Builtins.stringToBuiltinString nameInfo) of
@@ -743,7 +745,7 @@ compileExpr e = withContextM 2 (sdToTxt $ "Compiling expr:" GHC.<+> GHC.ppr e) $
         -- arg can be a type here, in which case it's a type instantiation
         l `GHC.App` GHC.Type t -> PIR.TyInst AnnOther <$> compileExpr l <*> compileTypeNorm t
         -- otherwise it's a normal application
-        l `GHC.App` arg -> PIR.Apply AnnOther <$> compileExpr l <*> compileExpr arg
+        l `GHC.App` arg -> PIR.apply AnnOther <$> compileExpr l <*> compileExpr arg
         -- if we're biding a type variable it's a type abstraction
         GHC.Lam b@(GHC.isTyVar -> True) body -> mkTyAbsScoped b $ compileExpr body
         -- otherwise it's a normal lambda
@@ -794,7 +796,7 @@ compileExpr e = withContextM 2 (sdToTxt $ "Compiling expr:" GHC.<+> GHC.ppr e) $
 
                 -- it's important to instantiate the match before alts compilation
                 match <- getMatchInstantiated scrutineeType
-                let matched = PIR.Apply AnnOther match scrutinee'
+                let matched = PIR.apply AnnOther match scrutinee'
 
                 -- See Note [Case expressions and laziness]
                 compiledAlts <- forM dcs $ \dc -> do
@@ -815,7 +817,8 @@ compileExpr e = withContextM 2 (sdToTxt $ "Compiling expr:" GHC.<+> GHC.ppr e) $
                 resultType <- compileTypeNorm t >>= maybeDelayType lazyCase
                 let instantiated = PIR.TyInst AnnOther matched resultType
 
-                let applied = PIR.mkIterApp AnnOther instantiated branches
+                let branchApply = if coMultilambda compileOpts then PIR.mkMultiApp else PIR.mkIterApp
+                    applied = branchApply AnnOther instantiated branches
                 -- See Note [Case expressions and laziness]
                 mainCase <- maybeForce lazyCase applied
 
@@ -828,9 +831,8 @@ compileExpr e = withContextM 2 (sdToTxt $ "Compiling expr:" GHC.<+> GHC.ppr e) $
         -- See Note [What source locations to cover]
         GHC.Tick tick body | Just src <- getSourceSpan maybeModBreaks tick ->
             withContextM 1 (sdToTxt $ "Compiling expr at:" GHC.<+> GHC.ppr src) $ do
-              CompileContext {ccOpts=coverageOpts} <- ask
               -- See Note [Coverage annotations]
-              let anns = Set.toList $ activeCoverageTypes coverageOpts
+              let anns = Set.toList $ activeCoverageTypes compileOpts
               compiledBody <- compileExpr body
               foldM (coverageCompile body (GHC.exprType body) src) compiledBody anns
 

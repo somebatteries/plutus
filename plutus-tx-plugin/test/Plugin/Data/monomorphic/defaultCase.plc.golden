@@ -15,17 +15,13 @@
       ds
       MyMonoData
       [
-        [
-          [
-            { [ MyMonoData_match ds ] (con integer) }
-            (lam
-              default_arg0
-              (con integer)
-              (lam default_arg1 (con integer) (con integer 2))
-            )
-          ]
-          (lam default_arg0 (con integer) (con integer 2))
-        ]
+        { [ MyMonoData_match ds ] (con integer) }
+        (lam
+          default_arg0
+          (con integer)
+          (lam default_arg1 (con integer) (con integer 2))
+        )
+        (lam default_arg0 (con integer) (con integer 2))
         (lam a (con integer) a)
       ]
     )

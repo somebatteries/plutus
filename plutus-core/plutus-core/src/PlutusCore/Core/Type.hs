@@ -22,6 +22,9 @@ module PlutusCore.Core.Type
     , fromPatFuncKind
     , argsFunKind
     , Type (..)
+    , funTySections
+    , funTyArgs
+    , splitFunTy
     , Term (..)
     , Version (..)
     , Program (..)
@@ -61,6 +64,7 @@ import PlutusCore.Name
 import Control.Lens
 import Data.Hashable
 import Data.Kind qualified as GHC
+import Data.List.NonEmpty qualified as NE
 import Instances.TH.Lift ()
 import Language.Haskell.TH.Lift
 import Universe
@@ -104,11 +108,33 @@ data Type tyname uni ann
     deriving stock (Show, Functor, Generic)
     deriving anyclass (NFData)
 
+-- | Get recursively all the domains and codomains of a type.
+-- @funTySections (A->B->C) = [A, B, C]@
+-- @funTySections (X) = [X]@
+funTySections :: Type tyname uni a -> NE.NonEmpty (Type tyname uni a)
+funTySections = \case
+    TyFun _ t1 t2 -> t1 NE.<| funTySections t2
+    t             -> pure t
+
+-- | Get the argument types of a function type.
+-- @funTyArgs (A->B->C) = [A, B]@
+funTyArgs :: Type tyname uni a ->  [Type tyname uni a]
+funTyArgs = NE.init . funTySections
+
+-- | Splits a type into its function arguments and result type.
+-- NOTE: Treats non-function types as nullary function types.
+splitFunTy :: Type tyname uni a -> ([Type tyname uni a], Type tyname uni a)
+splitFunTy t =
+  let sects = funTySections t
+      args = NE.init sects
+      res = NE.last sects
+  in (args, res)
+
 data Term tyname name uni fun ann
     = Var ann name -- ^ a named variable
     | TyAbs ann tyname (Kind ann) (Term tyname name uni fun ann)
-    | LamAbs ann name (Type tyname uni ann) (Term tyname name uni fun ann)
-    | Apply ann (Term tyname name uni fun ann) (Term tyname name uni fun ann)
+    | LamAbs ann (NE.NonEmpty (name, Type tyname uni ann)) (Term tyname name uni fun ann)
+    | Apply ann (Term tyname name uni fun ann) (NE.NonEmpty (Term tyname name uni fun ann))
     | Constant ann (Some (ValueOf uni)) -- ^ a constant term
     | Builtin ann fun
     | TyInst ann (Term tyname name uni fun ann) (Type tyname uni ann)
@@ -240,17 +266,17 @@ termAnn (TyInst ann _ _  ) = ann
 termAnn (Unwrap ann _    ) = ann
 termAnn (IWrap ann _ _ _ ) = ann
 termAnn (Error ann _     ) = ann
-termAnn (LamAbs ann _ _ _) = ann
+termAnn (LamAbs ann _ _)   = ann
 termAnn (Constr ann _ _ _) = ann
 termAnn (Case ann _ _ _  ) = ann
 
 -- | Map a function over the set of built-in functions.
 mapFun :: (fun -> fun') -> Term tyname name uni fun ann -> Term tyname name uni fun' ann
 mapFun f = go where
-    go (LamAbs ann name ty body)  = LamAbs ann name ty (go body)
+    go (LamAbs ann vars body)     = LamAbs ann vars (go body)
     go (TyAbs ann name kind body) = TyAbs ann name kind (go body)
     go (IWrap ann pat arg term)   = IWrap ann pat arg (go term)
-    go (Apply ann fun arg)        = Apply ann (go fun) (go arg)
+    go (Apply ann fun arg)        = Apply ann (go fun) (fmap go arg)
     go (Unwrap ann term)          = Unwrap ann (go term)
     go (Error ann ty)             = Error ann ty
     go (TyInst ann term ty)       = TyInst ann (go term) ty

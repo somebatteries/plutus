@@ -35,9 +35,11 @@ varTerm = Var <$> getSourcePos <*> name
 tyAbsTerm :: Parser PTerm
 tyAbsTerm = inParens $ TyAbs <$> wordPos "abs" <*> tyName  <*> kind <*> term
 
+-- TODO: parse multi-lams
 lamTerm :: Parser PTerm
-lamTerm = inParens $ LamAbs <$> wordPos "lam" <*> name <*> pType <*> term
+lamTerm = inParens $ LamAbs <$> wordPos "lam" <*> fmap (\t -> pure t) ((,) <$> name <*> pType) <*> term
 
+-- TODO: should be a multi-app, but only when that's safe
 appTerm :: Parser PTerm
 appTerm = inBrackets $ mkIterApp <$> getSourcePos <*> term <*> some term
 

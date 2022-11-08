@@ -40,7 +40,8 @@ fvTermCtx bound f = \case
         in Let a r <$> traverse (fvBindingCtx bound f) bs <*> fvTermCtx bound' f tIn
 
     Var a n         -> Var a <$> (if S.member n bound then pure n else f n)
-    LamAbs a n ty t -> LamAbs a n ty <$> fvTermCtx (S.insert n bound) f t
+    LamAbs a vars t -> LamAbs a vars <$> fvTermCtx extended f t
+      where extended = Prelude.foldr S.insert bound (fmap fst vars)
     t -> (termSubterms . fvTermCtx bound) f t
 
 -- | Get all the free type variables in a PIR term.

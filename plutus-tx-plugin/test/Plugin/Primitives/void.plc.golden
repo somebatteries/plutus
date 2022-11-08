@@ -43,29 +43,24 @@
         (con integer)
         {
           [
-            [
+            {
+              [ Bool_match [ [ equalsInteger ds ] ds ] ] (all dead (type) Bool)
+            }
+            (abs
+              dead
+              (type)
               {
-                [ Bool_match [ [ equalsInteger ds ] ds ] ]
-                (all dead (type) Bool)
+                [
+                  {
+                    [ Bool_match [ [ equalsInteger ds ] ds ] ]
+                    (all dead (type) Bool)
+                  }
+                  (abs dead (type) True)
+                  (abs dead (type) [ fail (con unit ()) ])
+                ]
+                (all dead (type) dead)
               }
-              (abs
-                dead
-                (type)
-                {
-                  [
-                    [
-                      {
-                        [ Bool_match [ [ equalsInteger ds ] ds ] ]
-                        (all dead (type) Bool)
-                      }
-                      (abs dead (type) True)
-                    ]
-                    (abs dead (type) [ fail (con unit ()) ])
-                  ]
-                  (all dead (type) dead)
-                }
-              )
-            ]
+            )
             (abs dead (type) [ fail (con unit ()) ])
           ]
           (all dead (type) dead)

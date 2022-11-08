@@ -18,17 +18,15 @@
         Bool
         {
           [
-            [
-              { [ Bool_match ds ] (all dead (type) (con data)) }
-              (abs
-                dead
-                (type)
-                [
-                  [ (builtin constrData) (con integer 1) ]
-                  [ (builtin mkNilData) unitval ]
-                ]
-              )
-            ]
+            { [ Bool_match ds ] (all dead (type) (con data)) }
+            (abs
+              dead
+              (type)
+              [
+                [ (builtin constrData) (con integer 1) ]
+                [ (builtin mkNilData) unitval ]
+              ]
+            )
             (abs
               dead
               (type)
@@ -601,24 +599,18 @@
                     ds
                     [ [ Either (con integer) ] b ]
                     [
-                      [
-                        {
-                          [ { { Either_match (con integer) } b } ds ] (con data)
-                        }
-                        (lam
-                          arg
-                          (con integer)
+                      { [ { { Either_match (con integer) } b } ds ] (con data) }
+                      (lam
+                        arg
+                        (con integer)
+                        [
+                          [ (builtin constrData) (con integer 0) ]
                           [
-                            [ (builtin constrData) (con integer 0) ]
-                            [
-                              [
-                                { (builtin mkCons) (con data) } [ dToData arg ]
-                              ]
-                              [ (builtin mkNilData) unitval ]
-                            ]
+                            [ { (builtin mkCons) (con data) } [ dToData arg ] ]
+                            [ (builtin mkNilData) unitval ]
                           ]
-                        )
-                      ]
+                        ]
+                      )
                       (lam
                         arg
                         b
@@ -651,29 +643,24 @@
                   [ Maybe a ]
                   {
                     [
-                      [
-                        {
-                          [ { Maybe_match a } ds ] (all dead (type) (con data))
-                        }
-                        (lam
-                          arg
-                          a
-                          (abs
-                            dead
-                            (type)
+                      { [ { Maybe_match a } ds ] (all dead (type) (con data)) }
+                      (lam
+                        arg
+                        a
+                        (abs
+                          dead
+                          (type)
+                          [
+                            [ (builtin constrData) (con integer 0) ]
                             [
-                              [ (builtin constrData) (con integer 0) ]
                               [
-                                [
-                                  { (builtin mkCons) (con data) }
-                                  [ dToData arg ]
-                                ]
-                                [ (builtin mkNilData) unitval ]
+                                { (builtin mkCons) (con data) } [ dToData arg ]
                               ]
+                              [ (builtin mkNilData) unitval ]
                             ]
-                          )
+                          ]
                         )
-                      ]
+                      )
                       (abs
                         dead
                         (type)

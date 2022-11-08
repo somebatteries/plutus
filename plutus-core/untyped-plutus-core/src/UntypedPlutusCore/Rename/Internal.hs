@@ -19,9 +19,12 @@ import PlutusCore.Rename.Monad as Export
 renameTermM
     :: (HasUniques (Term name uni fun ann), MonadQuote m)
     => Term name uni fun ann -> ScopedRenameT m (Term name uni fun ann)
-renameTermM (LamAbs ann name body)  =
-     withFreshenedName name $ \nameFr -> LamAbs ann nameFr <$> renameTermM body
-renameTermM (Apply ann fun arg)        = Apply ann <$> renameTermM fun <*> renameTermM arg
+renameTermM (LamAbs ann vars body)  =
+    -- TODO: gross
+    withFreshenedNames vars $ \names' -> do
+        body' <- renameTermM body
+        pure $ LamAbs ann names' body'
+renameTermM (Apply ann fun args)       = Apply ann <$> renameTermM fun <*> traverse renameTermM args
 renameTermM err@Error{}                = pure err
 renameTermM (Var ann name)             = Var ann <$> renameNameM name
 renameTermM (Delay ann term)           = Delay ann <$> renameTermM term

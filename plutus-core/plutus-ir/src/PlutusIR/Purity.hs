@@ -8,6 +8,7 @@ module PlutusIR.Purity (isPure) where
 
 import PlutusIR
 
+import Data.Foldable
 import PlutusCore.Builtin
 
 -- | An argument taken by a builtin: could be a term of a type.
@@ -45,7 +46,7 @@ asBuiltinApp :: Term tyname name uni fun a -> Maybe (BuiltinApp tyname name uni 
 asBuiltinApp = go []
     where
         go argsSoFar = \case
-            Apply _ t arg  -> go (TermArg arg:argsSoFar) t
+            Apply _ t args -> go (fmap TermArg (toList args) ++ argsSoFar) t
             TyInst _ t arg -> go (TypeArg arg:argsSoFar) t
             Builtin _ b    -> Just $ BuiltinApp b argsSoFar
             _              -> Nothing

@@ -12,6 +12,7 @@ import PlutusCore.Test
 import PlutusCore
 import PlutusCore.DeBruijn
 import PlutusCore.Mark
+import PlutusCore.MkPlc
 import PlutusCore.Pretty
 import PlutusCore.Rename.Internal
 
@@ -87,15 +88,15 @@ test_alphaEquality = testCase "alphaEquality" $ do
 
         varType = TyVar () (TyName (Name "a" (Unique 2)))
 
-        lamX = LamAbs () xName varType varX
-        lamY = LamAbs () yName varType varY
+        lamX = lamAbs () xName varType varX
+        lamY = lamAbs () yName varType varY
 
         term0, term1 :: Term TyName Name DefaultUni DefaultFun ()
 
         -- [(lam x a x) x]
-        term0 = Apply () lamX varX
+        term0 = apply () lamX varX
         -- [(lam y a y) x]
-        term1 = Apply () lamY varX
+        term1 = apply () lamY varX
 
     term0 @?= term1
 

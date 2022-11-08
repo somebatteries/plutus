@@ -17,6 +17,7 @@ import Data.Functor.Foldable
 
 import Control.Monad.State
 import Control.Monad.Writer
+import Data.Foldable (for_)
 
 termDefs
     :: (Ord ann,
@@ -26,9 +27,9 @@ termDefs
     => Term name uni fun ann
     -> m ()
 termDefs = cata $ \case
-    VarF ann n      -> addUsage n ann TermScope
-    LamAbsF ann n t -> addDef n ann TermScope >> t
-    x               -> sequence_ x
+    VarF ann n         -> addUsage n ann TermScope
+    LamAbsF ann vars t -> for_ vars (\n -> addDef n ann TermScope) >> t
+    x                  -> sequence_ x
 
 runTermDefs
     :: (Ord ann,

@@ -51,14 +51,18 @@ instance PLC.HasTypeCheckConfig (PirTCConfig uni fun) uni fun where
 data DatatypeStyle = ScottEncoding | SumsOfProducts
     deriving stock (Show)
 
+data CaseBranchStyle = NestedLambda | MultiLambda
+    deriving stock (Show)
+
 data DatatypeCompilationOpts = DatatypeCompilationOpts
-    { _dcoStyle :: DatatypeStyle
+    { _dcoStyle           :: DatatypeStyle
+    , _dcoCaseBranchStyle :: CaseBranchStyle
     } deriving stock (Show)
 
 makeLenses ''DatatypeCompilationOpts
 
 defaultDatatypeCompilationOpts :: DatatypeCompilationOpts
-defaultDatatypeCompilationOpts = DatatypeCompilationOpts SumsOfProducts
+defaultDatatypeCompilationOpts = DatatypeCompilationOpts SumsOfProducts MultiLambda
 
 data CompilationOpts a = CompilationOpts {
     _coOptimize                   :: Bool

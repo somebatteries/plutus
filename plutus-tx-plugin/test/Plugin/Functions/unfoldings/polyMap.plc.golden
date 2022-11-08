@@ -76,10 +76,8 @@
                     [ List a ]
                     {
                       [
-                        [
-                          { [ { Nil_match a } l ] (all dead (type) [ List b ]) }
-                          (abs dead (type) { Nil b })
-                        ]
+                        { [ { Nil_match a } l ] (all dead (type) [ List b ]) }
+                        (abs dead (type) { Nil b })
                         (lam
                           x
                           a

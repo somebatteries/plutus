@@ -45,12 +45,8 @@
                   [ List a ]
                   {
                     [
-                      [
-                        {
-                          [ { Nil_match a } ds ] (all dead (type) (con integer))
-                        }
-                        (abs dead (type) acc)
-                      ]
+                      { [ { Nil_match a } ds ] (all dead (type) (con integer)) }
+                      (abs dead (type) acc)
                       (lam
                         ds
                         a

@@ -20,6 +20,7 @@ import PlutusCore.Default qualified as PLC
 import PlutusCore.Generators.Hedgehog.AST as Export (AstGen, genBuiltin, genConstant, genKind, genVersion, runAstGen,
                                                      simpleRecursive)
 import PlutusCore.Generators.Hedgehog.AST qualified as PLC
+import PlutusCore.MkPlc
 
 import Hedgehog hiding (Rec, Var)
 import Hedgehog.Gen qualified as Gen
@@ -76,8 +77,8 @@ genTerm = simpleRecursive nonRecursive recursive where
     varGen = Var () <$> genName
     absGen = TyAbs () <$> genTyName <*> genKind <*> genTerm
     instGen = TyInst () <$> genTerm <*> genType
-    lamGen = LamAbs () <$> genName <*> genType <*> genTerm
-    applyGen = Apply () <$> genTerm <*> genTerm
+    lamGen = lamAbs () <$> genName <*> genType <*> genTerm
+    applyGen = apply () <$> genTerm <*> genTerm
     unwrapGen = Unwrap () <$> genTerm
     wrapGen = IWrap () <$> genType <*> genType <*> genTerm
     constrGen = Constr () <$> genType <*> Gen.int (Range.linear 0 10) <*> Gen.list (Range.linear 0 10) genTerm

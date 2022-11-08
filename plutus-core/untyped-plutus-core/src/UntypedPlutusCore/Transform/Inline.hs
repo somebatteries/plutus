@@ -34,13 +34,13 @@ import UntypedPlutusCore.Rename ()
 import PlutusCore qualified as PLC
 import PlutusCore.Builtin qualified as PLC
 import PlutusCore.InlineUtils
+import PlutusCore.MkPlc qualified as PLC
 import PlutusCore.Name
 import PlutusCore.Quote
 
 import Control.Lens hiding (Strict)
 import Control.Monad.Reader
 import Control.Monad.State
-
 import Data.Semigroup.Generic (GenericSemigroupMonoid (..))
 import Witherable (wither)
 
@@ -129,20 +129,20 @@ Some examples will help:
 extractApps :: Term name uni fun a -> Maybe ([UTermDef name uni fun a], Term name uni fun a)
 extractApps = collectArgs []
   where
-      collectArgs argStack (Apply _ f arg) = collectArgs (arg:argStack) f
-      collectArgs argStack t               = matchArgs argStack [] t
-      matchArgs (arg:rest) acc (LamAbs a n body) = matchArgs rest (Def (UVarDecl a n) arg:acc) body
-      matchArgs []         acc t                 = if null acc then Nothing else Just (reverse acc, t)
-      matchArgs (_:_)      _   _                 = Nothing
+      collectArgs argStack (Apply _ f (arg :| [])) = collectArgs (arg:argStack) f
+      collectArgs argStack t                       = matchArgs argStack [] t
+      matchArgs (arg:rest) acc (LamAbs a (n :| []) body) = matchArgs rest (Def (UVarDecl a n) arg:acc) body
+      matchArgs []         acc t                         = if null acc then Nothing else Just (reverse acc, t)
+      matchArgs (_:_)      _   _                         = Nothing
 
 -- | The inverse of 'extractApps'.
 restoreApps :: [UTermDef name uni fun a] -> Term name uni fun a -> Term name uni fun a
 restoreApps defs t = makeLams [] t (reverse defs)
   where
-      makeLams args acc (Def (UVarDecl a n) rhs:rest) = makeLams (rhs:args) (LamAbs a n acc) rest
+      makeLams args acc (Def (UVarDecl a n) rhs:rest) = makeLams (rhs:args) (LamAbs a (pure n) acc) rest
       makeLams args acc []                            = makeApps args acc
       -- This isn't the best annotation, but it will do
-      makeApps (arg:args) acc = makeApps args (Apply (termAnn acc) acc arg)
+      makeApps (arg:args) acc = makeApps args (Apply (termAnn acc) acc (pure arg))
       makeApps [] acc         = acc
 
 processTerm
@@ -158,6 +158,12 @@ processTerm = handleTerm where
             bs' <- wither (processSingleBinding t) bs
             t' <- processTerm t
             pure $ restoreApps bs' t'
+        -- TODO: merge handling of multi-lambdas into unary lambdas
+        (Apply a (LamAbs _ vars t) args) | Just ps <- zipExactNE vars args -> do
+            bs <- for ps $ \(n, rhs) -> pure $ Def (UVarDecl a n) rhs
+            bs' <- wither (processSingleBinding t) (toList bs)
+            t' <- processTerm t
+            pure $ PLC.mkMultiApp a (mkMultiLamAbs (fmap defVar bs') t') (fmap defVal bs')
         t -> forMOf termSubterms t processTerm
 
     -- See Note [Renaming strategy]

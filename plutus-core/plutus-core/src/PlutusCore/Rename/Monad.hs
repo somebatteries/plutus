@@ -18,6 +18,7 @@ module PlutusCore.Rename.Monad
     , lookupNameM
     , renameNameM
     , withFreshenedName
+    , withFreshenedNames
     , withRenamedName
     ) where
 
@@ -28,6 +29,7 @@ import PlutusCore.Quote
 
 import Control.Lens
 import Control.Monad.Reader
+import Data.List.NonEmpty qualified as NE
 
 -- | The monad the renamer runs in.
 newtype RenameT ren m a = RenameT
@@ -121,6 +123,18 @@ withFreshenedName
 withFreshenedName nameOld k = do
     uniqNew <- coerce <$> freshUnique
     local (insertByNameM nameOld uniqNew) $ k (nameOld & unique .~ uniqNew)
+
+withFreshenedNames
+    :: (HasRenaming ren unique, HasUnique name unique, MonadQuote m, MonadReader ren m)
+    => NonEmpty name -> (NonEmpty name -> m c) -> m c
+withFreshenedNames ns k = go (toList ns) []
+  where
+    -- PARTIAL: but safe, becasue these lists are always non-empty because the original input
+    -- we get is non-empty.
+    go [] namesNew = k (NE.fromList $ reverse namesNew)
+    go (nameOld:namesOld) namesNew = do
+        uniqNew <- coerce <$> freshUnique
+        local (insertByNameM nameOld uniqNew) $ go namesOld ((nameOld & unique .~ uniqNew):namesNew)
 
 -- | Run a 'RenameT' computation in the environment extended by the mapping from an old name
 -- to a new one.

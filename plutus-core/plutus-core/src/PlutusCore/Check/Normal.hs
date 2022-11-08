@@ -16,7 +16,7 @@ import PlutusCore.Core
 import PlutusCore.Error
 
 import Control.Monad.Except
-import Data.Foldable (traverse_)
+import Data.Foldable (for_, traverse_)
 
 -- | Ensure that all types in the 'Program' are normalized.
 checkProgram
@@ -35,8 +35,8 @@ check (Error _ ty)           = normalType ty
 check (TyInst _ t ty)        = check t >> normalType ty
 check (IWrap _ pat arg term) = normalType pat >> normalType arg >> check term
 check (Unwrap _ t)           = check t
-check (LamAbs _ _ ty t)      = normalType ty >> check t
-check (Apply _ t1 t2)        = check t1 >> check t2
+check (LamAbs _ vars t)      = for_ vars (\(_, ty) -> normalType ty) >> check t
+check (Apply _ f args)       = check f >> for_ args check
 check (TyAbs _ _ _ t)        = check t
 check (Constr _ ty _ es)     = normalType ty >> traverse_ check es
 check (Case _ ty arg cs)     = normalType ty >> check arg >> traverse_ check cs

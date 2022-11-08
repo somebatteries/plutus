@@ -131,8 +131,8 @@ termSubterms :: Traversal' (Term tyname name uni fun a) (Term tyname name uni fu
 termSubterms f = \case
     Let x r bs t      -> Let x r <$> (traverse . bindingSubterms) f bs <*> f t
     TyAbs x tn k t    -> TyAbs x tn k <$> f t
-    LamAbs x n ty t   -> LamAbs x n ty <$> f t
-    Apply x t1 t2     -> Apply x <$> f t1 <*> f t2
+    LamAbs x vars t   -> LamAbs x vars <$> f t
+    Apply x t1 t2     -> Apply x <$> f t1 <*> traverse f t2
     TyInst x t ty     -> TyInst x <$> f t <*> pure ty
     IWrap x ty1 ty2 t -> IWrap x ty1 ty2 <$> f t
     Unwrap x t        -> Unwrap x <$> f t
@@ -152,7 +152,7 @@ termSubtermsDeep = cosmosOf termSubterms
 termSubtypes :: Traversal' (Term tyname name uni fun a) (Type tyname uni a)
 termSubtypes f = \case
     Let x r bs t      -> Let x r <$> (traverse . bindingSubtypes) f bs <*> pure t
-    LamAbs x n ty t   -> LamAbs x n <$> f ty <*> pure t
+    LamAbs x vars t   -> LamAbs x <$> (traverse . _2) f vars <*> pure t
     TyInst x t ty     -> TyInst x t <$> f ty
     IWrap x ty1 ty2 t -> IWrap x <$> f ty1 <*> f ty2 <*> pure t
     Error x ty        -> Error x <$> f ty
@@ -184,7 +184,7 @@ termUniques f = \case
     Let ann r bs t    -> Let ann r <$> cloneTraversal (traversed.bindingIds) f bs <*> pure t
     Var ann n         -> PLC.theUnique f n  <&> Var ann
     TyAbs ann tn k t  -> PLC.theUnique f tn <&> \tn' -> TyAbs ann tn' k t
-    LamAbs ann n ty t -> PLC.theUnique f n  <&> \n'  -> LamAbs ann n' ty t
+    LamAbs ann vars t -> LamAbs ann <$> (traverse . _1 . PLC.theUnique) f vars <*> pure t
     a@Apply{}         -> pure a
     c@Constant{}      -> pure c
     b@Builtin{}       -> pure b

@@ -57,13 +57,18 @@ eqTermM (Builtin ann1 bi1) (Builtin ann2 bi2) = do
 eqTermM (Var ann1 name1) (Var ann2 name2) = do
     eqM ann1 ann2
     eqNameM name1 name2
-eqTermM (LamAbs ann1 name1 body1) (LamAbs ann2 name2 body2) = do
+eqTermM (LamAbs ann1 vars1 body1) (LamAbs ann2 vars2 body2) = do
     eqM ann1 ann2
-    withTwinBindings name1 name2 $ eqTermM body1 body2
-eqTermM (Apply ann1 fun1 arg1) (Apply ann2 fun2 arg2) = do
+    namePairs <- case zipExactNE vars1 vars2 of
+        Just ps -> pure ps
+        Nothing -> empty
+    withTwinBindingsList namePairs $ eqTermM body1 body2
+eqTermM (Apply ann1 fun1 args1) (Apply ann2 fun2 args2) = do
     eqM ann1 ann2
     eqTermM fun1 fun2
-    eqTermM arg1 arg2
+    case zipExactNE args1 args2 of
+        Just ps -> for_ ps $ \(arg1, arg2) -> eqTermM arg1 arg2
+        Nothing -> empty
 eqTermM (Delay ann1 term1) (Delay ann2 term2) = do
     eqM ann1 ann2
     eqTermM term1 term2

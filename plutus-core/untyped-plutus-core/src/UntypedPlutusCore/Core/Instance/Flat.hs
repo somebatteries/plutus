@@ -14,6 +14,8 @@ import UntypedPlutusCore.Core.Type
 
 import PlutusCore.Flat
 
+import Data.Foldable (toList)
+import Data.List.NonEmpty qualified as NE
 import Data.Word (Word8)
 import Flat
 import Flat.Decoder
@@ -107,8 +109,10 @@ encodeTerm
 encodeTerm = \case
     Var      ann n      -> encodeTermTag 0 <> encode ann <> encode n
     Delay    ann t      -> encodeTermTag 1 <> encode ann <> encodeTerm t
-    LamAbs   ann n t    -> encodeTermTag 2 <> encode ann <> encode (Binder n) <> encodeTerm t
-    Apply    ann t t'   -> encodeTermTag 3 <> encode ann <> encodeTerm t <> encodeTerm t'
+    -- TODO: absolutely cannot encode with a list like this, it'll be total garbage with a tag for every element
+    -- Applies to all the n-ary stuff
+    LamAbs   ann vars t -> encodeTermTag 2 <> encode ann <> encode (fmap Binder (toList vars)) <> encodeTerm t
+    Apply    ann t args -> encodeTermTag 3 <> encode ann <> encodeTerm t <> encodeListWith encodeTerm (toList args)
     Constant ann c      -> encodeTermTag 4 <> encode ann <> encode c
     Force    ann t      -> encodeTermTag 5 <> encode ann <> encodeTerm t
     Error    ann        -> encodeTermTag 6 <> encode ann
@@ -132,8 +136,8 @@ decodeTerm builtinPred = go
         go = handleTerm =<< decodeTermTag
         handleTerm 0 = Var      <$> decode <*> decode
         handleTerm 1 = Delay    <$> decode <*> go
-        handleTerm 2 = LamAbs   <$> decode <*> (unBinder <$> decode) <*> go
-        handleTerm 3 = Apply    <$> decode <*> go <*> go
+        handleTerm 2 = LamAbs   <$> decode <*> (fmap unBinder <$> assertNonEmpty decode) <*> go
+        handleTerm 3 = Apply    <$> decode <*> go <*> assertNonEmpty (decodeListWith go)
         handleTerm 4 = Constant <$> decode <*> decode
         handleTerm 5 = Force    <$> decode <*> go
         handleTerm 6 = Error    <$> decode
@@ -164,7 +168,7 @@ sizeTerm
 sizeTerm tm sz = termTagWidth + sz + case tm of
     Var      ann n      -> getSize ann + getSize n
     Delay    ann t      -> getSize ann + getSize t
-    LamAbs   ann n t    -> getSize ann + getSize n + getSize t
+    LamAbs   ann vars t -> getSize ann + getSize vars + getSize t
     Apply    ann t t'   -> getSize ann + getSize t + getSize t'
     Constant ann c      -> getSize ann + getSize c
     Force    ann t      -> getSize ann + getSize t
@@ -217,3 +221,10 @@ instance ( Closed uni
     encode (Program ann v t) = encode ann <> encode v <> encode t
 
     size (Program a v t) n = n + getSize a + getSize v + getSize t
+
+assertNonEmpty :: Get [a] -> Get (NE.NonEmpty a)
+assertNonEmpty dec = do
+  l <- dec
+  case NE.nonEmpty l of
+    Just nel -> pure nel
+    Nothing  -> fail "expected non-empty list, found empty list"

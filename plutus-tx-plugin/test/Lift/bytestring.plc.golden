@@ -19,8 +19,7 @@
       x_i0
       (delay
         (lam
-          case_Lift_Spec_WrappedBS_i0
-          (case x_i2 (lam arg1_i0 [ case_Lift_Spec_WrappedBS_i2 arg1_i1 ]))
+          case_Lift_Spec_WrappedBS_i0 (case x_i2 case_Lift_Spec_WrappedBS_i1)
         )
       )
     )

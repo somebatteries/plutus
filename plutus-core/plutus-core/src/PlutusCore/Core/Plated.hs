@@ -140,7 +140,7 @@ termTyBinds f term0 = case term0 of
 -- | Get all the direct child 'name a's of the given 'Term' from 'LamAbs'es.
 termBinds :: Traversal' (Term tyname name uni fun ann) name
 termBinds f term0 = case term0 of
-    LamAbs ann n ty t -> f n <&> \n' -> LamAbs ann n' ty t
+    LamAbs ann vars t -> LamAbs ann <$> (traverse . _1) f vars <*> pure t
     Var{}             -> pure term0
     TyAbs{}           -> pure term0
     TyInst{}          -> pure term0
@@ -173,7 +173,7 @@ termVars f term0 = case term0 of
 termUniques :: HasUniques (Term tyname name uni fun ann) => Traversal' (Term tyname name uni fun ann) Unique
 termUniques f term0 = case term0 of
     TyAbs ann tn k t  -> theUnique f tn <&> \tn' -> TyAbs ann tn' k t
-    LamAbs ann n ty t -> theUnique f n <&> \n' -> LamAbs ann n' ty t
+    LamAbs ann vars t -> LamAbs ann <$> (traverse . _1 . theUnique) f vars <*> pure t
     Var ann n         -> theUnique f n <&> Var ann
     TyInst{}          -> pure term0
     IWrap{}           -> pure term0
@@ -206,7 +206,7 @@ termSubkinds f term0 = case term0 of
 -- | Get all the direct child 'Type's of the given 'Term'.
 termSubtypes :: Traversal' (Term tyname name uni fun ann) (Type tyname uni ann)
 termSubtypes f term0 = case term0 of
-    LamAbs ann n ty t   -> LamAbs ann n <$> f ty <*> pure t
+    LamAbs ann vars t   -> LamAbs ann <$> (traverse . _2) f vars <*> pure t
     TyInst ann t ty     -> TyInst ann t <$> f ty
     IWrap ann ty1 ty2 t -> IWrap ann <$> f ty1 <*> f ty2 <*> pure t
     Error ann ty        -> Error ann <$> f ty
@@ -227,11 +227,11 @@ termSubtypesDeep = termSubtermsDeep . termSubtypes . typeSubtypesDeep
 -- | Get all the direct child 'Term's of the given 'Term'.
 termSubterms :: Traversal' (Term tyname name uni fun ann) (Term tyname name uni fun ann)
 termSubterms f term0 = case term0 of
-    LamAbs ann n ty t   -> LamAbs ann n ty <$> f t
+    LamAbs ann vars t   -> LamAbs ann vars <$> f t
     TyInst ann t ty     -> TyInst ann <$> f t <*> pure ty
     IWrap ann ty1 ty2 t -> IWrap ann ty1 ty2 <$> f t
     TyAbs ann n k t     -> TyAbs ann n k <$> f t
-    Apply ann t1 t2     -> Apply ann <$> f t1 <*> f t2
+    Apply ann t1 t2     -> Apply ann <$> f t1 <*> traverse f t2
     Unwrap ann t        -> Unwrap ann <$> f t
     Constr ann ty i es  -> Constr ann ty i <$> traverse f es
     Case ann ty arg cs  -> Case ann ty <$> f arg <*> traverse f cs

@@ -66,25 +66,21 @@
           (con integer)
           {
             [
-              [
-                {
-                  [ Bool_match [ [ equalsInteger n ] (con integer 0) ] ]
-                  (all dead (type) (con integer))
-                }
-                (abs dead (type) (con integer 0))
-              ]
+              {
+                [ Bool_match [ [ equalsInteger n ] (con integer 0) ] ]
+                (all dead (type) (con integer))
+              }
+              (abs dead (type) (con integer 0))
               (abs
                 dead
                 (type)
                 {
                   [
-                    [
-                      {
-                        [ Bool_match [ [ equalsInteger n ] (con integer 1) ] ]
-                        (all dead (type) (con integer))
-                      }
-                      (abs dead (type) (con integer 1))
-                    ]
+                    {
+                      [ Bool_match [ [ equalsInteger n ] (con integer 1) ] ]
+                      (all dead (type) (con integer))
+                    }
+                    (abs dead (type) (con integer 1))
                     (abs
                       dead
                       (type)

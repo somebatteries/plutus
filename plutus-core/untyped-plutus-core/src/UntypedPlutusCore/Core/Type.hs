@@ -28,6 +28,7 @@ module UntypedPlutusCore.Core.Type
 import Control.Lens
 import PlutusPrelude
 
+import Data.List.NonEmpty qualified as NE
 import PlutusCore.Builtin qualified as TPLC
 import PlutusCore.Core qualified as TPLC
 import PlutusCore.MkPlc
@@ -68,8 +69,8 @@ serve exactly this purpose.
 -- See Note [Term constructor ordering and numbers]
 data Term name uni fun ann
     = Var !ann !name
-    | LamAbs !ann !name !(Term name uni fun ann)
-    | Apply !ann !(Term name uni fun ann) !(Term name uni fun ann)
+    | LamAbs !ann !(NE.NonEmpty name) !(Term name uni fun ann)
+    | Apply !ann !(Term name uni fun ann) !(NE.NonEmpty (Term name uni fun ann))
     | Force !ann !(Term name uni fun ann)
     | Delay !ann !(Term name uni fun ann)
     | Constant !ann !(Some (ValueOf uni))
@@ -96,17 +97,19 @@ type instance TPLC.UniOf (Term name uni fun ann) = uni
 
 instance TermLike (Term name uni fun) TPLC.TyName name uni fun where
     var      = Var
-    tyAbs    = \ann _ _ -> Delay ann
-    lamAbs   = \ann name _ -> LamAbs ann name
-    apply    = Apply
+    tyAbs ann _ _  = Delay ann
+    lamAbs ann name _ b = LamAbs ann (pure name) b
+    multiLamAbs ann vars = LamAbs ann (fmap fst vars)
+    apply a l r = Apply a l (pure r)
+    multiApply = Apply
     constant = Constant
     builtin  = Builtin
-    tyInst   = \ann term _ -> Force ann term
-    unwrap   = const id
-    iWrap    = \_ _ _ -> id
-    error    = \ann _ -> Error ann
-    constr   = \ann _ i es -> Constr ann i es
-    kase     = \ann _ arg cs -> Case ann arg cs
+    tyInst ann term _ = Force ann term
+    unwrap _ = id
+    iWrap _ _ _ = id
+    error ann _ = Error ann
+    constr ann _ i es = Constr ann i es
+    kase ann _ arg cs = Case ann arg cs
 
 instance TPLC.HasConstant (Term name uni fun ()) where
     asConstant (Constant _ val) = pure val
@@ -143,16 +146,16 @@ bindFunM
     -> Term name uni fun ann
     -> m (Term name uni fun' ann)
 bindFunM f = go where
-    go (Constant ann val)     = pure $ Constant ann val
-    go (Builtin ann fun)      = f ann fun
-    go (Var ann name)         = pure $ Var ann name
-    go (LamAbs ann name body) = LamAbs ann name <$> go body
-    go (Apply ann fun arg)    = Apply ann <$> go fun <*> go arg
-    go (Delay ann term)       = Delay ann <$> go term
-    go (Force ann term)       = Force ann <$> go term
-    go (Error ann)            = pure $ Error ann
-    go (Constr ann i args)    = Constr ann i <$> traverse go args
-    go (Case ann arg cs)      = Case ann <$> go arg <*> traverse go cs
+    go (Constant ann val)      = pure $ Constant ann val
+    go (Builtin ann fun)       = f ann fun
+    go (Var ann name)          = pure $ Var ann name
+    go (LamAbs ann names body) = LamAbs ann names <$> go body
+    go (Apply ann fun args)    = Apply ann <$> go fun <*> traverse go args
+    go (Delay ann term)        = Delay ann <$> go term
+    go (Force ann term)        = Force ann <$> go term
+    go (Error ann)             = pure $ Error ann
+    go (Constr ann i args)     = Constr ann i <$> traverse go args
+    go (Case ann arg cs)       = Case ann <$> go arg <*> traverse go cs
 
 bindFun
     :: (ann -> fun -> Term name uni fun' ann)

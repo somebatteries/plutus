@@ -102,6 +102,7 @@ propEvaluate
     -> Property
 propEvaluate eval genTermOfTbv = withTests 200 . property $ do
     termOfTbv <- forAllNoShow genTermOfTbv
+    annotateShow (ShowPretty (_termOfTerm termOfTbv))
     case typeEvalCheckBy eval termOfTbv of
         Left (TypeEvalCheckErrorIllFormed err)             -> fail $ prettyPlcErrorString err
         Left (TypeEvalCheckErrorIllTyped expected actual)  ->

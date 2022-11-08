@@ -1,4 +1,5 @@
 -- editorconfig-checker-disable-file
+{-# LANGUAGE OverloadedLists   #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications  #-}
 module Transform.Simplify where
@@ -27,22 +28,31 @@ extraDelays = Force () $ Delay () $ Delay () $ mkConstant @Integer () 1
 interveningLambda :: Term Name PLC.DefaultUni PLC.DefaultFun ()
 interveningLambda = runQuote $ do
     n <- freshName "a"
-    let lam = LamAbs () n $ Delay () $ Apply () (Var () n) (Var () n)
+    let lam = LamAbs () [n] $ Delay () $ apply () (Var () n) (Var () n)
         arg = mkConstant @Integer () 1
-    pure $ Force () $ Apply () lam arg
+    pure $ Force () $ apply () lam arg
 
 basicInline :: Term Name PLC.DefaultUni PLC.DefaultFun ()
 basicInline = runQuote $ do
     n <- freshName "a"
-    pure $ Apply () (LamAbs () n (Var () n)) (mkConstant @Integer () 1)
+    pure $ apply () (LamAbs () [n] (Var () n)) (mkConstant @Integer () 1)
+
+multiAppNested :: Term Name PLC.DefaultUni PLC.DefaultFun ()
+multiAppNested = runQuote $ do
+    a <- freshName "a"
+    b <- freshName "b"
+    c <- freshName "c"
+    let lam = LamAbs () [a] $ LamAbs () [b] $ LamAbs () [c] $ mkIterApp () (Var () c) [Var () a, Var () b]
+        app = mkIterApp () lam [mkConstant @Integer () 1, mkConstant @Integer () 2, mkConstant @Integer () 3]
+    pure app
 
 multiApp :: Term Name PLC.DefaultUni PLC.DefaultFun ()
 multiApp = runQuote $ do
     a <- freshName "a"
     b <- freshName "b"
     c <- freshName "c"
-    let lam = LamAbs () a $ LamAbs () b $ LamAbs () c $ mkIterApp () (Var () c) [Var () a, Var () b]
-        app = mkIterApp () lam [mkConstant @Integer () 1, mkConstant @Integer () 2, mkConstant @Integer () 3]
+    let lam = LamAbs () [a, b, c] $ Apply () (Var () c) [Var () a, Var () b]
+        app = Apply () lam [mkConstant @Integer () 1, mkConstant @Integer () 2, mkConstant @Integer () 3]
     pure app
 
 -- TODO Fix duplication with other golden tests, quite annoying
@@ -66,5 +76,6 @@ test_simplify =
         , goldenVsSimplified "extraDelays" extraDelays
         , goldenVsSimplified "interveningLambda" interveningLambda
         , goldenVsSimplified "basicInline" basicInline
+        , goldenVsSimplified "multiAppNested" multiAppNested
         , goldenVsSimplified "multiApp" multiApp
         ]

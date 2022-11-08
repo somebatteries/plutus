@@ -62,7 +62,7 @@ applyCode fun arg = DeserializedCode (UPLC.applyProgram (getPlc fun) (getPlc arg
 
 -- | The size of a 'CompiledCodeIn', in AST nodes.
 sizePlc :: (PLC.Closed uni, uni `PLC.Everywhere` Flat, Flat fun) => CompiledCodeIn uni fun a -> Integer
-sizePlc = UPLC.programSize . getPlc
+sizePlc = PLC.unSize . UPLC.programSize . getPlc
 
 instance (PLC.Closed uni, uni `PLC.Everywhere` Flat, Flat fun)
     => Flat (CompiledCodeIn uni fun a) where

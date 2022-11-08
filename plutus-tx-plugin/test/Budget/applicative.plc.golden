@@ -67,13 +67,10 @@
                     [ Maybe a ]
                     {
                       [
-                        [
-                          {
-                            [ { Maybe_match a } ds ]
-                            (all dead (type) [ Maybe b ])
-                          }
-                          (lam a a (abs dead (type) [ { Just b } [ f a ] ]))
-                        ]
+                        {
+                          [ { Maybe_match a } ds ] (all dead (type) [ Maybe b ])
+                        }
+                        (lam a a (abs dead (type) [ { Just b } [ f a ] ]))
                         (abs dead (type) { Nothing b })
                       ]
                       (all dead (type) dead)
@@ -94,37 +91,33 @@
     )
     {
       [
-        [
-          {
-            [ { Maybe_match (fun (con integer) (con integer)) } ds ]
-            (all dead (type) [ Maybe (con integer) ])
-          }
-          (lam
-            ipv
-            (fun (con integer) (con integer))
-            (abs
-              dead
-              (type)
-              {
-                [
-                  [
-                    {
-                      [ { Maybe_match (con integer) } y ]
-                      (all dead (type) [ Maybe (con integer) ])
-                    }
-                    (lam
-                      ipv
-                      (con integer)
-                      (abs dead (type) [ { Just (con integer) } [ ipv ipv ] ])
-                    )
-                  ]
-                  (abs dead (type) { Nothing (con integer) })
-                ]
-                (all dead (type) dead)
-              }
-            )
+        {
+          [ { Maybe_match (fun (con integer) (con integer)) } ds ]
+          (all dead (type) [ Maybe (con integer) ])
+        }
+        (lam
+          ipv
+          (fun (con integer) (con integer))
+          (abs
+            dead
+            (type)
+            {
+              [
+                {
+                  [ { Maybe_match (con integer) } y ]
+                  (all dead (type) [ Maybe (con integer) ])
+                }
+                (lam
+                  ipv
+                  (con integer)
+                  (abs dead (type) [ { Just (con integer) } [ ipv ipv ] ])
+                )
+                (abs dead (type) { Nothing (con integer) })
+              ]
+              (all dead (type) dead)
+            }
           )
-        ]
+        )
         (abs dead (type) { Nothing (con integer) })
       ]
       (all dead (type) dead)

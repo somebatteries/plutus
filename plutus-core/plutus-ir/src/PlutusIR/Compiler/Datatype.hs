@@ -38,7 +38,6 @@ import Data.Traversable
 
 import Control.Lens hiding (index)
 import Data.List.NonEmpty qualified as NE
-import Data.String (fromString)
 
 {- NOTE [Normalization of data-constructors' types]
 
@@ -282,7 +281,7 @@ mkConstrProdTy ann vd =
 -- FIXME: inline this
 mkDatatypePatternFunctor :: MonadQuote m => DatatypeCompilationOpts -> ann -> Datatype TyName Name uni ann -> m (Type TyName uni ann)
 mkDatatypePatternFunctor opts ann d = case _dcoStyle opts of
-  ScottEncoding -> mkScottTy ann d <$> resultTypeName d
+  ScottEncoding  -> mkScottTy ann d <$> resultTypeName d
   SumsOfProducts -> pure $ mkDatatypeSumTy ann d
 
 mkBoundDatatypePatternFunctor :: MonadQuote m => DatatypeCompilationOpts -> ann -> Datatype TyName Name uni ann -> m (Type TyName uni ann)
@@ -351,32 +350,43 @@ mkConstructor opts dty d@(Datatype ann _ tvs _ constrs) index = do
 
     constrBody <- case _dcoStyle opts of
           SumsOfProducts -> do
-            boundPf <- mkBoundDatatypePatternFunctor opts ann d
-            let unrolled = TyApp ann boundPf (getType dty)
+              boundPf <- mkBoundDatatypePatternFunctor opts ann d
+              let unrolled = TyApp ann boundPf (getType dty)
 
-            pure $ Constr ann unrolled index (fmap (PIR.mkVar ann) argsAndTypes)
+              pure $ Constr ann unrolled index (fmap (PIR.mkVar ann) argsAndTypes)
           ScottEncoding -> do
-            resultType <- resultTypeName d
+              resultTypeN <- resultTypeName d
+              let resultType = TyVar ann resultTypeN
 
-            -- case arguments and their types
-            casesAndTypes <- do
-                  -- these types appear *outside* the scope of the abstraction for the datatype, so we need to use the concrete datatype here
-                  -- see note [Abstract data types]
-                  -- FIXME: normalize datacons' types also here
-                  let caseTypes = unveilDatatype (getType dty) d <$> fmap (constructorCaseType ann (TyVar ann resultType)) constrs
-                  caseArgNames <- for constrs (\c -> safeFreshName $ "case_" <> T.pack (varDeclNameString c))
-                  pure $ zipWith (VarDecl ann) caseArgNames caseTypes
+              -- case arguments and their types
+              caseVarsAndBodies <- for constrs $ \c -> do
+                    -- these types appear *outside* the scope of the abstraction for the datatype, so we need to use the concrete datatype here
+                    -- see note [Abstract data types]
+                    -- FIXME: normalize datacons' types also here
+                    let caseType = constructorCaseType ann resultType c
+                        unveiledCaseType = unveilDatatype (getType dty) d caseType
+                    caseArgName <- safeFreshName $ "case_" <> T.pack (varDeclNameString c)
+                    let caseVar = VarDecl ann caseArgName unveiledCaseType
+                    let caseBody = PIR.mkVar ann caseVar
 
-            -- This is inelegant, but it should never fail
-            let thisCase = PIR.mkVar ann $ casesAndTypes !! index
+                    pure (caseVar, caseBody)
 
-            pure $
-                -- forall out
-                TyAbs ann resultType (Type ann) $
-                -- \case_1 .. case_j
-                PIR.mkIterLamAbs casesAndTypes $
-                -- c_i arg_1 .. arg_m
-                PIR.mkIterApp ann thisCase (fmap (PIR.mkVar ann) argsAndTypes)
+              -- This is inelegant, but it should never fail
+              let thisCase = snd $ caseVarsAndBodies !! index
+              let mkCaseLam = case _dcoCaseBranchStyle opts of
+                    MultiLambda  -> PIR.mkMultiLamAbs
+                    NestedLambda -> PIR.mkIterLamAbs
+              let mkCaseApp = case _dcoCaseBranchStyle opts of
+                    NestedLambda -> PIR.mkIterApp
+                    MultiLambda  -> PIR.mkMultiApp
+
+              pure $
+                  -- forall out
+                  TyAbs ann resultTypeN (Type ann) $
+                  -- \case_1 .. case_j
+                  mkCaseLam (fmap fst caseVarsAndBodies) $
+                  -- c_i arg_1 .. arg_m
+                  mkCaseApp ann thisCase (fmap (PIR.mkVar ann) argsAndTypes)
 
     let constr =
             -- /\t_1 .. t_n
@@ -387,28 +397,6 @@ mkConstructor opts dty d@(Datatype ann _ tvs _ constrs) index = do
             -- wrap
             wrap ann dty (fmap (PIR.mkTyVar ann) tvs) constrBody
     pure $ fmap (\a -> DatatypeComponent Constructor a) constr
-
--- TODO: test this independently!
--- | Eta-expand a term for 'arity' arguments, given the term and the type of the term.
-etaExpand :: MonadQuote m => a -> Int -> Term TyName Name uni fun a -> Type TyName uni a -> m (Term TyName Name uni fun a)
-etaExpand ann arity term termTy = do
-    apps <- computeApps [] arity termTy
-    pure $ makeApps [] term (reverse apps)
-  where
-      computeApps acc 0 _ = pure acc
-      computeApps acc i (TyFun _ dom cod) = do
-        e <- freshName $ "arg" <> (fromString $ show i)
-        let vd = PLC.VarDecl ann e dom
-            rhs = Var ann e
-            def = PLC.Def vd rhs
-        computeApps (def:acc) (i-1) cod
-      computeApps _ _ _ = error "can't eta expand a non-function"
-
-      makeApps vds acc (PLC.Def vd rhs:rest) = makeApps (vd:vds) (Apply ann acc rhs) rest
-      makeApps vds acc []                    = makeLams vds acc
-
-      makeLams ((PLC.VarDecl a n ty):vds) acc = makeLams vds (LamAbs a n ty acc)
-      makeLams [] acc                         = acc
 
 -- Destructors
 
@@ -430,34 +418,35 @@ mkDestructor opts dty d@(Datatype ann _ tvs _ constrs) = do
 
     destrBody <- case _dcoStyle opts of
         SumsOfProducts -> do
-            resultType <- resultTypeName d
+
+            resultTypeN <- resultTypeName d
+            let resultType = TyVar ann resultTypeN
             -- Variables for case arguments, and the bodies to be used as the actual cases
             caseVarsAndBodies <- for constrs $ \c -> do
                 -- these types appear *outside* the scope of the abstraction for the datatype, so we need to use the concrete datatype here
                 -- see note [Abstract data types]
                 -- FIXME: normalize datacons' types also here
-                let caseType = constructorCaseType ann (TyVar ann resultType) c
-                    arity = length $ funTyArgs caseType
+                let caseType = constructorCaseType ann resultType c
                     unveiledCaseType = unveilDatatype (getType dty) d caseType
                 caseArgName <- safeFreshName $ "case_" <> T.pack (varDeclNameString c)
                 let caseVar = VarDecl ann caseArgName unveiledCaseType
-                -- We're requiring case bodies to be lambdas, but at this point they're
-                -- unknown functions passed into the destructor. So we just eta-expand them.
-                caseBody <- etaExpand ann arity (PIR.mkVar ann caseVar) unveiledCaseType
 
-                pure (caseVar, caseBody)
+                pure (caseVar, PIR.mkVar ann caseVar)
+
+            let mkCaseLam = case _dcoCaseBranchStyle opts of
+                  MultiLambda  -> PIR.mkMultiLamAbs
+                  NestedLambda -> PIR.mkIterLamAbs
             pure $
                 -- forall out
-                TyAbs ann resultType (Type ann) $
+                TyAbs ann resultTypeN (Type ann) $
                 -- \case_1 .. case_j
-                PIR.mkIterLamAbs (fmap fst caseVarsAndBodies) $
+                mkCaseLam (fmap fst caseVarsAndBodies) $
                 -- See note [Recursive datatypes]
                 -- case (unwrap x) case_1 .. case_j
-                Case ann (TyVar ann resultType) (unwrap ann dty $ Var ann xn) (fmap snd caseVarsAndBodies)
+                Case ann resultType (unwrap ann dty $ Var ann xn) (fmap snd caseVarsAndBodies)
         ScottEncoding ->
             pure $
                 -- See note [Recursive datatypes]
-                -- unwrap
                 unwrap ann dty $
                 Var ann xn
 
@@ -465,7 +454,8 @@ mkDestructor opts dty d@(Datatype ann _ tvs _ constrs) = do
             -- /\t_1 .. t_n
             PIR.mkIterTyAbs tvs $
             -- \x
-            LamAbs ann xn appliedReal destrBody
+            PLC.lamAbs ann xn appliedReal $
+            destrBody
     pure $ fmap (\a -> DatatypeComponent Destructor a) destr
 
 -- See note [Scott encoding of datatypes]

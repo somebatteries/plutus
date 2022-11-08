@@ -35,12 +35,14 @@ module PlutusCore.DeBruijn
 import PlutusCore.DeBruijn.Internal
 
 import PlutusCore.Core.Type
+import PlutusCore.MkPlc
 import PlutusCore.Name
 import PlutusCore.Quote
 
 import Control.Lens hiding (Index, Level, index)
 import Control.Monad.Except
 import Control.Monad.Reader
+import Data.List.NonEmpty
 
 {- NOTE: [DeBruijn indices of Binders]
 In a debruijnijfied Term AST, the Binders have a debruijn index
@@ -160,11 +162,17 @@ deBruijnTermWithM h = go
         TyAbs ann tn k t -> declareUnique tn $ do
             tn' <- tyNameToDeBruijn h tn
             withScope $ TyAbs ann tn' k <$> go t
-        LamAbs ann n ty t -> declareUnique n $ do
-            n' <- nameToDeBruijn h n
-            withScope $ LamAbs ann n' <$> goT ty <*> go t
+        LamAbs ann vars t -> handleVars (toList vars) []
+          where
+            -- TODO: does this even work?
+            handleVars [] newVars = mkMultiLamAbs (fmap (\(n,ty) -> VarDecl ann n ty) $ Prelude.reverse newVars) <$> go t
+            handleVars ((n, ty):vs) vars' = declareUnique n $ do
+                n' <- nameToDeBruijn h n
+                withScope $ do
+                  ty' <- goT ty
+                  handleVars vs ((n', ty'):vars')
         -- boring recursive cases
-        Apply ann t1 t2 -> Apply ann <$> go t1 <*> go t2
+        Apply ann t1 t2 -> Apply ann <$> go t1 <*> traverse go t2
         TyInst ann t ty -> TyInst ann <$> go t <*> goT ty
         Unwrap ann t -> Unwrap ann <$> go t
         IWrap ann pat arg t -> IWrap ann <$> goT pat <*> goT arg <*> go t
@@ -224,17 +232,20 @@ unDeBruijnTermWithM h = go
         Var ann n -> Var ann <$> deBruijnToName h n
         -- binder cases
         TyAbs ann tn k t ->
-            -- See NOTE: [DeBruijn indices of Binders]
             declareBinder $ do
               tn' <- deBruijnToTyName h $ set index deBruijnInitIndex tn
               withScope $ TyAbs ann tn' k <$> go t
-        LamAbs ann n ty t ->
+        LamAbs ann vars t -> handleVars (toList vars) []
+          where
+            handleVars [] newVars = mkMultiLamAbs (fmap (\(n,ty) -> VarDecl ann n ty) $ Prelude.reverse newVars) <$> go t
             -- See NOTE: [DeBruijn indices of Binders]
-            declareBinder $ do
-              n' <- deBruijnToName h $ set index deBruijnInitIndex n
-              withScope $ LamAbs ann n' <$> goT ty <*> go t
+            handleVars ((n, ty):vs) vars' = declareBinder $ do
+                n' <- deBruijnToName h $ set index deBruijnInitIndex n
+                withScope $ do
+                  ty' <- goT ty
+                  handleVars vs ((n', ty'):vars')
         -- boring recursive cases
-        Apply ann t1 t2 -> Apply ann <$> go t1 <*> go t2
+        Apply ann t1 t2 -> Apply ann <$> go t1 <*> traverse go t2
         TyInst ann t ty -> TyInst ann <$> go t <*> goT ty
         Unwrap ann t -> Unwrap ann <$> go t
         IWrap ann pat arg t -> IWrap ann <$> goT pat <*> goT arg <*> go t

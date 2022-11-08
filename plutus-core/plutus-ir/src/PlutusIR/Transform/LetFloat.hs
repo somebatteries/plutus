@@ -203,7 +203,7 @@ mark ver = snd . runWriter . flip runReaderT (MarkCtx topDepth mempty ver) . go
     go :: Term tyname name uni fun a -> ReaderT (MarkCtx fun) (Writer Marks) ()
     go = breakNonRec >>> \case
         -- lam/Lam are treated the same.
-        LamAbs _ n _ tBody  -> withLam n $ go tBody
+        LamAbs _ vars tBody  -> foldr (\(n, _) act -> withLam n act) (go tBody) vars
         TyAbs _ n _ tBody   -> withLam n $ go tBody
 
         -- main operation: for letrec or single letnonrec
@@ -295,21 +295,7 @@ removeLets marks term = runWriter $ go term
                     tell (MM.singleton pos (pure $ BindingGrp a r bs'))
                     pure tIn'
 
-        -- descend and collect
-        Apply a t1 t2 -> Apply a <$> go t1 <*> go t2
-        TyInst a t ty -> TyInst a <$> go t <*> pure ty
-        TyAbs a tyname k t -> TyAbs a tyname k <$> go t
-        LamAbs a name ty t -> LamAbs a name ty <$> go t
-        IWrap a ty1 ty2 t -> IWrap a ty1 ty2 <$> go t
-        Unwrap a t -> Unwrap a <$> go t
-        Constr a ty i es -> Constr a ty i <$> traverse go es
-        Case a ty arg cs -> Case a ty <$> go arg <*> traverse go cs
-
-        -- no term inside here, nothing to do
-        t@Var{} -> pure t
-        t@Constant{} -> pure t
-        t@Builtin{} -> pure t
-        t@Error{} -> pure t
+        t -> traverseOf termSubterms go t
 
 -- | The 3rd and last pass that, given the result of 'removeLets', places the lets back (floats) at the right marked positions.
 floatBackLets :: forall tyname name uni fun a term m.
@@ -332,8 +318,8 @@ floatBackLets term fTable =
 
     go = \case
         -- lam anchor, increase depth & try to float inside the lam's body
-        LamAbs a n ty tBody -> local (+1) $
-            LamAbs a n ty <$> (floatLam (n^.PLC.theUnique) =<< go tBody)
+        LamAbs a vars tBody -> local (+(fromIntegral $ length vars)) $
+            LamAbs a vars <$> (floatLam (NE.last vars^. _1 . PLC.theUnique) =<< go tBody)
         -- Lam anchor, increase depth & try to float inside the Lam's body
         TyAbs a n k tBody -> local (+1) $
             TyAbs a n k <$> (floatLam (n^.PLC.theUnique) =<< go tBody)

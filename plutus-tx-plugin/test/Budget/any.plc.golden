@@ -54,21 +54,19 @@
                     [ List a ]
                     {
                       [
-                        [
-                          { [ { Nil_match a } eta ] (all dead (type) m) }
-                          (abs
-                            dead
-                            (type)
-                            [
-                              { [ { Monoid_match m } dMonoid ] m }
-                              (lam
-                                v
-                                [ (lam a (type) (fun a (fun a a))) m ]
-                                (lam v m v)
-                              )
-                            ]
-                          )
-                        ]
+                        { [ { Nil_match a } eta ] (all dead (type) m) }
+                        (abs
+                          dead
+                          (type)
+                          [
+                            { [ { Monoid_match m } dMonoid ] m }
+                            (lam
+                              v
+                              [ (lam a (type) (fun a (fun a a))) m ]
+                              (lam v m v)
+                            )
+                          ]
+                        )
                         (lam
                           x
                           a
@@ -162,10 +160,8 @@
                             Bool
                             {
                               [
-                                [
-                                  { [ Bool_match l ] (all dead (type) Bool) }
-                                  (abs dead (type) True)
-                                ]
+                                { [ Bool_match l ] (all dead (type) Bool) }
+                                (abs dead (type) True)
                                 (abs dead (type) r)
                               ]
                               (all dead (type) dead)

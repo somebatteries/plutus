@@ -42,9 +42,11 @@ builtinTerm = inParens $ UPLC.Builtin <$> wordPos "builtin" <*> builtinFunction
 varTerm :: Parser PTerm
 varTerm = UPLC.Var <$> getSourcePos <*> name
 
+-- TODO: parse multi-lams
 lamTerm :: Parser PTerm
-lamTerm = inParens $ UPLC.LamAbs <$> wordPos "lam" <*> name <*> term
+lamTerm = inParens $ UPLC.LamAbs <$> wordPos "lam" <*> fmap (\t -> pure t) name <*> term
 
+-- TODO: should be a multi-app, but only when that's safe
 appTerm :: Parser PTerm
 appTerm = inBrackets $ mkIterApp <$> getSourcePos <*> term <*> some term
 

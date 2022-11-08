@@ -24,12 +24,12 @@ true = mkConstant @Bool () True
 
 -- A helper that just places index 0 to the binder (the only "reasonable" index for the binders)
 lamAbs0 :: (t ~ UPLC.Term DeBruijn DefaultUni DefaultFun ()) => t -> t
-lamAbs0 = LamAbs () (DeBruijn 0)
+lamAbs0 = LamAbs () (pure $ DeBruijn 0)
 
 -- A helper that constructs a lamabs with the binder having a nonsensical index.
 -- See NOTE: [DeBruijn indices of Binders]
 lamAbs99 :: (t ~ UPLC.Term DeBruijn DefaultUni DefaultFun ()) => t -> t
-lamAbs99 = LamAbs () ix99
+lamAbs99 = LamAbs () (pure $ ix99)
 
 constFun :: UPLC.Term DeBruijn DefaultUni DefaultFun ()
 constFun = lamAbs0 $ lamAbs0 $ Var () $ DeBruijn 2

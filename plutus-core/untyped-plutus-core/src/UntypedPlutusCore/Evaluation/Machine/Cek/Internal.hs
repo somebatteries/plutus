@@ -22,9 +22,10 @@
 {-# LANGUAGE TypeFamilies             #-}
 {-# LANGUAGE TypeOperators            #-}
 {-# LANGUAGE UndecidableInstances     #-}
+{-# LANGUAGE ViewPatterns             #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# OPTIONS_GHC -ddump-simpl -ddump-to-file -dsuppress-uniques -dsuppress-coercions -dsuppress-type-applications -dsuppress-unfoldings -dsuppress-idinfo -dumpdir /tmp/dumps #-}
+{-# OPTIONS_GHC -dppr-cols=400 -ddump-simpl -ddump-to-file -dsuppress-uniques -dsuppress-coercions -dsuppress-type-applications -dsuppress-unfoldings -dsuppress-idinfo -dumpdir /tmp/dumps #-}
 
 module UntypedPlutusCore.Evaluation.Machine.Cek.Internal
     -- See Note [Compilation peculiarities].
@@ -79,10 +80,12 @@ import Data.Array hiding (index)
 import Data.DList (DList)
 import Data.Hashable (Hashable)
 import Data.Kind qualified as GHC
+import Data.List.NonEmpty qualified as NE
 import Data.Semigroup (stimes)
 import Data.Text (Text)
 import Data.Vector qualified as V
 import Data.Vector.Mutable qualified as MV
+import Data.Vector.NonEmpty qualified as NEV
 import Data.Word
 import Data.Word64Array.Word8 hiding (Index, toList)
 import Prettyprinter
@@ -194,7 +197,16 @@ data CekValue uni fun =
     -- This bang gave us a 1-2% speed-up at the time of writing.
     VCon !(Some (ValueOf uni))
   | VDelay !(Term NamedDeBruijn uni fun ()) !(CekValEnv uni fun)
-  | VLamAbs !NamedDeBruijn !(Term NamedDeBruijn uni fun ()) !(CekValEnv uni fun)
+  | VLam
+      {-# UNPACK #-} !Int
+      -- ^ The remaining arity of the function, i.e. how many arguments it needs before
+      -- the body can be evaluated.
+      (NE.NonEmpty NamedDeBruijn)
+      -- ^ The original args, only needed for discharging, so lazy.
+      !(CekValEnv uni fun)
+      -- ^ The accumulated environment for the body.
+      !(Term NamedDeBruijn uni fun ())
+      -- ^ The body itself.
     -- | A partial builtin application, accumulating arguments for eventual full application.
     -- We don't need a 'CekValEnv' here unlike in the other constructors, because 'VBuiltin'
     -- values always store their corresponding 'Term's fully discharged, see the comments at
@@ -475,7 +487,7 @@ dischargeCekValEnv valEnv = go 0
   -- we have descended in the `go` loop.
   go :: Word64 -> Term NamedDeBruijn uni fun () -> Term NamedDeBruijn uni fun ()
   go !lamCnt =  \case
-    LamAbs ann name body -> LamAbs ann name $ go (lamCnt+1) body
+    LamAbs ann ns body -> LamAbs ann ns $ go (lamCnt+(fromIntegral $ NE.length ns)) body
     var@(Var _ (NamedDeBruijn _ ndbnIx)) -> let idx = coerce ndbnIx :: Word64  in
         if lamCnt >= idx
         -- the index n is less-than-or-equal than the number of lambdas we have descended
@@ -488,7 +500,7 @@ dischargeCekValEnv valEnv = go 0
                dischargeCekValue
                -- index relative to (as seen from the point of view of) the environment
                (Env.indexOne valEnv $ idx - lamCnt)
-    Apply ann fun arg    -> Apply ann (go lamCnt fun) $ go lamCnt arg
+    Apply ann fun arg    -> Apply ann (go lamCnt fun) $ fmap (go lamCnt) arg
     Delay ann term       -> Delay ann $ go lamCnt term
     Force ann term       -> Force ann $ go lamCnt term
     t -> t
@@ -502,9 +514,10 @@ dischargeCekValue = \case
     -- 'computeCek' turns @LamAbs _ name body@ into @VLamAbs name body env@ where @env@ is an
     -- argument of 'computeCek' and hence we need to start discharging outside of the reassembled
     -- lambda, otherwise @name@ could clash with the names that we have in @env@.
-    VLamAbs (NamedDeBruijn n _ix) body env ->
+    VLam _ vars env body ->
         -- The index on the binder is meaningless, we put `0` by convention, see 'Binder'.
-        dischargeCekValEnv env $ LamAbs () (NamedDeBruijn n deBruijnInitIndex) body
+        let rewriteVar (NamedDeBruijn n _ix) = NamedDeBruijn n deBruijnInitIndex
+        in dischargeCekValEnv env $ LamAbs () (fmap rewriteVar vars) body
     -- We only return a discharged builtin application when (a) it's being returned by the machine,
     -- or (b) it's needed for an error message.
     -- @term@ is fully discharged, so we can return it directly without any further discharging.
@@ -525,14 +538,19 @@ instance HasConstant (CekValue uni fun) where
 
 data Accumulator i o s = Accumulator {-# UNPACK #-} !Int ![i] {-# UNPACK #-} !(MV.MVector s o)
 
+-- Make sure we don't pay the price of making the NonEmptys
+{-# INLINE newNEAccumulator #-}
+newNEAccumulator :: NE.NonEmpty i -> ST s (i, Accumulator i o s)
+newNEAccumulator ts@(t :| rest) = do
+    let l = length ts -- note, length of *whole* list
+    emptyArr <- MV.new l
+    pure $ (t, Accumulator 0 rest emptyArr)
+
 newAccumulator :: [i] -> ST s (Either (V.Vector o) (i, Accumulator i o s))
 newAccumulator es =
     case es of
-        [] -> pure $ Left V.empty
-        t : ts -> do
-            let l = length es -- note, length of *whole* list
-            emptyArr <- MV.new l
-            pure $ Right (t, Accumulator 0 ts emptyArr)
+        []     -> pure $ Left V.empty
+        t : ts -> Right <$> newNEAccumulator (t :| ts)
 
 stepAccumulator :: Accumulator i o s -> o -> ST s (Either (V.Vector o) (i, Accumulator i o s))
 stepAccumulator (Accumulator nextIndex todo arr) next = do
@@ -548,8 +566,8 @@ Morally, this is a stack of frames, but we use the "intrusive list" representati
 we can match on context and the top frame in a single, strict pattern match.
 -}
 data Context uni fun s
-    = FrameApplyFun !(CekValue uni fun) !(Context uni fun s)                         -- ^ @[V _]@
-    | FrameApplyArg !(CekValEnv uni fun) !(Term NamedDeBruijn uni fun ()) !(Context uni fun s) -- ^ @[_ N]@
+    = FrameEvalApp !(CekValEnv uni fun) {-# UNPACK #-} !(Accumulator (Term NamedDeBruijn uni fun ()) (CekValue uni fun) s) !(Context uni fun s) -- ^ @[_ N]@
+    | FrameApplyArgs !(NEV.NonEmptyVector (CekValue uni fun)) !(Context uni fun s) -- ^ @[_ V ...]@
     | FrameForce !(Context uni fun s)                                               -- ^ @(force _)@
     | FrameConstr !(CekValEnv uni fun) {-# UNPACK #-} !Int {-# UNPACK #-} !(Accumulator (Term NamedDeBruijn uni fun ()) (CekValue uni fun) s) !(Context uni fun s)
     | FrameCases !(CekValEnv uni fun) ![Term NamedDeBruijn uni fun ()] !(Context uni fun s)
@@ -561,7 +579,7 @@ instance (Closed uni, uni `Everywhere` ExMemoryUsage) => ExMemoryUsage (CekValue
     memoryUsage = \case
         VCon c      -> memoryUsage c
         VDelay {}   -> 1
-        VLamAbs {}  -> 1
+        VLam {}     -> 1
         VBuiltin {} -> 1
         VConstr {}  -> 1
     {-# INLINE memoryUsage #-}
@@ -650,9 +668,9 @@ enterComputeCek = computeCek (toWordArray 0) where
     computeCek !unbudgetedSteps !ctx !_ (Constant _ val) = do
         !unbudgetedSteps' <- stepAndMaybeSpend BConst unbudgetedSteps
         returnCek unbudgetedSteps' ctx (VCon val)
-    computeCek !unbudgetedSteps !ctx !env (LamAbs _ name body) = do
+    computeCek !unbudgetedSteps !ctx !env (LamAbs _ vars body) = do
         !unbudgetedSteps' <- stepAndMaybeSpend BLamAbs unbudgetedSteps
-        returnCek unbudgetedSteps' ctx (VLamAbs name body env)
+        returnCek unbudgetedSteps' ctx (VLam (NE.length vars) vars env body)
     computeCek !unbudgetedSteps !ctx !env (Delay _ body) = do
         !unbudgetedSteps' <- stepAndMaybeSpend BDelay unbudgetedSteps
         returnCek unbudgetedSteps' ctx (VDelay body env)
@@ -661,9 +679,10 @@ enterComputeCek = computeCek (toWordArray 0) where
         !unbudgetedSteps' <- stepAndMaybeSpend BForce unbudgetedSteps
         computeCek unbudgetedSteps' (FrameForce ctx) env body
     -- s ; ρ ▻ [L M]  ↦  s , [_ (M,ρ)]  ; ρ ▻ L
-    computeCek !unbudgetedSteps !ctx !env (Apply _ fun arg) = do
+    computeCek !unbudgetedSteps !ctx !env (Apply _ fun args) = do
         !unbudgetedSteps' <- stepAndMaybeSpend BApply unbudgetedSteps
-        computeCek unbudgetedSteps' (FrameApplyArg env arg ctx) env fun
+        (t, acc) <- CekM $ newNEAccumulator (NE.cons fun args)
+        computeCek unbudgetedSteps' (FrameEvalApp env acc ctx) env t
     -- s ; ρ ▻ abs α L  ↦  s ◅ abs α (L , ρ)
     -- s ; ρ ▻ con c  ↦  s ◅ con c
     -- s ; ρ ▻ builtin bn  ↦  s ◅ builtin bn arity arity [] [] ρ
@@ -677,10 +696,10 @@ enterComputeCek = computeCek (toWordArray 0) where
         throwing_ _EvaluationFailure
     computeCek !unbudgetedSteps !ctx !env (Constr _ i es) = do
         !unbudgetedSteps' <- stepAndMaybeSpend BApply unbudgetedSteps
-        acc <- CekM $ newAccumulator es
-        case acc of
-            Left res        -> returnCek unbudgetedSteps ctx $ VConstr i res
-            Right (t, acc') -> computeCek unbudgetedSteps' (FrameConstr env i acc' ctx) env t
+        nacc <- CekM $ newAccumulator es
+        case nacc of
+            Left res       -> returnCek unbudgetedSteps' ctx $ VConstr i res
+            Right (t, acc) -> computeCek unbudgetedSteps' (FrameConstr env i acc ctx) env t
     computeCek !unbudgetedSteps !ctx !env (Case _ arg cs) = do
         !unbudgetedSteps' <- stepAndMaybeSpend BApply unbudgetedSteps
         computeCek unbudgetedSteps' (FrameCases env cs ctx) env arg
@@ -707,12 +726,21 @@ enterComputeCek = computeCek (toWordArray 0) where
     -- s , {_ A} ◅ abs α M  ↦  s ; ρ ▻ M [ α / A ]*
     returnCek !unbudgetedSteps (FrameForce ctx) fun = forceEvaluate unbudgetedSteps ctx fun
     -- s , [_ (M,ρ)] ◅ V  ↦  s , [V _] ; ρ ▻ M
-    returnCek !unbudgetedSteps (FrameApplyArg argVarEnv arg ctx) fun =
-        computeCek unbudgetedSteps (FrameApplyFun fun ctx) argVarEnv arg
+    returnCek !unbudgetedSteps (FrameEvalApp env acc ctx) arg = do
+        r <- CekM $ stepAccumulator acc arg
+        case r of
+            Right (next, acc') -> computeCek unbudgetedSteps (FrameEvalApp env acc' ctx) env next
+            -- we seeded the accumulator with the fun and a non-empty list of args, so they have to
+            -- be in there!
+            Left (V.uncons -> Just (fun, NEV.fromVector -> Just args)) ->
+                    returnCek unbudgetedSteps (FrameApplyArgs args ctx) fun
+            -- TODO: maybe try and make this impossible in the types?
+            -- Or I guesss make an error for it, but it genuinely is impossible
+            _ -> error "impossible"
     -- s , [(lam x (M,ρ)) _] ◅ V  ↦  s ; ρ [ x  ↦  V ] ▻ M
     -- FIXME: add rule for VBuiltin once it's in the specification.
-    returnCek !unbudgetedSteps (FrameApplyFun fun ctx) arg =
-        applyEvaluate unbudgetedSteps ctx fun arg
+    returnCek !unbudgetedSteps (FrameApplyArgs args ctx) fun =
+        applyEvaluate unbudgetedSteps ctx fun args
     returnCek !unbudgetedSteps (FrameConstr env i acc ctx) e = do
         r <- CekM $ stepAccumulator acc e
         case r of
@@ -720,13 +748,9 @@ enterComputeCek = computeCek (toWordArray 0) where
             Left done          -> returnCek unbudgetedSteps ctx $ VConstr i done
     returnCek !unbudgetedSteps (FrameCases env cs ctx) e = case e of
         (VConstr i args) -> case cs ^? ix i of
-            Just t ->
-                let nArgs = V.length args
-                in case stripNLambdas nArgs t of
-                    Just body ->
-                        let extended = foldl' (\ev arg -> Env.cons arg ev) env args
-                        in computeCek unbudgetedSteps ctx extended body
-                    Nothing -> throwingWithCause _MachineError (WrongNumberOfCaseArgs nArgs) (Just t)
+            Just t  -> case NEV.fromVector args of
+                Just args' -> computeCek unbudgetedSteps (FrameApplyArgs args' ctx) env t
+                Nothing    -> computeCek unbudgetedSteps ctx env t
             Nothing -> throwingDischarged _MachineError (MissingCaseBranch i) e
         _ -> throwingDischarged _MachineError NonConstrScrutinized e
 
@@ -770,26 +794,43 @@ enterComputeCek = computeCek (toWordArray 0) where
         :: WordArray
         -> Context uni fun s
         -> CekValue uni fun   -- lhs of application
-        -> CekValue uni fun   -- rhs of application
+        -> NEV.NonEmptyVector (CekValue uni fun)   -- rhs of application
         -> CekM uni fun s (Term NamedDeBruijn uni fun ())
-    applyEvaluate !unbudgetedSteps !ctx (VLamAbs _ body env) arg =
-        computeCek unbudgetedSteps ctx (Env.cons arg env) body
+    applyEvaluate !unbudgetedSteps !ctx (VLam arity vars env body) !args =
+        let
+            numArgs = NEV.length args
+            remainingArity = arity-numArgs
+            (toApply, rest) = NEV.splitAt arity args
+            extended = foldl' (\ev arg -> Env.cons arg ev) env toApply
+            ctx' = case NEV.fromVector rest of
+              Just rest' -> FrameApplyArgs rest' ctx
+              Nothing    -> ctx
+        -- TODO: slab env
+        in if remainingArity > 0
+        -- ctx == ctx' in this case, do the version with less computation
+        then returnCek unbudgetedSteps ctx (VLam remainingArity vars extended body)
+        else computeCek unbudgetedSteps ctx' extended body
     -- Annotating @f@ and @exF@ with bangs gave us some speed-up, but only until we added a bang to
     -- 'VCon'. After that the bangs here were making things a tiny bit slower and so we removed them.
-    applyEvaluate !unbudgetedSteps !ctx (VBuiltin fun term runtime) arg = do
-        let argTerm = dischargeCekValue arg
+    applyEvaluate !unbudgetedSteps !ctx (VBuiltin fun term runtime) !args = do
+        let argTerms = fmap dischargeCekValue $ NEV.toNonEmpty args
             -- @term@ and @argTerm@ are fully discharged, and so @term'@ is, hence we can put it
             -- in a 'VBuiltin'.
-            term' = Apply () term argTerm
+            term' = Apply () term argTerms
+        -- TODO: inefficient because it just repeatedly calls applyEvaluate with fewer arguments each time,
+        -- could apply them all in a loop here, perhaps.
+        let (arg, remaining) = NEV.uncons args
         case runtime of
             -- It's only possible to apply a builtin application if the builtin expects a term
             -- argument next.
             BuiltinExpectArgument f -> do
                 res <- evalBuiltinApp fun term' $ f arg
-                returnCek unbudgetedSteps ctx res
+                case NEV.fromVector remaining of
+                    Just remaining' -> applyEvaluate unbudgetedSteps ctx res remaining'
+                    Nothing         -> returnCek unbudgetedSteps ctx res
             _ ->
                 throwingWithCause _MachineError UnexpectedBuiltinTermArgumentMachineError (Just term')
-    applyEvaluate !_ !_ val _ =
+    applyEvaluate !_ !_ val !_ =
         throwingDischarged _MachineError NonFunctionalApplicationMachineError val
 
     -- | Spend the budget that has been accumulated for a number of machine steps.
@@ -817,11 +858,6 @@ enterComputeCek = computeCek (toWordArray 0) where
         if unbudgetedStepsTotal >= ?cekSlippage
         then spendAccumulatedBudget unbudgetedSteps' >> pure (toWordArray 0)
         else pure unbudgetedSteps'
-
-stripNLambdas :: Int -> Term name uni fun a -> Maybe (Term name uni fun a)
-stripNLambdas 0 t              = Just t
-stripNLambdas n (LamAbs _ _ b) = stripNLambdas (n-1) b
-stripNLambdas _ _              = Nothing
 
 -- See Note [Compilation peculiarities].
 -- | Evaluate a term using the CEK machine and keep track of costing, logging is optional.

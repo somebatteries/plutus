@@ -54,21 +54,19 @@
                     [ List a ]
                     {
                       [
-                        [
-                          { [ { Nil_match a } eta ] (all dead (type) m) }
-                          (abs
-                            dead
-                            (type)
-                            [
-                              { [ { Monoid_match m } dMonoid ] m }
-                              (lam
-                                v
-                                [ (lam a (type) (fun a (fun a a))) m ]
-                                (lam v m v)
-                              )
-                            ]
-                          )
-                        ]
+                        { [ { Nil_match a } eta ] (all dead (type) m) }
+                        (abs
+                          dead
+                          (type)
+                          [
+                            { [ { Monoid_match m } dMonoid ] m }
+                            (lam
+                              v
+                              [ (lam a (type) (fun a (fun a a))) m ]
+                              (lam v m v)
+                            )
+                          ]
+                        )
                         (lam
                           x
                           a
@@ -212,17 +210,15 @@
                         [ (lam a (type) [ Maybe a ]) (con integer) ]
                         {
                           [
-                            [
-                              {
-                                [ { Maybe_match (con integer) } ds ]
-                                (all
-                                  dead
-                                  (type)
-                                  [ (lam a (type) [ Maybe a ]) (con integer) ]
-                                )
-                              }
-                              (lam ipv (con integer) (abs dead (type) ds))
-                            ]
+                            {
+                              [ { Maybe_match (con integer) } ds ]
+                              (all
+                                dead
+                                (type)
+                                [ (lam a (type) [ Maybe a ]) (con integer) ]
+                              )
+                            }
+                            (lam ipv (con integer) (abs dead (type) ds))
                             (abs dead (type) b)
                           ]
                           (all dead (type) dead)
@@ -238,31 +234,29 @@
                 (con integer)
                 {
                   [
-                    [
-                      {
+                    {
+                      [
+                        Bool_match
                         [
-                          Bool_match
                           [
                             [
+                              { (builtin ifThenElse) Bool }
                               [
-                                { (builtin ifThenElse) Bool }
                                 [
-                                  [
-                                    (builtin lessThanEqualsInteger)
-                                    (con integer 10)
-                                  ]
-                                  x
+                                  (builtin lessThanEqualsInteger)
+                                  (con integer 10)
                                 ]
+                                x
                               ]
-                              False
                             ]
-                            True
+                            False
                           ]
+                          True
                         ]
-                        (all dead (type) [ Maybe (con integer) ])
-                      }
-                      (abs dead (type) [ { Just (con integer) } x ])
-                    ]
+                      ]
+                      (all dead (type) [ Maybe (con integer) ])
+                    }
+                    (abs dead (type) [ { Just (con integer) } x ])
                     (abs dead (type) { Nothing (con integer) })
                   ]
                   (all dead (type) dead)

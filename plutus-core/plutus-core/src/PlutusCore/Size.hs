@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+{-# OPTIONS_GHC -Wno-identities #-}
 module PlutusCore.Size
     ( Size (..)
     , kindSize
@@ -23,7 +24,7 @@ import Flat hiding (to)
 newtype Size = Size
     { unSize :: Integer
     } deriving stock (Show)
-      deriving newtype (Pretty, Eq, Ord, Num)
+      deriving newtype (Pretty, Eq, Ord, Num, Enum, Real, Integral)
       deriving (Semigroup, Monoid) via Sum Integer
 
 -- | Count the number of AST nodes in a kind.

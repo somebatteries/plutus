@@ -21,44 +21,37 @@
     )
     {
       [
-        [
-          {
-            [ { Maybe_match (con integer) } x ]
-            (all dead (type) [ Maybe (con integer) ])
-          }
-          (lam
-            x
-            (con integer)
-            (abs
-              dead
-              (type)
-              {
-                [
-                  [
-                    {
-                      [ { Maybe_match (con integer) } y ]
-                      (all dead (type) [ Maybe (con integer) ])
-                    }
-                    (lam
-                      y
-                      (con integer)
-                      (abs
-                        dead
-                        (type)
-                        [
-                          { Just (con integer) }
-                          [ [ (builtin addInteger) x ] y ]
-                        ]
-                      )
-                    )
-                  ]
-                  (abs dead (type) { Nothing (con integer) })
-                ]
-                (all dead (type) dead)
-              }
-            )
+        {
+          [ { Maybe_match (con integer) } x ]
+          (all dead (type) [ Maybe (con integer) ])
+        }
+        (lam
+          x
+          (con integer)
+          (abs
+            dead
+            (type)
+            {
+              [
+                {
+                  [ { Maybe_match (con integer) } y ]
+                  (all dead (type) [ Maybe (con integer) ])
+                }
+                (lam
+                  y
+                  (con integer)
+                  (abs
+                    dead
+                    (type)
+                    [ { Just (con integer) } [ [ (builtin addInteger) x ] y ] ]
+                  )
+                )
+                (abs dead (type) { Nothing (con integer) })
+              ]
+              (all dead (type) dead)
+            }
           )
-        ]
+        )
         (abs dead (type) { Nothing (con integer) })
       ]
       (all dead (type) dead)

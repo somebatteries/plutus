@@ -17,7 +17,7 @@ import UntypedPlutusCore.Core.Type
 import PlutusCore.Core.Instance.Pretty.Common ()
 import PlutusCore.Pretty.PrettyConst
 import PlutusCore.Pretty.Readable (Direction (ToTheRight), PrettyConfigReadable, PrettyReadableBy, binderFixity,
-                                   botFixity, compoundDocM, inContextM, juxtFixity, juxtPrettyM, prettyM, sequenceDocM,
+                                   botFixity, compoundDocM, inContextM, infixDocM, juxtFixity, prettyM, sequenceDocM,
                                    unitDocM)
 
 import Prettyprinter
@@ -31,11 +31,12 @@ instance
         Constant _ val -> unitDocM $ pretty val
         Builtin _ bi -> unitDocM $ pretty bi
         Var _ name -> prettyM name
-        LamAbs _ name body ->
+        LamAbs _ vars body ->
             compoundDocM binderFixity $ \prettyIn ->
                 let prettyBot x = prettyIn ToTheRight botFixity x
-                in "\\" <> prettyBot name <+> "->" <+> prettyBot body
-        Apply _ fun arg -> fun `juxtPrettyM` arg
+                in "\\" <> hsep (fmap prettyBot (toList vars)) <+> "->" <+> prettyBot body
+        Apply _ fun args ->
+            infixDocM juxtFixity $ \prettyL prettyR -> hsep (prettyL fun : fmap prettyR (toList args))
         Delay _ term ->
             sequenceDocM ToTheRight juxtFixity $ \prettyEl ->
                 "delay" <+> prettyEl term

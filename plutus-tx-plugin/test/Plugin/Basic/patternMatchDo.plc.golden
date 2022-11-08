@@ -38,10 +38,8 @@
               (fun a [ Maybe b ])
               {
                 [
-                  [
-                    { [ { Maybe_match a } ds ] (all dead (type) [ Maybe b ]) }
-                    (lam x a (abs dead (type) [ k x ]))
-                  ]
+                  { [ { Maybe_match a } ds ] (all dead (type) [ Maybe b ]) }
+                  (lam x a (abs dead (type) [ k x ]))
                   (abs dead (type) { Nothing b })
                 ]
                 (all dead (type) dead)

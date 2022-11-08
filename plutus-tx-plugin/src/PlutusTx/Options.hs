@@ -56,6 +56,8 @@ data PluginOptions = PluginOptions
     , -- Setting to `True` defines `trace` as `\_ a -> a` instead of the builtin version.
       -- Which effectively ignores the trace text.
       _posRemoveTrace                    :: Bool
+    , _posSOP                            :: Bool
+    , _posMultilambda                    :: Bool
     }
 
 makeLenses ''PluginOptions
@@ -182,6 +184,12 @@ pluginOptions =
         , let k = "remove-trace"
               desc = "Eliminate calls to ``trace`` from Plutus Core"
            in (k, PluginOption typeRep (setTrue k) posRemoveTrace desc)
+        , let k = "sums-of-products"
+              desc = "Use sums-of-products to encode datatypes"
+           in (k, PluginOption typeRep (setTrue k) posSOP desc)
+        , let k = "multi-lambda"
+              desc = "Use multi-lambdas and multi-applications"
+           in (k, PluginOption typeRep (setTrue k) posMultilambda desc)
         ]
 
 flag :: (a -> a) -> OptionKey -> Maybe OptionValue -> Validation ParseError (a -> a)
@@ -220,6 +228,8 @@ defaultPluginOptions =
         , _posCoverageLocation = False
         , _posCoverageBoolean = False
         , _posRemoveTrace = False
+        , _posSOP = True
+        , _posMultilambda = True
         }
 
 processOne ::

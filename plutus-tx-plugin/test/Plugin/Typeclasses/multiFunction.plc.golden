@@ -20,9 +20,8 @@
           Bool
           {
             [
-              [
-                { [ Bool_match l ] (all dead (type) Bool) } (abs dead (type) r)
-              ]
+              { [ Bool_match l ] (all dead (type) Bool) }
+              (abs dead (type) r)
               (abs dead (type) False)
             ]
             (all dead (type) dead)
@@ -150,7 +149,8 @@
         ds
         Person
         [
-          [ { [ Person_match ds ] (con integer) } (con integer 35) ]
+          { [ Person_match ds ] (con integer) }
+          (con integer 35)
           (con integer 30)
         ]
       )
@@ -166,23 +166,19 @@
           Animal
           {
             [
-              [
-                { [ Person_match ds ] (all dead (type) Bool) }
-                (abs
-                  dead
-                  (type)
-                  {
-                    [
-                      [
-                        { [ Animal_match ds ] (all dead (type) Bool) }
-                        (abs dead (type) True)
-                      ]
-                      (abs dead (type) False)
-                    ]
-                    (all dead (type) dead)
-                  }
-                )
-              ]
+              { [ Person_match ds ] (all dead (type) Bool) }
+              (abs
+                dead
+                (type)
+                {
+                  [
+                    { [ Animal_match ds ] (all dead (type) Bool) }
+                    (abs dead (type) True)
+                    (abs dead (type) False)
+                  ]
+                  (all dead (type) dead)
+                }
+              )
               (abs dead (type) False)
             ]
             (all dead (type) dead)

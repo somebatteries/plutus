@@ -45,8 +45,8 @@ shadowed =
             ty <- freshTyName "ty"
             let n = Name "yo" u
             let term =
-                    LamAbs (Tag 1) n (TyVar Ignore ty) $
-                    LamAbs (Tag 2) n (TyVar Ignore ty) $
+                    lamAbs (Tag 1) n (TyVar Ignore ty) $
+                    lamAbs (Tag 2) n (TyVar Ignore ty) $
                     Var Ignore n
             checkTermUniques term
         assertion = checked @?= Left (MultiplyDefined u (Tag 1) (Tag 2))
@@ -60,9 +60,9 @@ multiplyDefined =
             ty <- freshTyName "ty"
             let n = Name "yo" u
             let term =
-                    Apply Ignore
-                    (LamAbs (Tag 1) n (TyVar Ignore ty) (Var Ignore n))
-                    (LamAbs (Tag 2) n (TyVar Ignore ty) (Var Ignore n))
+                    apply Ignore
+                    (lamAbs (Tag 1) n (TyVar Ignore ty) (Var Ignore n))
+                    (lamAbs (Tag 2) n (TyVar Ignore ty) (Var Ignore n))
             checkTermUniques term
         assertion = checked @?= Left (MultiplyDefined u (Tag 1) (Tag 2))
     in testCase "multiplyDefined" assertion
@@ -75,7 +75,7 @@ incoherentUse =
             let n = Name "yo" u
             let ty = TyName n
             let term =
-                    LamAbs (Tag 1) n (TyVar (Tag 2) ty) $
+                    lamAbs (Tag 1) n (TyVar (Tag 2) ty) $
                     TyInst Ignore (Var (Tag 3) n) (TyVar (Tag 4) ty)
             checkTermUniques term
         assertion = checked @?= Left (IncoherentUsage u (Tag 1) (Tag 2))
@@ -107,8 +107,8 @@ values = runQuote $ do
         , testCase "absValue" $ VR.isTermValue (TyAbs () aN (Type()) val) @?= True
 
         , testCase "error" $ VR.isTermValue (Error () aV) @?= False
-        , testCase "lam" $ VR.isTermValue (LamAbs () (Var () aN) aV nonVal) @?= True
-        , testCase "app" $ VR.isTermValue (Apply () val val) @?= False
+        , testCase "lam" $ VR.isTermValue (lamAbs () (Var () aN) aV nonVal) @?= True
+        , testCase "app" $ VR.isTermValue (apply () val val) @?= False
         , testCase "unwrap" $ VR.isTermValue (Unwrap () val) @?= False
         , testCase "inst" $ VR.isTermValue (TyInst () val aV) @?= False
         , testCase "constant" $ VR.isTermValue (mkConstant @Integer @DefaultUni () 1) @?= True
@@ -153,8 +153,8 @@ normalTypesCheck = runQuote $ do
         normal = integer
         nonNormal = TyApp () (TyLam () aN (Type ()) aV) normal
     pure $ testGroup "normalized types check" [
-        testCase "lamNormal" $ isRight (checkNormal (LamAbs () xN normal xV)) @? "Normalization"
-        , testCase "lamNonNormal" $ isLeft (checkNormal (LamAbs () xN nonNormal xV)) @? "Normalization"
+        testCase "lamNormal" $ isRight (checkNormal (lamAbs () xN normal xV)) @? "Normalization"
+        , testCase "lamNonNormal" $ isLeft (checkNormal (lamAbs () xN nonNormal xV)) @? "Normalization"
 
         , testCase "abs" $ isRight (checkNormal (TyAbs () aN (Type ()) xV)) @? "Normalization"
 
@@ -163,7 +163,7 @@ normalTypesCheck = runQuote $ do
 
         , testCase "unwrap" $ isRight (checkNormal (Unwrap () xV)) @? "Normalization"
 
-        , testCase "app" $ isRight (checkNormal (Apply () xV xV)) @? "Normalization"
+        , testCase "app" $ isRight (checkNormal (apply () xV xV)) @? "Normalization"
 
         , testCase "errorNormal" $ isRight (checkNormal (Error () normal)) @? "Normalization"
         , testCase "errorNonNormal" $ isLeft (checkNormal (Error () nonNormal)) @? "Normalization"

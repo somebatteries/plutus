@@ -31,12 +31,12 @@ instance
     prettyBy config = \case
         Var ann n ->
             sep (consAnnIf config ann [prettyBy config n])
-        LamAbs ann n t ->
+        LamAbs ann vars t ->
             sexp "lam" (consAnnIf config ann
-                [prettyBy config n, prettyBy config t])
-        Apply ann t1 t2 ->
-            brackets' (sep (consAnnIf config ann
-                [prettyBy config t1, prettyBy config t2]))
+               (fmap (prettyBy config) (toList vars) ++ [prettyBy config t]))
+        Apply ann f args ->
+            brackets' (sep (consAnnIf config ann (prettyBy config f
+                                                  : fmap (prettyBy config) (toList args))))
         Constant ann c ->
             sexp "con" (consAnnIf config ann [prettyTypeOf c, pretty c])
         Builtin ann bi ->

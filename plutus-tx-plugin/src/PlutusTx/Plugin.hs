@@ -326,7 +326,12 @@ compileMarkedExpr locStr codeTy origE = do
                 ++ [ LocationCoverage  | _posCoverageLocation opts  ]
                 ++ [ BooleanCoverage  | _posCoverageBoolean opts  ]
     let ctx = CompileContext {
-            ccOpts = CompileOptions {coProfile=_posProfile opts,coCoverage=coverage,coRemoveTrace=_posRemoveTrace opts},
+            ccOpts = CompileOptions {
+                coProfile=_posProfile opts,
+                coCoverage=coverage,
+                coRemoveTrace=_posRemoveTrace opts,
+                coMultilambda=_posMultilambda opts
+                },
             ccFlags = flags,
             ccFamInstEnvs = famEnvs,
             ccNameInfo = nameInfo,
@@ -394,11 +399,15 @@ runCompiler moduleName opts expr = do
                       -- pir's tc-config is based on plc tcconfig
                       then Just $ PIR.PirTCConfig plcTcConfig PIR.YesEscape
                       else Nothing
+        datatypes = PIR.defaultDatatypeCompilationOpts
+            & set PIR.dcoStyle (if _posSOP opts then PIR.SumsOfProducts else PIR.ScottEncoding)
+            & set PIR.dcoCaseBranchStyle (if _posMultilambda opts then PIR.MultiLambda else PIR.NestedLambda)
         pirCtx = PIR.toDefaultCompilationCtx plcTcConfig
                  & set (PIR.ccOpts . PIR.coOptimize) (_posOptimize opts)
                  & set (PIR.ccOpts . PIR.coPedantic) (_posPedantic opts)
                  & set (PIR.ccOpts . PIR.coVerbose) (_posVerbose opts)
                  & set (PIR.ccOpts . PIR.coDebug) (_posDebug opts)
+                 & set (PIR.ccOpts . PIR.coDatatypes) datatypes
                  & set (PIR.ccOpts . PIR.coMaxSimplifierIterations) (_posMaxSimplifierIterations opts)
                  & set PIR.ccTypeCheckConfig pirTcConfig
                  -- Simplifier options

@@ -1,3 +1,4 @@
+-- editorconfig-checker-disable-file
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -91,12 +92,12 @@ instance ( PLC.PrettyClassicBy configName tyname
         TyAbs ann tn k t ->
             sexp "abs" (PLC.consAnnIf config ann
                 [prettyBy config tn, prettyBy config k, prettyBy config t])
-        LamAbs ann n ty t ->
+        LamAbs ann vars t ->
             sexp "lam" (PLC.consAnnIf config ann
-                [prettyBy config n, prettyBy config ty, prettyBy config t])
-        Apply ann t1 t2 ->
-            brackets' (sep (PLC.consAnnIf config ann
-                [prettyBy config t1, prettyBy config t2]))
+               (concatMap (\(n, ty) -> [prettyBy config n, prettyBy config ty]) (toList vars)
+                ++ [prettyBy config t]))
+        Apply ann f args ->
+            brackets' (sep (PLC.consAnnIf config ann (prettyBy config f : fmap (prettyBy config) (toList args))))
         Constant ann c ->
             sexp "con" (PLC.consAnnIf config ann [prettyTypeOf c, pretty c])
         Builtin ann bi ->

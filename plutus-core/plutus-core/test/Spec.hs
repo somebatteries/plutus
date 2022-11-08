@@ -36,6 +36,7 @@ import Control.Monad.Except
 import Data.ByteString.Lazy qualified as BSL
 import Data.Either (isLeft)
 import Data.Foldable (for_)
+import Data.List.NonEmpty qualified as NE
 import Data.Proxy
 import Data.Text qualified as T
 import Data.Text.Encoding (encodeUtf8)
@@ -78,8 +79,8 @@ compareTerm
     => Term TyName Name uni fun a -> Term TyName Name uni fun a -> Bool
 compareTerm (Var _ n) (Var _ n')                   = compareName n n'
 compareTerm (TyAbs _ n k t) (TyAbs _ n' k' t')     = compareTyName n n' && k == k' && compareTerm t t'
-compareTerm (LamAbs _ n ty t) (LamAbs _ n' ty' t') = compareName n n' && compareType ty ty' && compareTerm t t'
-compareTerm (Apply _ t t'') (Apply _ t' t''')      = compareTerm t t' && compareTerm t'' t'''
+compareTerm (LamAbs _ vars t) (LamAbs _ vars' t')  = and (NE.zipWith (\(n, ty) (n',ty') -> compareName n n' && compareType ty ty') vars vars') && compareTerm t t'
+compareTerm (Apply _ t args) (Apply _ t' args')    = compareTerm t t' && and (NE.zipWith compareTerm args args')
 compareTerm (Constant _ x) (Constant _ y)          = x == y
 compareTerm (Builtin _ bi) (Builtin _ bi')         = bi == bi'
 compareTerm (TyInst _ t ty) (TyInst _ t' ty')      = compareTerm t t' && compareType ty ty'

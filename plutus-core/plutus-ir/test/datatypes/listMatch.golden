@@ -195,66 +195,31 @@
           (lam
             case_Nil_i0
             out_List_i2
-            (lam
-              case_Cons_i0
+            case_Cons_i0
+            (fun
+              a_i5
               (fun
-                a_i5
-                (fun
-                  [
-                    (lam
-                      a_i0
-                      (type)
-                      (ifix
-                        (lam
-                          List_i0
-                          (fun (type) (type))
-                          (lam
-                            a_i0
-                            (type)
-                            (sum (prod ) (prod a_i1 [ List_i2 a_i1 ]))
-                          )
-                        )
-                        a_i1
-                      )
-                    )
-                    a_i5
-                  ]
-                  out_List_i3
-                )
-              )
-              (case
-                (unwrap x_i4)
-                out_List_i3
-                case_Nil_i2
-                (lam
-                  arg2_i0
-                  a_i6
+                [
                   (lam
-                    arg1_i0
-                    [
+                    a_i0
+                    (type)
+                    (ifix
                       (lam
-                        a_i0
-                        (type)
-                        (ifix
-                          (lam
-                            List_i0
-                            (fun (type) (type))
-                            (lam
-                              a_i0
-                              (type)
-                              (sum (prod ) (prod a_i1 [ List_i2 a_i1 ]))
-                            )
-                          )
-                          a_i1
+                        List_i0
+                        (fun (type) (type))
+                        (lam
+                          a_i0 (type) (sum (prod ) (prod a_i1 [ List_i2 a_i1 ]))
                         )
                       )
-                      a_i7
-                    ]
-                    [ [ case_Cons_i3 arg2_i2 ] arg1_i1 ]
+                      a_i1
+                    )
                   )
-                )
+                  a_i5
+                ]
+                out_List_i3
               )
             )
+            (case (unwrap x_i4) out_List_i3 case_Nil_i2 case_Cons_i1)
           )
         )
       )

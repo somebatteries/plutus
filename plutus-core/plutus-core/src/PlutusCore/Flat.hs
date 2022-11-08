@@ -3,6 +3,7 @@
 
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE GADTs                #-}
+{-# LANGUAGE InstanceSigs         #-}
 {-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE TypeApplications     #-}
@@ -279,7 +280,7 @@ instance ( Closed uni
     encode = \case
         Var      ann n         -> encodeTerm 0 <> encode ann <> encode n
         TyAbs    ann tn k t    -> encodeTerm 1 <> encode ann <> encode tn  <> encode k   <> encode t
-        LamAbs   ann n ty t    -> encodeTerm 2 <> encode ann <> encode n   <> encode ty  <> encode t
+        LamAbs   ann vars t    -> encodeTerm 2 <> encode ann <> encode vars <> encode t
         Apply    ann t t'      -> encodeTerm 3 <> encode ann <> encode t   <> encode t'
         Constant ann c         -> encodeTerm 4 <> encode ann <> encode c
         TyInst   ann t ty      -> encodeTerm 5 <> encode ann <> encode t   <> encode ty
@@ -293,7 +294,7 @@ instance ( Closed uni
     decode = go =<< decodeTerm
         where go 0  = Var      <$> decode <*> decode
               go 1  = TyAbs    <$> decode <*> decode <*> decode <*> decode
-              go 2  = LamAbs   <$> decode <*> decode <*> decode <*> decode
+              go 2  = LamAbs   <$> decode <*> decode <*> decode
               go 3  = Apply    <$> decode <*> decode <*> decode
               go 4  = Constant <$> decode <*> decode
               go 5  = TyInst   <$> decode <*> decode <*> decode
@@ -308,7 +309,7 @@ instance ( Closed uni
     size tm sz = termTagWidth + sz + case tm of
         Var      ann n         -> getSize ann + getSize n
         TyAbs    ann tn k t    -> getSize ann + getSize tn  + getSize k   + getSize t
-        LamAbs   ann n ty t    -> getSize ann + getSize n   + getSize ty  + getSize t
+        LamAbs   ann vars t    -> getSize ann + getSize vars + getSize t
         Apply    ann t t'      -> getSize ann + getSize t   + getSize t'
         Constant ann c         -> getSize ann + getSize c
         TyInst   ann t ty      -> getSize ann + getSize t   + getSize ty

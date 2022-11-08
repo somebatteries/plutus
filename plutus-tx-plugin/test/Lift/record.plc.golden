@@ -23,16 +23,7 @@
       (delay
         (lam
           case_Plugin_Data_Spec_MyMonoRecord_i0
-          (case
-            x_i2
-            (lam
-              arg2_i0
-              (lam
-                arg1_i0
-                [ [ case_Plugin_Data_Spec_MyMonoRecord_i3 arg2_i2 ] arg1_i1 ]
-              )
-            )
-          )
+          (case x_i2 case_Plugin_Data_Spec_MyMonoRecord_i1)
         )
       )
     )

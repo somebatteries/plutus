@@ -127,10 +127,8 @@
                       [ List a ]
                       {
                         [
-                          [
-                            { [ { Nil_match a } eta ] (all dead (type) m) }
-                            (abs dead (type) [ { mempty m } dMonoid ])
-                          ]
+                          { [ { Nil_match a } eta ] (all dead (type) m) }
+                          (abs dead (type) [ { mempty m } dMonoid ])
                           (lam
                             x
                             a
@@ -191,12 +189,8 @@
                       [ List a ]
                       {
                         [
-                          [
-                            {
-                              [ { Nil_match a } l ] (all dead (type) [ List b ])
-                            }
-                            (abs dead (type) { Nil b })
-                          ]
+                          { [ { Nil_match a } l ] (all dead (type) [ List b ]) }
+                          (abs dead (type) { Nil b })
                           (lam
                             x
                             a
@@ -526,22 +520,18 @@
                               [ List a ]
                               {
                                 [
-                                  [
-                                    {
-                                      [ { Nil_match a } ds ]
-                                      (all dead (type) [ f [ List b ] ])
-                                    }
-                                    (abs
-                                      dead
-                                      (type)
-                                      [
-                                        {
-                                          [ { pure f } dApplicative ] [ List b ]
-                                        }
-                                        { Nil b }
-                                      ]
-                                    )
-                                  ]
+                                  {
+                                    [ { Nil_match a } ds ]
+                                    (all dead (type) [ f [ List b ] ])
+                                  }
+                                  (abs
+                                    dead
+                                    (type)
+                                    [
+                                      { [ { pure f } dApplicative ] [ List b ] }
+                                      { Nil b }
+                                    ]
+                                  )
                                   (lam
                                     x
                                     a

@@ -14,13 +14,11 @@
       ds
       [ [ MyPolyData (con integer) ] (con integer) ]
       [
-        [
-          {
-            [ { { MyPolyData_match (con integer) } (con integer) } ds ]
-            (con integer)
-          }
-          (lam a (con integer) (lam ds (con integer) a))
-        ]
+        {
+          [ { { MyPolyData_match (con integer) } (con integer) } ds ]
+          (con integer)
+        }
+        (lam a (con integer) (lam ds (con integer) a))
         (lam ipv (con integer) (con integer 2))
       ]
     )

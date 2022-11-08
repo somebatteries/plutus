@@ -451,10 +451,12 @@ inferTypeM (Var ann name) =
 -- [check| G !- dom :: *]    dom ~> vDom    [infer| G , n : dom !- body : vCod]
 -- ----------------------------------------------------------------------------
 -- [infer| G !- lam n dom body : vDom -> vCod]
-inferTypeM (LamAbs ann n dom body) = do
-    checkKindM ann dom $ Type ()
-    vDom <- normalizeTypeM $ void dom
-    TyFun () <<$>> pure vDom <<*>> withVar n vDom (inferTypeM body)
+inferTypeM (LamAbs ann vars body) = do
+    vars' <- for vars $ \(n, ty) -> do
+        checkKindM ann ty $ Type ()
+        vTy <- normalizeTypeM $ void ty
+        pure (n, vTy)
+    foldr (\(n, vTy) inner -> TyFun () <<$>> pure vTy <<*>> withVar n vTy inner) (inferTypeM body) vars'
 
 -- [infer| G , n :: nK !- body : vBodyTy]
 -- ---------------------------------------------------
@@ -466,14 +468,16 @@ inferTypeM (TyAbs _ n nK body) = do
 -- [infer| G !- fun : vDom -> vCod]    [check| G !- arg : vDom]
 -- ------------------------------------------------------------
 -- [infer| G !- fun arg : vCod]
-inferTypeM (Apply ann fun arg) = do
+inferTypeM (Apply ann fun args) = do
     vFunTy <- inferTypeM fun
-    case unNormalized vFunTy of
-        TyFun _ vDom vCod -> do
+    let
+        handleArgs (arg:remaining) (TyFun _ dom cod) = do
             -- Subparts of a normalized type, so normalized.
-            checkTypeM ann arg $ Normalized vDom
-            pure $ Normalized vCod
-        _ -> throwing _TypeError (TypeMismatch ann (void fun) (TyFun () dummyType dummyType) vFunTy)
+            checkTypeM ann arg $ Normalized dom
+            handleArgs remaining cod
+        handleArgs (_:_) _ = throwing _TypeError (TypeMismatch ann (void fun) (mkIterTyFun () (replicate (length args) dummyType) dummyType) vFunTy)
+        handleArgs [] resTy = pure $ Normalized resTy
+    handleArgs (toList args) (unNormalized vFunTy)
 
 -- [infer| G !- body : all (n :: nK) vCod]    [check| G !- ty :: tyK]    ty ~> vTy
 -- -------------------------------------------------------------------------------

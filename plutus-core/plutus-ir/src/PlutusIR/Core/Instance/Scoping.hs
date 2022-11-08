@@ -22,7 +22,7 @@ instance tyname ~ TyName => Reference TyName (Term tyname name uni fun) where
     referenceVia reg tyname term = TyInst NotAName term $ TyVar (reg tyname) tyname
 
 instance name ~ Name => Reference Name (Term tyname name uni fun) where
-    referenceVia reg name term = Apply NotAName term $ Var (reg name) name
+    referenceVia reg name term = Apply NotAName term (pure $ Var (reg name) name)
 
 instance tyname ~ TyName => Reference TyName (VarDecl tyname name uni) where
     referenceVia reg tyname (VarDecl ann varName ty) =
@@ -219,7 +219,8 @@ registerByRecursivity Rec    = registerBound
 registerByRecursivity NonRec = registerOutOfScope
 
 instance (tyname ~ TyName, name ~ Name) => EstablishScoping (Term tyname name uni fun) where
-    establishScoping (Let _ recy bindingsDup body) = do
+    establishScoping (Let _ recy bindingsDup body) = Prelude.error "no idea"
+    {-
         bindings <- establishScopingBindings (registerByRecursivity recy) bindingsDup
         -- Follows the shape of 'establishScopingBinder', but subtly differs (for example,
         -- does not bind a single name, does not have a @sort@ etc), hence we write things out
@@ -228,16 +229,20 @@ instance (tyname ~ TyName, name ~ Name) => EstablishScoping (Term tyname name un
             Let NotAName recy bindings .
                 referenceBound bindings <$>
                     establishScoping body
-    establishScoping (LamAbs _ nameDup ty body) = do
-        name <- freshenName nameDup
-        establishScopingBinder LamAbs name ty body
+    -}
+    establishScoping (LamAbs _ vars body)  = do
+        vars' <- for vars $ \(n, ty) -> do
+            n' <- freshenName n
+            pure (n', ty)
+        -- TODO: no idea
+        Prelude.error "no idea"
     establishScoping (TyAbs _ nameDup kind body) = do
         name <- freshenTyName nameDup
         establishScopingBinder TyAbs name kind body
     establishScoping (IWrap _ pat arg term) =
         IWrap NotAName <$> establishScoping pat <*> establishScoping arg <*> establishScoping term
-    establishScoping (Apply _ fun arg) =
-        Apply NotAName <$> establishScoping fun <*> establishScoping arg
+    establishScoping (Apply _ fun args) =
+        Apply NotAName <$> establishScoping fun <*> traverse establishScoping args
     establishScoping (Unwrap _ term) = Unwrap NotAName <$> establishScoping term
     establishScoping (Error _ ty) = Error NotAName <$> establishScoping ty
     establishScoping (TyInst _ term ty) =
@@ -275,13 +280,13 @@ instance (tyname ~ TyName, name ~ Name) => CollectScopeInfo (Binding tyname name
 instance (tyname ~ TyName, name ~ Name) => CollectScopeInfo (Term tyname name uni fun) where
     collectScopeInfo (Let _ _ bindings body) =
         foldMap collectScopeInfo bindings <> collectScopeInfo body
-    collectScopeInfo (LamAbs ann name ty body) =
-        handleSname ann name <> collectScopeInfo ty <> collectScopeInfo body
+    collectScopeInfo (LamAbs ann vars body)  =
+        foldMap (\(n, ty) -> handleSname ann n <> collectScopeInfo ty) vars <> collectScopeInfo body
     collectScopeInfo (TyAbs ann name kind body) =
         handleSname ann name <> collectScopeInfo kind <> collectScopeInfo body
     collectScopeInfo (IWrap _ pat arg term) =
         collectScopeInfo pat <> collectScopeInfo arg <> collectScopeInfo term
-    collectScopeInfo (Apply _ fun arg) = collectScopeInfo fun <> collectScopeInfo arg
+    collectScopeInfo (Apply _ fun args) = collectScopeInfo fun <> foldMap collectScopeInfo args
     collectScopeInfo (Unwrap _ term) = collectScopeInfo term
     collectScopeInfo (Error _ ty) = collectScopeInfo ty
     collectScopeInfo (TyInst _ term ty) = collectScopeInfo term <> collectScopeInfo ty

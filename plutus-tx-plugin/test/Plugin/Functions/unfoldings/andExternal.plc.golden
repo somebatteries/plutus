@@ -20,9 +20,8 @@
           Bool
           {
             [
-              [
-                { [ Bool_match a ] (all dead (type) Bool) } (abs dead (type) b)
-              ]
+              { [ Bool_match a ] (all dead (type) Bool) }
+              (abs dead (type) b)
               (abs dead (type) False)
             ]
             (all dead (type) dead)

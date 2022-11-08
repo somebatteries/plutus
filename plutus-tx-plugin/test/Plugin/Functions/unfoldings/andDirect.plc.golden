@@ -20,19 +20,15 @@
           Bool
           {
             [
-              [
-                { [ Bool_match ds ] (all dead (type) Bool) }
-                (abs dead (type) False)
-              ]
+              { [ Bool_match ds ] (all dead (type) Bool) }
+              (abs dead (type) False)
               (abs
                 dead
                 (type)
                 {
                   [
-                    [
-                      { [ Bool_match ds ] (all dead (type) Bool) }
-                      (abs dead (type) False)
-                    ]
+                    { [ Bool_match ds ] (all dead (type) Bool) }
+                    (abs dead (type) False)
                     (abs dead (type) True)
                   ]
                   (all dead (type) dead)

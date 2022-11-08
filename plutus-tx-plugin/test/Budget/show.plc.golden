@@ -46,37 +46,33 @@
                 )
                 {
                   [
-                    [
-                      {
+                    {
+                      [
+                        Bool_match
                         [
-                          Bool_match
                           [
                             [
-                              [
-                                { (builtin ifThenElse) Bool }
-                                [
-                                  [ (builtin equalsInteger) q ] (con integer 0)
-                                ]
-                              ]
-                              True
+                              { (builtin ifThenElse) Bool }
+                              [ [ (builtin equalsInteger) q ] (con integer 0) ]
                             ]
-                            False
+                            True
                           ]
+                          False
                         ]
-                        (all dead (type) [ List (con integer) ])
-                      }
-                      (abs
-                        dead
-                        (type)
+                      ]
+                      (all dead (type) [ List (con integer) ])
+                    }
+                    (abs
+                      dead
+                      (type)
+                      [
                         [
-                          [
-                            { Cons (con integer) }
-                            [ [ (builtin remainderInteger) n ] y ]
-                          ]
-                          acc
+                          { Cons (con integer) }
+                          [ [ (builtin remainderInteger) n ] y ]
                         ]
-                      )
-                    ]
+                        acc
+                      ]
+                    )
                     (abs
                       dead
                       (type)
@@ -132,10 +128,8 @@
                       [ List a ]
                       {
                         [
-                          [
-                            { [ { Nil_match a } l ] (all dead (type) b) }
-                            (abs dead (type) acc)
-                          ]
+                          { [ { Nil_match a } l ] (all dead (type) b) }
+                          (abs dead (type) acc)
                           (lam
                             x
                             a
@@ -183,54 +177,50 @@
                   (con integer)
                   {
                     [
-                      [
-                        {
+                      {
+                        [
+                          Bool_match
                           [
-                            Bool_match
                             [
                               [
+                                { (builtin ifThenElse) Bool }
                                 [
-                                  { (builtin ifThenElse) Bool }
-                                  [
-                                    [ (builtin lessThanInteger) w ]
-                                    (con integer 0)
-                                  ]
+                                  [ (builtin lessThanInteger) w ]
+                                  (con integer 0)
                                 ]
-                                True
                               ]
-                              False
+                              True
                             ]
+                            False
                           ]
-                          (all
-                            dead
-                            (type)
-                            (fun [ List (con string) ] [ List (con string) ])
-                          )
-                        }
-                        (abs
+                        ]
+                        (all
                           dead
                           (type)
-                          (lam
-                            x
-                            [ List (con string) ]
-                            [
-                              [ { Cons (con string) } (con string "-") ]
-                              [
-                                [
-                                  wcshowsPrec
-                                  [
-                                    [
-                                      (builtin subtractInteger) (con integer 0)
-                                    ]
-                                    w
-                                  ]
-                                ]
-                                x
-                              ]
-                            ]
-                          )
+                          (fun [ List (con string) ] [ List (con string) ])
                         )
-                      ]
+                      }
+                      (abs
+                        dead
+                        (type)
+                        (lam
+                          x
+                          [ List (con string) ]
+                          [
+                            [ { Cons (con string) } (con string "-") ]
+                            [
+                              [
+                                wcshowsPrec
+                                [
+                                  [ (builtin subtractInteger) (con integer 0) ]
+                                  w
+                                ]
+                              ]
+                              x
+                            ]
+                          ]
+                        )
+                      )
                       (abs
                         dead
                         (type)
@@ -259,486 +249,461 @@
                                         { Cons (con string) }
                                         {
                                           [
-                                            [
-                                              {
+                                            {
+                                              [
+                                                Bool_match
                                                 [
-                                                  Bool_match
                                                   [
                                                     [
+                                                      {
+                                                        (builtin ifThenElse)
+                                                        Bool
+                                                      }
                                                       [
-                                                        {
-                                                          (builtin ifThenElse)
-                                                          Bool
-                                                        }
                                                         [
-                                                          [
-                                                            (builtin
-                                                              equalsInteger
-                                                            )
-                                                            digit
-                                                          ]
-                                                          (con integer 0)
+                                                          (builtin
+                                                            equalsInteger
+                                                          )
+                                                          digit
                                                         ]
+                                                        (con integer 0)
                                                       ]
-                                                      True
                                                     ]
-                                                    False
+                                                    True
                                                   ]
+                                                  False
                                                 ]
-                                                (all dead (type) (con string))
-                                              }
-                                              (abs dead (type) (con string "0"))
-                                            ]
+                                              ]
+                                              (all dead (type) (con string))
+                                            }
+                                            (abs dead (type) (con string "0"))
                                             (abs
                                               dead
                                               (type)
                                               {
                                                 [
-                                                  [
-                                                    {
+                                                  {
+                                                    [
+                                                      Bool_match
                                                       [
-                                                        Bool_match
                                                         [
                                                           [
+                                                            {
+                                                              (builtin
+                                                                ifThenElse
+                                                              )
+                                                              Bool
+                                                            }
                                                             [
-                                                              {
-                                                                (builtin
-                                                                  ifThenElse
-                                                                )
-                                                                Bool
-                                                              }
                                                               [
-                                                                [
-                                                                  (builtin
-                                                                    equalsInteger
-                                                                  )
-                                                                  digit
-                                                                ]
-                                                                (con integer 1)
+                                                                (builtin
+                                                                  equalsInteger
+                                                                )
+                                                                digit
                                                               ]
+                                                              (con integer 1)
                                                             ]
-                                                            True
                                                           ]
-                                                          False
+                                                          True
                                                         ]
+                                                        False
                                                       ]
-                                                      (all
-                                                        dead (type) (con string)
-                                                      )
-                                                    }
-                                                    (abs
-                                                      dead
-                                                      (type)
-                                                      (con string "1")
+                                                    ]
+                                                    (all
+                                                      dead (type) (con string)
                                                     )
-                                                  ]
+                                                  }
+                                                  (abs
+                                                    dead (type) (con string "1")
+                                                  )
                                                   (abs
                                                     dead
                                                     (type)
                                                     {
                                                       [
-                                                        [
-                                                          {
+                                                        {
+                                                          [
+                                                            Bool_match
                                                             [
-                                                              Bool_match
                                                               [
                                                                 [
+                                                                  {
+                                                                    (builtin
+                                                                      ifThenElse
+                                                                    )
+                                                                    Bool
+                                                                  }
                                                                   [
-                                                                    {
-                                                                      (builtin
-                                                                        ifThenElse
-                                                                      )
-                                                                      Bool
-                                                                    }
                                                                     [
-                                                                      [
-                                                                        (builtin
-                                                                          equalsInteger
-                                                                        )
-                                                                        digit
-                                                                      ]
-                                                                      (con
-                                                                        integer
-                                                                        2
+                                                                      (builtin
+                                                                        equalsInteger
                                                                       )
+                                                                      digit
                                                                     ]
+                                                                    (con
+                                                                      integer 2
+                                                                    )
                                                                   ]
-                                                                  True
                                                                 ]
-                                                                False
+                                                                True
                                                               ]
+                                                              False
                                                             ]
-                                                            (all
-                                                              dead
-                                                              (type)
-                                                              (con string)
-                                                            )
-                                                          }
-                                                          (abs
+                                                          ]
+                                                          (all
                                                             dead
                                                             (type)
-                                                            (con string "2")
+                                                            (con string)
                                                           )
-                                                        ]
+                                                        }
+                                                        (abs
+                                                          dead
+                                                          (type)
+                                                          (con string "2")
+                                                        )
                                                         (abs
                                                           dead
                                                           (type)
                                                           {
                                                             [
-                                                              [
-                                                                {
+                                                              {
+                                                                [
+                                                                  Bool_match
                                                                   [
-                                                                    Bool_match
                                                                     [
                                                                       [
+                                                                        {
+                                                                          (builtin
+                                                                            ifThenElse
+                                                                          )
+                                                                          Bool
+                                                                        }
                                                                         [
-                                                                          {
-                                                                            (builtin
-                                                                              ifThenElse
-                                                                            )
-                                                                            Bool
-                                                                          }
                                                                           [
-                                                                            [
-                                                                              (builtin
-                                                                                equalsInteger
-                                                                              )
-                                                                              digit
-                                                                            ]
-                                                                            (con
-                                                                              integer
-                                                                              3
+                                                                            (builtin
+                                                                              equalsInteger
                                                                             )
+                                                                            digit
                                                                           ]
+                                                                          (con
+                                                                            integer
+                                                                            3
+                                                                          )
                                                                         ]
-                                                                        True
                                                                       ]
-                                                                      False
+                                                                      True
                                                                     ]
+                                                                    False
                                                                   ]
-                                                                  (all
-                                                                    dead
-                                                                    (type)
-                                                                    (con string)
-                                                                  )
-                                                                }
-                                                                (abs
+                                                                ]
+                                                                (all
                                                                   dead
                                                                   (type)
-                                                                  (con
-                                                                    string "3"
-                                                                  )
+                                                                  (con string)
                                                                 )
-                                                              ]
+                                                              }
+                                                              (abs
+                                                                dead
+                                                                (type)
+                                                                (con string "3")
+                                                              )
                                                               (abs
                                                                 dead
                                                                 (type)
                                                                 {
                                                                   [
-                                                                    [
-                                                                      {
+                                                                    {
+                                                                      [
+                                                                        Bool_match
                                                                         [
-                                                                          Bool_match
                                                                           [
                                                                             [
+                                                                              {
+                                                                                (builtin
+                                                                                  ifThenElse
+                                                                                )
+                                                                                Bool
+                                                                              }
                                                                               [
-                                                                                {
-                                                                                  (builtin
-                                                                                    ifThenElse
-                                                                                  )
-                                                                                  Bool
-                                                                                }
                                                                                 [
-                                                                                  [
-                                                                                    (builtin
-                                                                                      equalsInteger
-                                                                                    )
-                                                                                    digit
-                                                                                  ]
-                                                                                  (con
-                                                                                    integer
-                                                                                    4
+                                                                                  (builtin
+                                                                                    equalsInteger
                                                                                   )
+                                                                                  digit
                                                                                 ]
+                                                                                (con
+                                                                                  integer
+                                                                                  4
+                                                                                )
                                                                               ]
-                                                                              True
                                                                             ]
-                                                                            False
+                                                                            True
                                                                           ]
+                                                                          False
                                                                         ]
-                                                                        (all
-                                                                          dead
-                                                                          (type)
-                                                                          (con
-                                                                            string
-                                                                          )
-                                                                        )
-                                                                      }
-                                                                      (abs
+                                                                      ]
+                                                                      (all
                                                                         dead
                                                                         (type)
                                                                         (con
                                                                           string
-                                                                          "4"
                                                                         )
                                                                       )
-                                                                    ]
+                                                                    }
+                                                                    (abs
+                                                                      dead
+                                                                      (type)
+                                                                      (con
+                                                                        string
+                                                                        "4"
+                                                                      )
+                                                                    )
                                                                     (abs
                                                                       dead
                                                                       (type)
                                                                       {
                                                                         [
-                                                                          [
-                                                                            {
+                                                                          {
+                                                                            [
+                                                                              Bool_match
                                                                               [
-                                                                                Bool_match
                                                                                 [
                                                                                   [
+                                                                                    {
+                                                                                      (builtin
+                                                                                        ifThenElse
+                                                                                      )
+                                                                                      Bool
+                                                                                    }
                                                                                     [
-                                                                                      {
-                                                                                        (builtin
-                                                                                          ifThenElse
-                                                                                        )
-                                                                                        Bool
-                                                                                      }
                                                                                       [
-                                                                                        [
-                                                                                          (builtin
-                                                                                            equalsInteger
-                                                                                          )
-                                                                                          digit
-                                                                                        ]
-                                                                                        (con
-                                                                                          integer
-                                                                                          5
+                                                                                        (builtin
+                                                                                          equalsInteger
                                                                                         )
+                                                                                        digit
                                                                                       ]
+                                                                                      (con
+                                                                                        integer
+                                                                                        5
+                                                                                      )
                                                                                     ]
-                                                                                    True
                                                                                   ]
-                                                                                  False
+                                                                                  True
                                                                                 ]
+                                                                                False
                                                                               ]
-                                                                              (all
-                                                                                dead
-                                                                                (type)
-                                                                                (con
-                                                                                  string
-                                                                                )
-                                                                              )
-                                                                            }
-                                                                            (abs
+                                                                            ]
+                                                                            (all
                                                                               dead
                                                                               (type)
                                                                               (con
                                                                                 string
-                                                                                "5"
                                                                               )
                                                                             )
-                                                                          ]
+                                                                          }
+                                                                          (abs
+                                                                            dead
+                                                                            (type)
+                                                                            (con
+                                                                              string
+                                                                              "5"
+                                                                            )
+                                                                          )
                                                                           (abs
                                                                             dead
                                                                             (type)
                                                                             {
                                                                               [
-                                                                                [
-                                                                                  {
+                                                                                {
+                                                                                  [
+                                                                                    Bool_match
                                                                                     [
-                                                                                      Bool_match
                                                                                       [
                                                                                         [
+                                                                                          {
+                                                                                            (builtin
+                                                                                              ifThenElse
+                                                                                            )
+                                                                                            Bool
+                                                                                          }
                                                                                           [
-                                                                                            {
-                                                                                              (builtin
-                                                                                                ifThenElse
-                                                                                              )
-                                                                                              Bool
-                                                                                            }
                                                                                             [
-                                                                                              [
-                                                                                                (builtin
-                                                                                                  equalsInteger
-                                                                                                )
-                                                                                                digit
-                                                                                              ]
-                                                                                              (con
-                                                                                                integer
-                                                                                                6
+                                                                                              (builtin
+                                                                                                equalsInteger
                                                                                               )
+                                                                                              digit
                                                                                             ]
+                                                                                            (con
+                                                                                              integer
+                                                                                              6
+                                                                                            )
                                                                                           ]
-                                                                                          True
                                                                                         ]
-                                                                                        False
+                                                                                        True
                                                                                       ]
+                                                                                      False
                                                                                     ]
-                                                                                    (all
-                                                                                      dead
-                                                                                      (type)
-                                                                                      (con
-                                                                                        string
-                                                                                      )
-                                                                                    )
-                                                                                  }
-                                                                                  (abs
+                                                                                  ]
+                                                                                  (all
                                                                                     dead
                                                                                     (type)
                                                                                     (con
                                                                                       string
-                                                                                      "6"
                                                                                     )
                                                                                   )
-                                                                                ]
+                                                                                }
+                                                                                (abs
+                                                                                  dead
+                                                                                  (type)
+                                                                                  (con
+                                                                                    string
+                                                                                    "6"
+                                                                                  )
+                                                                                )
                                                                                 (abs
                                                                                   dead
                                                                                   (type)
                                                                                   {
                                                                                     [
-                                                                                      [
-                                                                                        {
+                                                                                      {
+                                                                                        [
+                                                                                          Bool_match
                                                                                           [
-                                                                                            Bool_match
                                                                                             [
                                                                                               [
+                                                                                                {
+                                                                                                  (builtin
+                                                                                                    ifThenElse
+                                                                                                  )
+                                                                                                  Bool
+                                                                                                }
                                                                                                 [
-                                                                                                  {
-                                                                                                    (builtin
-                                                                                                      ifThenElse
-                                                                                                    )
-                                                                                                    Bool
-                                                                                                  }
                                                                                                   [
-                                                                                                    [
-                                                                                                      (builtin
-                                                                                                        equalsInteger
-                                                                                                      )
-                                                                                                      digit
-                                                                                                    ]
-                                                                                                    (con
-                                                                                                      integer
-                                                                                                      7
+                                                                                                    (builtin
+                                                                                                      equalsInteger
                                                                                                     )
+                                                                                                    digit
                                                                                                   ]
+                                                                                                  (con
+                                                                                                    integer
+                                                                                                    7
+                                                                                                  )
                                                                                                 ]
-                                                                                                True
                                                                                               ]
-                                                                                              False
+                                                                                              True
                                                                                             ]
+                                                                                            False
                                                                                           ]
-                                                                                          (all
-                                                                                            dead
-                                                                                            (type)
-                                                                                            (con
-                                                                                              string
-                                                                                            )
-                                                                                          )
-                                                                                        }
-                                                                                        (abs
+                                                                                        ]
+                                                                                        (all
                                                                                           dead
                                                                                           (type)
                                                                                           (con
                                                                                             string
-                                                                                            "7"
                                                                                           )
                                                                                         )
-                                                                                      ]
+                                                                                      }
+                                                                                      (abs
+                                                                                        dead
+                                                                                        (type)
+                                                                                        (con
+                                                                                          string
+                                                                                          "7"
+                                                                                        )
+                                                                                      )
                                                                                       (abs
                                                                                         dead
                                                                                         (type)
                                                                                         {
                                                                                           [
-                                                                                            [
-                                                                                              {
+                                                                                            {
+                                                                                              [
+                                                                                                Bool_match
                                                                                                 [
-                                                                                                  Bool_match
                                                                                                   [
                                                                                                     [
+                                                                                                      {
+                                                                                                        (builtin
+                                                                                                          ifThenElse
+                                                                                                        )
+                                                                                                        Bool
+                                                                                                      }
                                                                                                       [
-                                                                                                        {
-                                                                                                          (builtin
-                                                                                                            ifThenElse
-                                                                                                          )
-                                                                                                          Bool
-                                                                                                        }
                                                                                                         [
-                                                                                                          [
-                                                                                                            (builtin
-                                                                                                              equalsInteger
-                                                                                                            )
-                                                                                                            digit
-                                                                                                          ]
-                                                                                                          (con
-                                                                                                            integer
-                                                                                                            8
+                                                                                                          (builtin
+                                                                                                            equalsInteger
                                                                                                           )
+                                                                                                          digit
                                                                                                         ]
+                                                                                                        (con
+                                                                                                          integer
+                                                                                                          8
+                                                                                                        )
                                                                                                       ]
-                                                                                                      True
                                                                                                     ]
-                                                                                                    False
+                                                                                                    True
                                                                                                   ]
+                                                                                                  False
                                                                                                 ]
-                                                                                                (all
-                                                                                                  dead
-                                                                                                  (type)
-                                                                                                  (con
-                                                                                                    string
-                                                                                                  )
-                                                                                                )
-                                                                                              }
-                                                                                              (abs
+                                                                                              ]
+                                                                                              (all
                                                                                                 dead
                                                                                                 (type)
                                                                                                 (con
                                                                                                   string
-                                                                                                  "8"
                                                                                                 )
                                                                                               )
-                                                                                            ]
+                                                                                            }
+                                                                                            (abs
+                                                                                              dead
+                                                                                              (type)
+                                                                                              (con
+                                                                                                string
+                                                                                                "8"
+                                                                                              )
+                                                                                            )
                                                                                             (abs
                                                                                               dead
                                                                                               (type)
                                                                                               [
-                                                                                                [
-                                                                                                  {
+                                                                                                {
+                                                                                                  [
+                                                                                                    Bool_match
                                                                                                     [
-                                                                                                      Bool_match
                                                                                                       [
                                                                                                         [
+                                                                                                          {
+                                                                                                            (builtin
+                                                                                                              ifThenElse
+                                                                                                            )
+                                                                                                            Bool
+                                                                                                          }
                                                                                                           [
-                                                                                                            {
-                                                                                                              (builtin
-                                                                                                                ifThenElse
-                                                                                                              )
-                                                                                                              Bool
-                                                                                                            }
                                                                                                             [
-                                                                                                              [
-                                                                                                                (builtin
-                                                                                                                  equalsInteger
-                                                                                                                )
-                                                                                                                digit
-                                                                                                              ]
-                                                                                                              (con
-                                                                                                                integer
-                                                                                                                9
+                                                                                                              (builtin
+                                                                                                                equalsInteger
                                                                                                               )
+                                                                                                              digit
                                                                                                             ]
+                                                                                                            (con
+                                                                                                              integer
+                                                                                                              9
+                                                                                                            )
                                                                                                           ]
-                                                                                                          True
                                                                                                         ]
-                                                                                                        False
+                                                                                                        True
                                                                                                       ]
+                                                                                                      False
                                                                                                     ]
-                                                                                                    (con
-                                                                                                      string
-                                                                                                    )
-                                                                                                  }
+                                                                                                  ]
                                                                                                   (con
                                                                                                     string
-                                                                                                    "9"
                                                                                                   )
-                                                                                                ]
+                                                                                                }
+                                                                                                (con
+                                                                                                  string
+                                                                                                  "9"
+                                                                                                )
                                                                                                 (con
                                                                                                   string
                                                                                                   "<invalid digit>"
@@ -835,392 +800,363 @@
                     (con integer)
                     {
                       [
-                        [
-                          {
+                        {
+                          [
+                            Bool_match
                             [
-                              Bool_match
                               [
                                 [
+                                  { (builtin ifThenElse) Bool }
                                   [
-                                    { (builtin ifThenElse) Bool }
-                                    [
-                                      [ (builtin lessThanEqualsInteger) x ]
-                                      (con integer 9)
-                                    ]
+                                    [ (builtin lessThanEqualsInteger) x ]
+                                    (con integer 9)
                                   ]
-                                  True
                                 ]
-                                False
+                                True
                               ]
+                              False
                             ]
-                            (all
-                              dead
-                              (type)
-                              (fun [ List (con string) ] [ List (con string) ])
-                            )
-                          }
-                          (abs dead (type) [ wcshowsPrec x ])
-                        ]
+                          ]
+                          (all
+                            dead
+                            (type)
+                            (fun [ List (con string) ] [ List (con string) ])
+                          )
+                        }
+                        (abs dead (type) [ wcshowsPrec x ])
                         (abs
                           dead
                           (type)
                           {
                             [
-                              [
-                                {
+                              {
+                                [
+                                  Bool_match
                                   [
-                                    Bool_match
                                     [
                                       [
+                                        { (builtin ifThenElse) Bool }
                                         [
-                                          { (builtin ifThenElse) Bool }
-                                          [
-                                            [ (builtin equalsInteger) x ]
-                                            (con integer 10)
-                                          ]
+                                          [ (builtin equalsInteger) x ]
+                                          (con integer 10)
                                         ]
-                                        True
                                       ]
-                                      False
+                                      True
                                     ]
+                                    False
                                   ]
-                                  (all
-                                    dead
-                                    (type)
-                                    (fun
-                                      [ List (con string) ]
-                                      [ List (con string) ]
-                                    )
-                                  )
-                                }
-                                (abs
+                                ]
+                                (all
                                   dead
                                   (type)
-                                  (lam
-                                    ds
-                                    [ List (con string) ]
-                                    [
-                                      [ { Cons (con string) } (con string "a") ]
-                                      ds
-                                    ]
+                                  (fun
+                                    [ List (con string) ] [ List (con string) ]
                                   )
                                 )
-                              ]
+                              }
+                              (abs
+                                dead
+                                (type)
+                                (lam
+                                  ds
+                                  [ List (con string) ]
+                                  [
+                                    [ { Cons (con string) } (con string "a") ]
+                                    ds
+                                  ]
+                                )
+                              )
                               (abs
                                 dead
                                 (type)
                                 {
                                   [
-                                    [
-                                      {
+                                    {
+                                      [
+                                        Bool_match
                                         [
-                                          Bool_match
                                           [
                                             [
+                                              { (builtin ifThenElse) Bool }
                                               [
-                                                { (builtin ifThenElse) Bool }
-                                                [
-                                                  [ (builtin equalsInteger) x ]
-                                                  (con integer 11)
-                                                ]
+                                                [ (builtin equalsInteger) x ]
+                                                (con integer 11)
                                               ]
-                                              True
                                             ]
-                                            False
+                                            True
                                           ]
+                                          False
                                         ]
-                                        (all
-                                          dead
-                                          (type)
-                                          (fun
-                                            [ List (con string) ]
-                                            [ List (con string) ]
-                                          )
-                                        )
-                                      }
-                                      (abs
+                                      ]
+                                      (all
                                         dead
                                         (type)
-                                        (lam
-                                          ds
+                                        (fun
                                           [ List (con string) ]
-                                          [
-                                            [
-                                              { Cons (con string) }
-                                              (con string "b")
-                                            ]
-                                            ds
-                                          ]
+                                          [ List (con string) ]
                                         )
                                       )
-                                    ]
+                                    }
+                                    (abs
+                                      dead
+                                      (type)
+                                      (lam
+                                        ds
+                                        [ List (con string) ]
+                                        [
+                                          [
+                                            { Cons (con string) }
+                                            (con string "b")
+                                          ]
+                                          ds
+                                        ]
+                                      )
+                                    )
                                     (abs
                                       dead
                                       (type)
                                       {
                                         [
-                                          [
-                                            {
+                                          {
+                                            [
+                                              Bool_match
                                               [
-                                                Bool_match
                                                 [
                                                   [
+                                                    {
+                                                      (builtin ifThenElse) Bool
+                                                    }
                                                     [
-                                                      {
-                                                        (builtin ifThenElse)
-                                                        Bool
-                                                      }
                                                       [
-                                                        [
-                                                          (builtin
-                                                            equalsInteger
-                                                          )
-                                                          x
-                                                        ]
-                                                        (con integer 12)
+                                                        (builtin equalsInteger)
+                                                        x
                                                       ]
+                                                      (con integer 12)
                                                     ]
-                                                    True
                                                   ]
-                                                  False
+                                                  True
                                                 ]
+                                                False
                                               ]
-                                              (all
-                                                dead
-                                                (type)
-                                                (fun
-                                                  [ List (con string) ]
-                                                  [ List (con string) ]
-                                                )
-                                              )
-                                            }
-                                            (abs
+                                            ]
+                                            (all
                                               dead
                                               (type)
-                                              (lam
-                                                ds
+                                              (fun
                                                 [ List (con string) ]
-                                                [
-                                                  [
-                                                    { Cons (con string) }
-                                                    (con string "c")
-                                                  ]
-                                                  ds
-                                                ]
+                                                [ List (con string) ]
                                               )
                                             )
-                                          ]
+                                          }
+                                          (abs
+                                            dead
+                                            (type)
+                                            (lam
+                                              ds
+                                              [ List (con string) ]
+                                              [
+                                                [
+                                                  { Cons (con string) }
+                                                  (con string "c")
+                                                ]
+                                                ds
+                                              ]
+                                            )
+                                          )
                                           (abs
                                             dead
                                             (type)
                                             {
                                               [
-                                                [
-                                                  {
+                                                {
+                                                  [
+                                                    Bool_match
                                                     [
-                                                      Bool_match
                                                       [
                                                         [
+                                                          {
+                                                            (builtin ifThenElse)
+                                                            Bool
+                                                          }
                                                           [
-                                                            {
-                                                              (builtin
-                                                                ifThenElse
-                                                              )
-                                                              Bool
-                                                            }
                                                             [
-                                                              [
-                                                                (builtin
-                                                                  equalsInteger
-                                                                )
-                                                                x
-                                                              ]
-                                                              (con integer 13)
+                                                              (builtin
+                                                                equalsInteger
+                                                              )
+                                                              x
                                                             ]
+                                                            (con integer 13)
                                                           ]
-                                                          True
                                                         ]
-                                                        False
+                                                        True
                                                       ]
+                                                      False
                                                     ]
-                                                    (all
-                                                      dead
-                                                      (type)
-                                                      (fun
-                                                        [ List (con string) ]
-                                                        [ List (con string) ]
-                                                      )
-                                                    )
-                                                  }
-                                                  (abs
+                                                  ]
+                                                  (all
                                                     dead
                                                     (type)
-                                                    (lam
-                                                      ds
+                                                    (fun
                                                       [ List (con string) ]
-                                                      [
-                                                        [
-                                                          { Cons (con string) }
-                                                          (con string "d")
-                                                        ]
-                                                        ds
-                                                      ]
+                                                      [ List (con string) ]
                                                     )
                                                   )
-                                                ]
+                                                }
+                                                (abs
+                                                  dead
+                                                  (type)
+                                                  (lam
+                                                    ds
+                                                    [ List (con string) ]
+                                                    [
+                                                      [
+                                                        { Cons (con string) }
+                                                        (con string "d")
+                                                      ]
+                                                      ds
+                                                    ]
+                                                  )
+                                                )
                                                 (abs
                                                   dead
                                                   (type)
                                                   {
                                                     [
-                                                      [
-                                                        {
+                                                      {
+                                                        [
+                                                          Bool_match
                                                           [
-                                                            Bool_match
                                                             [
                                                               [
+                                                                {
+                                                                  (builtin
+                                                                    ifThenElse
+                                                                  )
+                                                                  Bool
+                                                                }
                                                                 [
-                                                                  {
-                                                                    (builtin
-                                                                      ifThenElse
-                                                                    )
-                                                                    Bool
-                                                                  }
                                                                   [
-                                                                    [
-                                                                      (builtin
-                                                                        equalsInteger
-                                                                      )
-                                                                      x
-                                                                    ]
-                                                                    (con
-                                                                      integer 14
+                                                                    (builtin
+                                                                      equalsInteger
                                                                     )
+                                                                    x
                                                                   ]
+                                                                  (con
+                                                                    integer 14
+                                                                  )
                                                                 ]
-                                                                True
                                                               ]
-                                                              False
+                                                              True
                                                             ]
+                                                            False
                                                           ]
-                                                          (all
-                                                            dead
-                                                            (type)
-                                                            (fun
-                                                              [
-                                                                List
-                                                                (con string)
-                                                              ]
-                                                              [
-                                                                List
-                                                                (con string)
-                                                              ]
-                                                            )
-                                                          )
-                                                        }
-                                                        (abs
+                                                        ]
+                                                        (all
                                                           dead
                                                           (type)
-                                                          (lam
-                                                            ds
+                                                          (fun
                                                             [
                                                               List (con string)
                                                             ]
                                                             [
-                                                              [
-                                                                {
-                                                                  Cons
-                                                                  (con string)
-                                                                }
-                                                                (con string "e")
-                                                              ]
-                                                              ds
+                                                              List (con string)
                                                             ]
                                                           )
                                                         )
-                                                      ]
+                                                      }
+                                                      (abs
+                                                        dead
+                                                        (type)
+                                                        (lam
+                                                          ds
+                                                          [ List (con string) ]
+                                                          [
+                                                            [
+                                                              {
+                                                                Cons
+                                                                (con string)
+                                                              }
+                                                              (con string "e")
+                                                            ]
+                                                            ds
+                                                          ]
+                                                        )
+                                                      )
                                                       (abs
                                                         dead
                                                         (type)
                                                         {
                                                           [
-                                                            [
-                                                              {
+                                                            {
+                                                              [
+                                                                Bool_match
                                                                 [
-                                                                  Bool_match
                                                                   [
                                                                     [
+                                                                      {
+                                                                        (builtin
+                                                                          ifThenElse
+                                                                        )
+                                                                        Bool
+                                                                      }
                                                                       [
-                                                                        {
-                                                                          (builtin
-                                                                            ifThenElse
-                                                                          )
-                                                                          Bool
-                                                                        }
                                                                         [
-                                                                          [
-                                                                            (builtin
-                                                                              equalsInteger
-                                                                            )
-                                                                            x
-                                                                          ]
-                                                                          (con
-                                                                            integer
-                                                                            15
+                                                                          (builtin
+                                                                            equalsInteger
                                                                           )
+                                                                          x
                                                                         ]
+                                                                        (con
+                                                                          integer
+                                                                          15
+                                                                        )
                                                                       ]
-                                                                      True
                                                                     ]
-                                                                    False
+                                                                    True
                                                                   ]
+                                                                  False
                                                                 ]
-                                                                (all
-                                                                  dead
-                                                                  (type)
-                                                                  (fun
-                                                                    [
-                                                                      List
-                                                                      (con
-                                                                        string
-                                                                      )
-                                                                    ]
-                                                                    [
-                                                                      List
-                                                                      (con
-                                                                        string
-                                                                      )
-                                                                    ]
-                                                                  )
-                                                                )
-                                                              }
-                                                              (abs
+                                                              ]
+                                                              (all
                                                                 dead
                                                                 (type)
-                                                                (lam
-                                                                  ds
+                                                                (fun
                                                                   [
                                                                     List
                                                                     (con string)
                                                                   ]
                                                                   [
-                                                                    [
-                                                                      {
-                                                                        Cons
-                                                                        (con
-                                                                          string
-                                                                        )
-                                                                      }
-                                                                      (con
-                                                                        string
-                                                                        "f"
-                                                                      )
-                                                                    ]
-                                                                    ds
+                                                                    List
+                                                                    (con string)
                                                                   ]
                                                                 )
                                                               )
-                                                            ]
+                                                            }
+                                                            (abs
+                                                              dead
+                                                              (type)
+                                                              (lam
+                                                                ds
+                                                                [
+                                                                  List
+                                                                  (con string)
+                                                                ]
+                                                                [
+                                                                  [
+                                                                    {
+                                                                      Cons
+                                                                      (con
+                                                                        string
+                                                                      )
+                                                                    }
+                                                                    (con
+                                                                      string "f"
+                                                                    )
+                                                                  ]
+                                                                  ds
+                                                                ]
+                                                              )
+                                                            )
                                                             (abs
                                                               dead
                                                               (type)
@@ -1344,27 +1280,25 @@
                           [ List a ]
                           {
                             [
-                              [
-                                {
-                                  [ { Nil_match a } ds ]
-                                  (all
-                                    dead
-                                    (type)
-                                    [ [ Tuple2 [ List a ] ] [ List a ] ]
-                                  )
-                                }
-                                (abs
+                              {
+                                [ { Nil_match a } ds ]
+                                (all
                                   dead
                                   (type)
+                                  [ [ Tuple2 [ List a ] ] [ List a ] ]
+                                )
+                              }
+                              (abs
+                                dead
+                                (type)
+                                [
                                   [
-                                    [
-                                      { { Tuple2 [ List a ] } [ List a ] }
-                                      { Nil a }
-                                    ]
+                                    { { Tuple2 [ List a ] } [ List a ] }
                                     { Nil a }
                                   ]
-                                )
-                              ]
+                                  { Nil a }
+                                ]
+                              )
                               (lam
                                 y
                                 a
@@ -1376,63 +1310,55 @@
                                     (type)
                                     {
                                       [
-                                        [
-                                          {
+                                        {
+                                          [
+                                            Bool_match
                                             [
-                                              Bool_match
                                               [
                                                 [
+                                                  { (builtin ifThenElse) Bool }
                                                   [
-                                                    {
-                                                      (builtin ifThenElse) Bool
-                                                    }
                                                     [
-                                                      [
-                                                        (builtin equalsInteger)
-                                                        ds
-                                                      ]
-                                                      (con integer 1)
+                                                      (builtin equalsInteger) ds
                                                     ]
+                                                    (con integer 1)
                                                   ]
-                                                  True
                                                 ]
-                                                False
+                                                True
                                               ]
+                                              False
                                             ]
-                                            (all
-                                              dead
-                                              (type)
-                                              [
-                                                [ Tuple2 [ List a ] ] [ List a ]
-                                              ]
-                                            )
-                                          }
-                                          (abs
+                                          ]
+                                          (all
                                             dead
                                             (type)
-                                            [
-                                              [
-                                                {
-                                                  { Tuple2 [ List a ] }
-                                                  [ List a ]
-                                                }
-                                                [
-                                                  { build a }
-                                                  (abs
-                                                    a
-                                                    (type)
-                                                    (lam
-                                                      c
-                                                      (fun a (fun a a))
-                                                      (lam n a [ [ c y ] n ])
-                                                    )
-                                                  )
-                                                ]
-                                              ]
-                                              ys
-                                            ]
+                                            [ [ Tuple2 [ List a ] ] [ List a ] ]
                                           )
-                                        ]
+                                        }
+                                        (abs
+                                          dead
+                                          (type)
+                                          [
+                                            [
+                                              {
+                                                { Tuple2 [ List a ] } [ List a ]
+                                              }
+                                              [
+                                                { build a }
+                                                (abs
+                                                  a
+                                                  (type)
+                                                  (lam
+                                                    c
+                                                    (fun a (fun a a))
+                                                    (lam n a [ [ c y ] n ])
+                                                  )
+                                                )
+                                              ]
+                                            ]
+                                            ys
+                                          ]
+                                        )
                                         (abs
                                           dead
                                           (type)
@@ -1515,30 +1441,26 @@
                           (con integer)
                           {
                             [
-                              [
-                                {
+                              {
+                                [
+                                  Bool_match
                                   [
-                                    Bool_match
                                     [
                                       [
+                                        { (builtin ifThenElse) Bool }
                                         [
-                                          { (builtin ifThenElse) Bool }
-                                          [
-                                            [
-                                              (builtin lessThanEqualsInteger) x
-                                            ]
-                                            y
-                                          ]
+                                          [ (builtin lessThanEqualsInteger) x ]
+                                          y
                                         ]
-                                        False
                                       ]
-                                      True
+                                      False
                                     ]
+                                    True
                                   ]
-                                  (all dead (type) [ List (con integer) ])
-                                }
-                                (abs dead (type) { Nil (con integer) })
-                              ]
+                                ]
+                                (all dead (type) [ List (con integer) ])
+                              }
+                              (abs dead (type) { Nil (con integer) })
                               (abs
                                 dead
                                 (type)
@@ -1685,15 +1607,13 @@
                                     [ List a ]
                                     {
                                       [
-                                        [
-                                          {
-                                            [ { Nil_match a } eta ]
-                                            (all dead (type) m)
-                                          }
-                                          (abs
-                                            dead (type) [ { mempty m } dMonoid ]
-                                          )
-                                        ]
+                                        {
+                                          [ { Nil_match a } eta ]
+                                          (all dead (type) m)
+                                        }
+                                        (abs
+                                          dead (type) [ { mempty m } dMonoid ]
+                                        )
                                         (lam
                                           x
                                           a
@@ -1942,66 +1862,60 @@
                                             }
                                             {
                                               [
-                                                [
-                                                  {
+                                                {
+                                                  [
+                                                    Bool_match
                                                     [
-                                                      Bool_match
                                                       [
                                                         [
+                                                          {
+                                                            (builtin ifThenElse)
+                                                            Bool
+                                                          }
                                                           [
-                                                            {
-                                                              (builtin
-                                                                ifThenElse
-                                                              )
-                                                              Bool
-                                                            }
                                                             [
-                                                              [
-                                                                (builtin
-                                                                  lessThanEqualsInteger
-                                                                )
-                                                                w
-                                                              ]
-                                                              (con integer 0)
+                                                              (builtin
+                                                                lessThanEqualsInteger
+                                                              )
+                                                              w
                                                             ]
+                                                            (con integer 0)
                                                           ]
-                                                          True
                                                         ]
-                                                        False
+                                                        True
                                                       ]
+                                                      False
                                                     ]
-                                                    (all
-                                                      dead
-                                                      (type)
-                                                      [
-                                                        [
-                                                          UTuple2
-                                                          [ List (con string) ]
-                                                        ]
-                                                        [ List (con string) ]
-                                                      ]
-                                                    )
-                                                  }
-                                                  (abs
+                                                  ]
+                                                  (all
                                                     dead
                                                     (type)
                                                     [
                                                       [
-                                                        {
-                                                          {
-                                                            UTuple2
-                                                            [
-                                                              List (con string)
-                                                            ]
-                                                          }
-                                                          [ List (con string) ]
-                                                        }
-                                                        { Nil (con string) }
+                                                        UTuple2
+                                                        [ List (con string) ]
                                                       ]
-                                                      ds
+                                                      [ List (con string) ]
                                                     ]
                                                   )
-                                                ]
+                                                }
+                                                (abs
+                                                  dead
+                                                  (type)
+                                                  [
+                                                    [
+                                                      {
+                                                        {
+                                                          UTuple2
+                                                          [ List (con string) ]
+                                                        }
+                                                        [ List (con string) ]
+                                                      }
+                                                      { Nil (con string) }
+                                                    ]
+                                                    ds
+                                                  ]
+                                                )
                                                 (abs
                                                   dead
                                                   (type)
@@ -2095,13 +2009,11 @@
                                     )
                                   )
                                   [
-                                    [
-                                      {
-                                        [ { Nil_match (con string) } ds ]
-                                        (con string)
-                                      }
-                                      (con string "")
-                                    ]
+                                    {
+                                      [ { Nil_match (con string) } ds ]
+                                      (con string)
+                                    }
+                                    (con string "")
                                     (lam
                                       x
                                       (con string)
@@ -2110,15 +2022,11 @@
                                         [ List (con string) ]
                                         {
                                           [
-                                            [
-                                              {
-                                                [
-                                                  { Nil_match (con string) } ds
-                                                ]
-                                                (all dead (type) (con string))
-                                              }
-                                              (abs dead (type) x)
-                                            ]
+                                            {
+                                              [ { Nil_match (con string) } ds ]
+                                              (all dead (type) (con string))
+                                            }
+                                            (abs dead (type) x)
                                             (lam
                                               ipv
                                               (con string)
@@ -2546,10 +2454,8 @@
                                         ]
                                       )
                                       [
-                                        [
-                                          { [ Bool_match b ] (con string) }
-                                          (con string "True")
-                                        ]
+                                        { [ Bool_match b ] (con string) }
+                                        (con string "True")
                                         (con string "False")
                                       ]
                                     )
@@ -2623,39 +2529,35 @@
                                             )
                                             {
                                               [
-                                                [
-                                                  {
-                                                    [
-                                                      {
-                                                        Nil_match (con integer)
-                                                      }
-                                                      x
-                                                    ]
-                                                    (all
-                                                      dead
-                                                      (type)
-                                                      (fun
-                                                        [ List (con string) ]
-                                                        [ List (con string) ]
-                                                      )
-                                                    )
-                                                  }
-                                                  (abs
+                                                {
+                                                  [
+                                                    { Nil_match (con integer) }
+                                                    x
+                                                  ]
+                                                  (all
                                                     dead
                                                     (type)
-                                                    (lam
-                                                      ds
+                                                    (fun
                                                       [ List (con string) ]
-                                                      [
-                                                        [
-                                                          { Cons (con string) }
-                                                          (con string "[]")
-                                                        ]
-                                                        ds
-                                                      ]
+                                                      [ List (con string) ]
                                                     )
                                                   )
-                                                ]
+                                                }
+                                                (abs
+                                                  dead
+                                                  (type)
+                                                  (lam
+                                                    ds
+                                                    [ List (con string) ]
+                                                    [
+                                                      [
+                                                        { Cons (con string) }
+                                                        (con string "[]")
+                                                      ]
+                                                      ds
+                                                    ]
+                                                  )
+                                                )
                                                 (lam
                                                   x
                                                   (con integer)

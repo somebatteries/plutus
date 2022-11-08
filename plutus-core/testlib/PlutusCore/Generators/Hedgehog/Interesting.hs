@@ -9,7 +9,9 @@
 module PlutusCore.Generators.Hedgehog.Interesting
     ( TermGen
     , TermOf(..)
+    , genChunks
     , genOverapplication
+    , genInterleavedLamApp
     , factorial
     , genFactorial
     , naiveFib
@@ -41,7 +43,11 @@ import PlutusCore.StdLib.Data.Unit
 import PlutusCore.StdLib.Meta
 import PlutusCore.StdLib.Type
 
+import Control.Monad (replicateM)
+import Control.Monad.Trans (lift)
 import Data.List (genericIndex)
+import Data.String
+import Data.Traversable (for)
 import Hedgehog hiding (Size, Var)
 import Hedgehog.Gen qualified as Gen
 import Hedgehog.Range qualified as Range
@@ -71,6 +77,60 @@ genOverapplication = do
                 ]
     return . TermOf term $ if i < j then i + j else i - j
 
+{-| Generates a function which takes a number of integer arguments and performs an operation on them,
+and applies it to the corresponding number of arguments.
+
+However,
+1. The function abstracts the arguments with a series of lambdas which take a varible number of arguments.
+2. The application consists of a series of applications which provide a variable number of arguments.
+3. The operation is non-associative, so if the arguments get mixed up we'll get the wrong answer.
+
+This thus exercises various cases involving over- and under-application of functions.
+-}
+genInterleavedLamApp :: TermGen Integer
+genInterleavedLamApp = runQuoteT $ do
+    let typedInteger = typeRep
+        integer = toTypeAst typedInteger
+    numArgs <- lift $ Gen.integral $ Range.linear 1 16
+    args <- lift $ replicateM numArgs (genTypedBuiltinDef typedInteger)
+    let terms = fmap _termOfTerm args
+        ints = fmap _termOfValue args
+        res = foldr (\v acc -> v - acc) 0 ints
+    argVars <- for [0..(numArgs-1)] $ \i -> do
+      n <- freshName (fromString $ "arg_" ++ show i)
+      pure $ VarDecl () n integer
+    -- operation is (arg0 - (arg1 - ... - (argN - 0)))
+    -- which is the simplest definitely non-associative thing I could think of
+    let body = foldr (\v t -> mkIterApp () (Builtin () SubtractInteger) [v, t]) (mkConstant @Integer () 0) (fmap (mkVar ()) argVars)
+    f <- lift $ genLams argVars body
+    term <- lift $ genApps terms f
+    return $ TermOf term res
+    where
+        genLams vars body = do
+          chunks <- genChunks vars
+          pure $ foldr (\chunk acc -> mkMultiLamAbs chunk acc) body chunks
+        genApps args f = do
+          chunks <- genChunks args
+          pure $ foldl (\acc chunk -> mkMultiApp () acc chunk) f chunks
+
+-- I'm not entirely sure how, but checking in GHCi suggests that shrinking this always
+-- returns a correct chunking of the list, just with smaller chunks. Which is fine.
+-- | Given an input list, generate a list of chunks from the list.
+genChunks
+  :: [a]
+  -> Gen [[a]]
+genChunks l = Prelude.reverse <$> go [] l
+    where
+        go acc [] = pure acc
+        go acc ls = do
+            let len = length ls
+            -- Don't let the size of the chunk depend on the size
+            -- parameter, that's not what we want
+            chunkSize <- Gen.integral $ Range.constant 1 len
+            let (chunk, remaining) = splitAt chunkSize ls
+
+            go (chunk:acc) remaining
+
 -- | @\i -> product [1 :: Integer .. i]@ as a PLC term.
 --
 -- > \(i : integer) -> product (enumFromTo 1 i)
@@ -79,7 +139,7 @@ factorial = runQuote $ do
     i <- freshName "i"
     let int = mkTyBuiltin @_ @Integer ()
     return
-        . LamAbs () i int
+        . lamAbs () i int
         . apply () ScottList.product
         $ mkIterApp () ScottList.enumFromTo
             [ mkConstant @Integer () 1
@@ -106,24 +166,24 @@ naiveFib iv = runQuote $ do
     u   <- freshName "u"
     let
       intS = mkTyBuiltin @_ @Integer ()
-      fib = LamAbs () i0 intS
+      fib = lamAbs () i0 intS
         $ mkIterApp () (mkIterInst () fix [intS, intS])
-            [   LamAbs () rec (TyFun () intS intS)
-              . LamAbs () i intS
+            [   lamAbs () rec (TyFun () intS intS)
+              . lamAbs () i intS
               $ mkIterApp () (TyInst () ifThenElse intS)
                   [ mkIterApp () (Builtin () LessThanEqualsInteger)
                       [Var () i, mkConstant @Integer () 1]
-                  , LamAbs () u unit $ Var () i
-                  , LamAbs () u unit $ mkIterApp () (Builtin () AddInteger)
-                      [ Apply () (Var () rec) $ mkIterApp () (Builtin () SubtractInteger)
+                  , lamAbs () u unit $ Var () i
+                  , lamAbs () u unit $ mkIterApp () (Builtin () AddInteger)
+                      [ apply () (Var () rec) $ mkIterApp () (Builtin () SubtractInteger)
                           [Var () i, mkConstant @Integer () 1]
-                      , Apply () (Var () rec) $ mkIterApp () (Builtin () SubtractInteger)
+                      , apply () (Var () rec) $ mkIterApp () (Builtin () SubtractInteger)
                           [Var () i, mkConstant @Integer () 2]
                       ]
                   ]
             , Var () i0
             ]
-    pure . Apply () fib $ mkConstant @Integer () iv
+    pure . apply () fib $ mkConstant @Integer () iv
 
 -- | Generate a term that computes the factorial of an @integer@ and return it
 -- along with the factorial of the corresponding 'Integer' computed on the Haskell side.
@@ -131,7 +191,7 @@ genFactorial :: TermGen Integer
 genFactorial = do
     let m = 10
     iv <- Gen.integral $ Range.linear 1 m
-    let term = Apply () factorial (mkConstant @Integer () iv)
+    let term = apply () factorial (mkConstant @Integer () iv)
     return . TermOf term $ Prelude.product [1..iv]
 
 -- | Generate a term that computes the ith Fibonacci number and return it
@@ -165,8 +225,8 @@ natSum = runQuote $ do
     n <- freshName "n"
     return
         $ mkIterApp () (mkIterInst () foldList [nat, int])
-          [   LamAbs () acc int
-            . LamAbs () n nat
+          [   lamAbs () acc int
+            . lamAbs () n nat
             . mkIterApp () add
             $ [ Var () acc
               , mkIterApp () natToInteger [ Var () n ]
@@ -195,7 +255,7 @@ genIfIntegers = do
     TermOf b bv <- genTermLoose typeRep
     TermOf i iv <- genTermLoose typedInt
     TermOf j jv <- genTermLoose typedInt
-    let instConst = Apply () $ mkIterInst () Function.const [int, unit]
+    let instConst = apply () $ mkIterInst () Function.const [int, unit]
         value = if bv then iv else jv
         term =
             mkIterApp ()
@@ -212,7 +272,7 @@ genApplyAdd1 = do
     TermOf j jv <- genTermLoose typedInt
     let term =
             mkIterApp () (mkIterInst () applyFun [int, int])
-                [ Apply () (Builtin () AddInteger) i
+                [ apply () (Builtin () AddInteger) i
                 , j
                 ]
     return . TermOf term $ iv + jv
@@ -259,14 +319,15 @@ fromInterestingTermGens
     :: (forall a. KnownType (Term TyName Name DefaultUni DefaultFun ()) a => String -> TermGen a -> c)
     -> [c]
 fromInterestingTermGens f =
-    [ f "overapplication"  genOverapplication
-    , f "factorial"        genFactorial
-    , f "fibonacci"        genNaiveFib
-    , f "NatRoundTrip"     genNatRoundtrip
-    , f "ScottListSum"     genScottListSum
-    , f "IfIntegers"       genIfIntegers
-    , f "ApplyAdd1"        genApplyAdd1
-    , f "ApplyAdd2"        genApplyAdd2
-    , f "DivideByZero"     genDivideByZero
-    , f "DivideByZeroDrop" genDivideByZeroDrop
+    [ f "overapplication"   genOverapplication
+    , f "interleavedLamApp" genInterleavedLamApp
+    , f "factorial"         genFactorial
+    , f "fibonacci"         genNaiveFib
+    , f "NatRoundTrip"      genNatRoundtrip
+    , f "ScottListSum"      genScottListSum
+    , f "IfIntegers"        genIfIntegers
+    , f "ApplyAdd1"         genApplyAdd1
+    , f "ApplyAdd2"         genApplyAdd2
+    , f "DivideByZero"      genDivideByZero
+    , f "DivideByZeroDrop"  genDivideByZeroDrop
     ]
