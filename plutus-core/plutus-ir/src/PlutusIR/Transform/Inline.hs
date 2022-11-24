@@ -56,14 +56,11 @@ PreInlineUncoditional: we don't do it, since we don't bother using usage informa
 We *could* do it, but it doesn't seem worth it. We also don't need to worry about
 inlining nested let-bindings, since we don't inline any.
 
-CallSiteInline: not worth it.
+CallSiteInline: we do it based on ambient arity, not context.
 
 Inlining recursive bindings: not worth it, complicated.
 
-Context-based inlining: we don't do CallSiteInline, so no point.
-
-Beta reduction: not worth it, but would be easy. We could do the inlining of the argument
-here and also detect dead immediately-applied-lambdas in the dead code pass.
+Context-based inlining: CallSiteInline is done based on ambient arity, so no point.
 
 Implementation
 --------------
