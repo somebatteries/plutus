@@ -56,11 +56,12 @@ PreInlineUncoditional: we don't do it, since we don't bother using usage informa
 We *could* do it, but it doesn't seem worth it. We also don't need to worry about
 inlining nested let-bindings, since we don't inline any.
 
-CallSiteInline: not worth it.
+CallSiteInline: TODO PLT-1041.
 
 Inlining recursive bindings: not worth it, complicated.
 
-Context-based inlining: we don't do CallSiteInline, so no point.
+Context-based inlining: As mentioned in PLT-1041, will implement an ambient arity based
+one for CallSiteInline.
 
 Beta reduction: not worth it, but would be easy. We could do the inlining of the argument
 here and also detect dead immediately-applied-lambdas in the dead code pass.
@@ -329,66 +330,68 @@ maybeAddSubst
     -> name
     -> Term tyname name uni fun a
     -> InlineM tyname name uni fun a (Maybe (Term tyname name uni fun a))
-maybeAddSubst body a s n rhs = do
+maybeAddSubst _body a _s n rhs = do
     rhs' <- processTerm rhs
 
     -- Check whether we've been told specifically to inline this
     hints <- view iiHints
     let hinted = shouldInline hints a n
 
-    preUnconditional <- preInlineUnconditional rhs'
+    preUnconditional <- preInlineUnconditional n rhs'
     if preUnconditional
-    then extendAndDrop (Done $ dupable rhs')
+    then extendAndDrop (Done $ dupable rhs') n
     else do
         -- See Note [Inlining approach and 'Secrets of the GHC Inliner']
         postUnconditional <- postInlineUnconditional rhs'
         if hinted || postUnconditional
-        then extendAndDrop (Done $ dupable rhs')
+        then extendAndDrop (Done $ dupable rhs') n
         else pure $ Just rhs'
-    where
-        extendAndDrop ::
-            forall b . InlineTerm tyname name uni fun a
-            -> InlineM tyname name uni fun a (Maybe b)
-        extendAndDrop t = modify' (extendTerm n t) >> pure Nothing
 
-        checkPurity :: Term tyname name uni fun a -> InlineM tyname name uni fun a Bool
-        checkPurity t = do
-            strctMap <- view iiStrictnessMap
-            builtinVer <- view iiBuiltinVer
-            let strictnessFun = \n' -> Map.findWithDefault NonStrict (n' ^. theUnique) strctMap
-            pure $ isPure builtinVer strictnessFun t
 
-        preInlineUnconditional :: Term tyname name uni fun a -> InlineM tyname name uni fun a Bool
-        preInlineUnconditional t = do
-            usgs <- view iiUsages
-            -- 'inlining' terms used 0 times is a cheap way to remove dead code while we're here
-            let termUsedAtMostOnce = Usages.getUsageCount n usgs <= 1
-            -- See Note [Inlining and purity]
-            termIsPure <- checkPurity t
-            -- This can in the worst case traverse a lot of the term, which could lead to us
-            -- doing ~quadratic work as we process the program. However in practice most term
-            -- types will make it give up, so it's not too bad.
-            let immediatelyEvaluated = case firstEffectfulTerm body of
-                 Just (Var _ n') -> n == n'
-                 _               -> False
-                effectSafe = case s of
-                    Strict    -> termIsPure || immediatelyEvaluated
-                    NonStrict -> True
+extendAndDrop ::
+    forall tyname name uni fun a b . InlineTerm tyname name uni fun a
+    -> name
+    -> InlineM tyname name uni fun a (Maybe b)
+extendAndDrop t n = modify' (extendTerm n t) >> pure Nothing
 
-            pure $ termUsedAtMostOnce && effectSafe
+checkPurity :: Term tyname name uni fun a -> InlineM tyname name uni fun a Bool
+checkPurity t = do
+    strctMap <- view iiStrictnessMap
+    builtinVer <- view iiBuiltinVer
+    let strictnessFun n' = Map.findWithDefault NonStrict (n' ^. theUnique) strctMap
+    pure $ isPure builtinVer strictnessFun t
 
-        -- | Should we inline? Should only inline things that won't duplicate work or code.
-        -- See Note [Inlining approach and 'Secrets of the GHC Inliner']
-        postInlineUnconditional ::  Term tyname name uni fun a -> InlineM tyname name uni fun a Bool
-        postInlineUnconditional t = do
-            -- See Note [Inlining criteria]
-            let acceptable = costIsAcceptable t && sizeIsAcceptable t
-            -- See Note [Inlining and purity]
-            -- This is the case where we don't know that the number of occurences is exactly one,
-            -- so there's no point checking if the term is immediately evaluated.
-            termIsPure <- checkPurity t
+preInlineUnconditional :: name -> Term tyname name uni fun a -> InlineM tyname name uni fun a Bool
+preInlineUnconditional n t = do
+    usgs <- view iiUsages
+    -- 'inlining' terms used 0 times is a cheap way to remove dead code while we're here
+    let termUsedAtMostOnce = Usages.getUsageCount n usgs <= 1
+    -- See Note [Inlining and purity]
+    termIsPure <- checkPurity t
+    -- This can in the worst case traverse a lot of the term, which could lead to us
+    -- doing ~quadratic work as we process the program. However in practice most term
+    -- types will make it give up, so it's not too bad.
+    let immediatelyEvaluated = case firstEffectfulTerm body of
+            Just (Var _ n') -> n == n'
+            _               -> False
+        effectSafe = case s of
+            Strict    -> termIsPure || immediatelyEvaluated
+            NonStrict -> True
 
-            pure $ acceptable && termIsPure
+    pure $ termUsedAtMostOnce && effectSafe
+
+-- | Should we inline? Should only inline things that won't duplicate work or code.
+-- See Note [Inlining approach and 'Secrets of the GHC Inliner']
+postInlineUnconditional ::  Term tyname name uni fun a -> InlineM tyname name uni fun a Bool
+postInlineUnconditional t = do
+    -- See Note [Inlining criteria]
+    let acceptable = costIsAcceptable t && sizeIsAcceptable t
+    -- See Note [Inlining and purity]
+    -- This is the case where we don't know that the number of occurrences is exactly one,
+    -- so there's no point checking if the term is immediately evaluated.
+    termIsPure <- checkPurity t
+
+    pure $ acceptable && termIsPure
 
 {- |
 Try to identify the first sub term which will be evaluated in the given term and
@@ -412,7 +415,7 @@ firstEffectfulTerm = goTerm
         t@Error{} -> Just t
         t@Builtin{} -> Just t
 
-        -- Hard to know what gets evaluted first in a recursive let-binding,
+        -- Hard to know what gets evaluated first in a recursive let-binding,
         -- just give up and say nothing
         (Let _ Rec _ _) -> Nothing
         TyAbs{} -> Nothing
@@ -440,7 +443,7 @@ After that it gets more difficult. As soon as we're inlining things that are not
 and are used more than once, we are at risk of doing more work or making things bigger.
 
 There are a few things we could do to do this in a more principled way, such as call-site inlining
-based on whether a funciton is fully applied.
+based on whether a function is fully applied.
 -}
 
 {- Note [Inlining and purity]
