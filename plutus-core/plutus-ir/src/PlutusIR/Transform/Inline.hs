@@ -17,8 +17,8 @@ module PlutusIR.Transform.Inline (inline, InlineHints (..)) where
 import PlutusIR
 import PlutusIR.Analysis.Dependencies qualified as Deps
 import PlutusIR.Analysis.Usages qualified as Usages
-import PlutusIR.MkPir
-import PlutusIR.Purity
+import PlutusIR.MkPir (mkLet)
+import PlutusIR.Purity (isPure)
 import PlutusIR.Transform.Rename ()
 import PlutusPrelude
 
@@ -38,7 +38,7 @@ import Algebra.Graph qualified as G
 import Data.List.NonEmpty qualified as NE
 import Data.Map qualified as Map
 import Data.Semigroup.Generic (GenericSemigroupMonoid (..))
-import Witherable
+import Witherable (Witherable (wither))
 
 {- Note [Inlining approach and 'Secrets of the GHC Inliner']
 The approach we take is more-or-less exactly taken from 'Secrets of the GHC Inliner'.
@@ -52,7 +52,7 @@ We differ from the paper a few ways, mostly leaving things out:
 Functionality
 ------------
 
-PreInlineUncoditional: we don't do it, since we don't bother using usage information.
+PreInlineUnconditional: we don't do it, since we don't bother using usage information.
 We *could* do it, but it doesn't seem worth it. We also don't need to worry about
 inlining nested let-bindings, since we don't inline any.
 
@@ -113,18 +113,23 @@ turn into a delay/force pair and get simplified away, and then we have something
 inline. This is essentially the reason for the existence of the UPLC inlining pass.
 -}
 
--- 'SubstRng' in the paper, no 'Susp' case
+-- | Substitution range, 'SubstRng' in the paper.
+-- No 'Susp' case because we don't do PreInlineConditionally.
 -- See Note [Inlining approach and 'Secrets of the GHC Inliner']
-newtype InlineTerm tyname name uni fun a = Done (Dupable (Term tyname name uni fun a))
+newtype InlineTerm tyname name uni fun a =
+    Done (Dupable (Term tyname name uni fun a)) --out expressions
 
+-- | A map of unprocessed variables and their substitution range, 'Subst' in the paper.
 newtype TermEnv tyname name uni fun a =
     TermEnv { _unTermEnv :: UniqueMap TermUnique (InlineTerm tyname name uni fun a) }
     deriving newtype (Semigroup, Monoid)
 
+-- | Type version of `TermEnv`.
 newtype TypeEnv tyname uni a =
     TypeEnv { _unTypeEnv :: UniqueMap TypeUnique (Dupable (Type tyname uni a)) }
     deriving newtype (Semigroup, Monoid)
 
+-- | Similar to 'Subst' in the paper, but we have both term and type.
 data Subst tyname name uni fun a = Subst { _termEnv :: TermEnv tyname name uni fun a
                                          , _typeEnv :: TypeEnv tyname uni a
                                          }
@@ -150,13 +155,18 @@ type InliningConstraints tyname name uni fun =
     , PLC.ToBuiltinMeaning uni fun
     )
 
-
+-- | Useful info for inlining.
 data InlineInfo name fun a = InlineInfo
     { _iiStrictnessMap :: Deps.StrictnessMap
+    -- ^ Is it strict? Only needed for PIR, not UPLC
     , _iiUsages        :: Usages.Usages
+    -- ^ how many times is it used?
     , _iiHints         :: InlineHints name a
+    -- ^ have we explicitly been told to inline.
     , _iiBuiltinVer    :: PLC.BuiltinVersion fun
-    , _iiArity         :: Natural -- ambient arity of the expression
+    -- ^ the builtin version.
+    , _iiArity         :: Natural
+    -- ^ ambient arity of the expression, for CallSiteInline and inlining saturated functions.
     }
 makeLenses ''InlineInfo
 
@@ -412,7 +422,7 @@ firstEffectfulTerm = goTerm
         t@Error{} -> Just t
         t@Builtin{} -> Just t
 
-        -- Hard to know what gets evaluted first in a recursive let-binding,
+        -- Hard to know what gets evaluated first in a recursive let-binding,
         -- just give up and say nothing
         (Let _ Rec _ _) -> Nothing
         TyAbs{} -> Nothing
@@ -440,7 +450,7 @@ After that it gets more difficult. As soon as we're inlining things that are not
 and are used more than once, we are at risk of doing more work or making things bigger.
 
 There are a few things we could do to do this in a more principled way, such as call-site inlining
-based on whether a funciton is fully applied.
+based on whether a function is fully applied.
 -}
 
 {- Note [Inlining and purity]
