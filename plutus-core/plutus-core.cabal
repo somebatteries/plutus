@@ -310,6 +310,7 @@ library
     , monoidal-containers
     , mtl
     , multiset
+    , nonempty-containers
     , nonempty-vector
     , nothunks                    >=0.1.1
     , parser-combinators          >=0.4.0
@@ -327,6 +328,7 @@ library
     , th-lift
     , th-lift-instances
     , th-utilities
+    , these
     , time
     , transformers
     , unordered-containers
