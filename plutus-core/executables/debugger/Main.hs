@@ -3,6 +3,8 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE StrictData        #-}
 {-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE LambdaCase  #-}
+{-# LANGUAGE ImplicitParams  #-}
 
 {- | A Plutus Core debugger TUI application.
 
@@ -13,6 +15,12 @@
 -}
 module Main (main) where
 
+import UntypedPlutusCore as UPLC
+import UntypedPlutusCore.Evaluation.Machine.Cek.Debug.Driver qualified as D
+import UntypedPlutusCore.Evaluation.Machine.Cek.Debug.Internal
+import PlutusCore.Evaluation.Machine.ExBudgetingDefaults qualified as PLC
+import PlutusCore.Evaluation.Machine.MachineParameters
+
 import Draw
 import Event
 import Types
@@ -20,13 +28,20 @@ import Types
 import Brick.AttrMap qualified as B
 import Brick.Focus qualified as B
 import Brick.Main qualified as B
+import Brick.BChan qualified as B
 import Brick.Util qualified as B
 import Brick.Widgets.Edit qualified as BE
 import Control.Monad.Extra
+import Data.Text qualified as Text
 import Data.Text.IO qualified as Text
 import Graphics.Vty qualified as Vty
 import Options.Applicative qualified as OA
 import System.Directory.Extra
+import Control.Concurrent
+import Control.Monad.IO.Class
+import Control.Monad.ST (RealWorld)
+import PlutusPrelude
+import Control.Monad.Except
 
 debuggerAttrMap :: B.AttrMap
 debuggerAttrMap =
@@ -66,12 +81,14 @@ main = do
         "Does not exist or not a file: " <> optPath opts
     uplcText <- Text.readFile (optPath opts)
 
-    let app :: B.App DebuggerState e ResourceName
+    driverIn <- newEmptyMVar @D.Cmd
+
+    let app :: B.App DebuggerState CustomBrickEvent ResourceName
         app =
             B.App
                 { B.appDraw = drawDebugger
                 , B.appChooseCursor = B.showFirstCursor
-                , B.appHandleEvent = handleDebuggerEvent
+                , B.appHandleEvent = handleDebuggerEvent driverIn
                 , B.appStartEvent = pure ()
                 , B.appAttrMap = const debuggerAttrMap
                 }
@@ -105,4 +122,51 @@ main = do
                 , _dsVLimitBottomEditors = 20
                 }
 
-    void $ B.defaultMain app initialState
+    let builder = Vty.mkVty Vty.defaultConfig
+    initialVty <- builder
+
+    -- chan size of 20 seems to be the default for builtin non-custom events (mouse,key,etc)
+    brickIn <- B.newBChan @CustomBrickEvent 20
+
+    _dTid <- forkIO $ client driverIn brickIn uplcText
+    void $ B.customMain initialVty builder (Just brickIn) app initialState
+
+
+data CustomBrickEvent =
+    UpdateClientEvent (D.DriverState DefaultUni DefaultFun)
+  | LogEvent String
+
+client :: MVar D.Cmd -> B.BChan CustomBrickEvent -> Text.Text -> IO ()
+client driverIn brickIn uplcText = do
+    let term = undefined -- void $ prog ^. UPLC.progTerm
+        cekparams = mkMachineParameters @UPLC.DefaultUni @UPLC.DefaultFun def PLC.defaultCekCostModel
+        (MachineParameters costs runtime) = cekparams
+    let ndterm = fromRight undefined $ runExcept @FreeVariableError $ deBruijnTerm term
+        emptySrcSpansNdDterm = fmap (const mempty) ndterm
+    -- ExBudgetInfo{_exBudgetModeSpender, _exBudgetModeGetFinal, _exBudgetModeGetCumulative} <- getExBudgetInfo
+    -- CekEmitterInfo{_cekEmitterInfoEmit, _cekEmitterInfoGetFinal} <- getEmitterMode _exBudgetModeGetCumulative
+    let ?cekRuntime = runtime
+        ?cekEmitter = undefined
+        ?cekBudgetSpender = undefined
+        ?cekCosts = costs
+        ?cekSlippage = defaultSlippage
+      in D.iterM (handle driverIn brickIn) $ D.runDriver emptySrcSpansNdDterm
+
+-- Peel off one layer
+handle :: (MonadIO m,
+          GivenCekReqs DefaultUni DefaultFun RealWorld)
+       => MVar D.Cmd
+       -> B.BChan CustomBrickEvent
+       -> D.DebugF DefaultUni DefaultFun (m a)
+       -> m a
+handle driverIn brickIn = \case
+    D.StepF prevState k -> liftIO (cekMToIO $ D.handleStep prevState) >>= k
+    D.InputF k -> handleInput >>= k
+    D.LogF text k -> handleLog text >> k
+    D.UpdateClientF ds k -> handleUpdate ds >> k -- TODO: implement
+  where
+
+    handleInput = liftIO $ readMVar driverIn
+
+    handleUpdate = liftIO . B.writeBChan brickIn . UpdateClientEvent
+    handleLog = liftIO . B.writeBChan brickIn . LogEvent

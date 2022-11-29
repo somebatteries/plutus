@@ -26,27 +26,30 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module UntypedPlutusCore.Evaluation.Machine.Cek.Internal
-    -- See Note [Compilation peculiarities].
-    ( EvaluationResult(..)
-    , CekValue(..)
-    , CekUserError(..)
-    , CekEvaluationException
-    , CekBudgetSpender(..)
-    , ExBudgetInfo(..)
-    , ExBudgetMode(..)
-    , CekEmitter
-    , CekEmitterInfo(..)
-    , EmitterMode(..)
-    , CekM (..)
-    , ErrorWithCause(..)
-    , EvaluationError(..)
-    , ExBudgetCategory(..)
-    , StepKind(..)
-    , PrettyUni
-    , extractEvaluationResult
-    , runCekDeBruijn
-    , dischargeCekValue
+    (module UntypedPlutusCore.Evaluation.Machine.Cek.Internal
+    ,EvaluationResult(..)
     )
+    -- -- See Note [Compilation peculiarities].
+    -- ( EvaluationResult(..)
+    -- , CekValue(..)
+    -- , CekUserError(..)
+    -- , CekEvaluationException
+    -- , CekBudgetSpender(..)
+    -- , ExBudgetInfo(..)
+    -- , ExBudgetMode(..)
+    -- , CekEmitter
+    -- , CekEmitterInfo(..)
+    -- , EmitterMode(..)
+    -- , CekM (..)
+    -- , ErrorWithCause(..)
+    -- , EvaluationError(..)
+    -- , ExBudgetCategory(..)
+    -- , StepKind(..)
+    -- , PrettyUni
+    -- , extractEvaluationResult
+    -- , runCekDeBruijn
+    -- , dischargeCekValue
+    -- )
 where
 
 import ErrorCode
