@@ -804,17 +804,11 @@ enterComputeCek = computeCek (toWordArray 0) where
         let
             numArgs = NESeq.length args
             remainingArity = arity-numArgs
-            (env', ctx') = case NESeq.splitAt arity args of
-                -- arity >= numArgs
-                This toApply ->
-                  let extended = foldl' (\ev arg -> Env.cons arg ev) env toApply
-                  in (extended, ctx)
-                -- arity <= 0, impossible but handle it
-                That rest -> (env, FrameApplyArgs rest ctx)
-                -- 0 < arity < numArgs
-                These toApply rest ->
-                    let extended = foldl' (\ev arg -> Env.cons arg ev) env toApply
-                    in (extended, FrameApplyArgs rest ctx)
+            (toApply, rest) = Seq.splitAt arity $ NESeq.toSeq args
+            env' = foldl' (\ev arg -> Env.cons arg ev) env toApply
+            ctx' = case NESeq.nonEmptySeq rest of
+                Just rest' -> FrameApplyArgs rest' ctx
+                Nothing    -> ctx
         -- TODO: slab env
         in if remainingArity > 0
         then returnCek unbudgetedSteps ctx' (VLam remainingArity vars env' body)
