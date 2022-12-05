@@ -86,14 +86,11 @@ import Data.Semigroup.Foldable (toNonEmpty)
 import Data.Sequence qualified as Seq
 import Data.Sequence.NonEmpty qualified as NESeq
 import Data.Text (Text)
-import Data.These
-import Data.Vector qualified as V
-import Data.Vector.Mutable qualified as MV
-import Data.Vector.NonEmpty qualified as NEV
 import Data.Word
 import Data.Word64Array.Word8 hiding (Index, toList)
 import Prettyprinter
 import Universe
+import UntypedPlutusCore.Evaluation.Machine.Cek.ArgQueue as ArgQueue
 
 {- Note [Compilation peculiarities]
 READ THIS BEFORE TOUCHING ANYTHING IN THIS FILE
@@ -192,6 +189,8 @@ We need to be able to print 'CekValue's and for that we need a 'Show' instance f
 but functions are not printable and hence we provide a dummy instance.
 -}
 
+type Args = Seq.Seq
+
 -- See Note [Show instance for BuiltinRuntime].
 instance Show (BuiltinRuntime (CekValue uni fun)) where
     show _ = "<builtin_runtime>"
@@ -232,7 +231,7 @@ data CekValue uni fun =
       !(BuiltinRuntime (CekValue uni fun))
       -- ^ The partial application and its costing function.
       -- Check the docs of 'BuiltinRuntime' for details.
-  | VConstr {-# UNPACK #-} !Int {-# UNPACK #-} !(V.Vector (CekValue uni fun))
+  | VConstr {-# UNPACK #-} !Int {-# UNPACK #-} !(Args (CekValue uni fun))
     deriving stock (Show)
 
 type CekValEnv uni fun = Env.RAList (CekValue uni fun)
@@ -540,28 +539,6 @@ instance HasConstant (CekValue uni fun) where
 
     fromConstant = VCon
 
-data Accumulator i o s = Accumulator {-# UNPACK #-} !Int ![i] {-# UNPACK #-} !(MV.MVector s o)
-
--- Make sure we don't pay the price of making the NonEmptys
-{-# INLINE newNEAccumulator #-}
-newNEAccumulator :: NE.NonEmpty i -> ST s (i, Accumulator i o s)
-newNEAccumulator ts@(t :| rest) = do
-    let l = length ts -- note, length of *whole* list
-    emptyArr <- MV.new l
-    pure $ (t, Accumulator 0 rest emptyArr)
-
-newAccumulator :: [i] -> ST s (Either (V.Vector o) (i, Accumulator i o s))
-newAccumulator es =
-    case es of
-        []     -> pure $ Left V.empty
-        t : ts -> Right <$> newNEAccumulator (t :| ts)
-
-stepAccumulator :: Accumulator i o s -> o -> ST s (Either (V.Vector o) (i, Accumulator i o s))
-stepAccumulator (Accumulator nextIndex todo arr) next = do
-    MV.write arr nextIndex next
-    case todo of
-        []     -> Left <$> V.unsafeFreeze arr
-        t : ts -> pure $ Right (t, Accumulator (nextIndex+1) ts arr)
 
 {-|
 The context in which the machine operates.
@@ -570,10 +547,10 @@ Morally, this is a stack of frames, but we use the "intrusive list" representati
 we can match on context and the top frame in a single, strict pattern match.
 -}
 data Context uni fun s
-    = FrameEvalApp !(CekValEnv uni fun) ![Term NamedDeBruijn uni fun ()] !(Seq.Seq (CekValue uni fun)) !(Context uni fun s) -- ^ @[_ N]@
-    | FrameApplyArgs !(NESeq.NESeq (CekValue uni fun)) !(Context uni fun s) -- ^ @[_ V ...]@
+    = FrameEvalApp !(CekValEnv uni fun) !(Acc Args (Term NamedDeBruijn uni fun ()) (CekValue uni fun) s) !(Context uni fun s) -- ^ @[_ N]@
+    | FrameApplyArgs !(Args (CekValue uni fun)) !(Context uni fun s) -- ^ @[_ V ...]@
     | FrameForce !(Context uni fun s)                                               -- ^ @(force _)@
-    | FrameConstr !(CekValEnv uni fun) {-# UNPACK #-} !Int {-# UNPACK #-} !(Accumulator (Term NamedDeBruijn uni fun ()) (CekValue uni fun) s) !(Context uni fun s)
+    | FrameConstr !(CekValEnv uni fun) {-# UNPACK #-} !Int {-# UNPACK #-} !(Acc Args (Term NamedDeBruijn uni fun ()) (CekValue uni fun) s) !(Context uni fun s)
     | FrameCases !(CekValEnv uni fun) ![Term NamedDeBruijn uni fun ()] !(Context uni fun s)
     | NoFrame
     -- deriving stock (Show)
@@ -685,7 +662,8 @@ enterComputeCek = computeCek (toWordArray 0) where
     -- s ; ρ ▻ [L M]  ↦  s , [_ (M,ρ)]  ; ρ ▻ L
     computeCek !unbudgetedSteps !ctx !env (Apply _ fun args) = do
         !unbudgetedSteps' <- stepAndMaybeSpend BApply unbudgetedSteps
-        computeCek unbudgetedSteps' (FrameEvalApp env (toList args) Seq.empty ctx) env fun
+        (fun', acc) <- CekM $ ArgQueue.newNEAcc (fun `NE.cons` args)
+        computeCek unbudgetedSteps' (FrameEvalApp env acc ctx) env fun'
     -- s ; ρ ▻ abs α L  ↦  s ◅ abs α (L , ρ)
     -- s ; ρ ▻ con c  ↦  s ◅ con c
     -- s ; ρ ▻ builtin bn  ↦  s ◅ builtin bn arity arity [] [] ρ
@@ -699,7 +677,7 @@ enterComputeCek = computeCek (toWordArray 0) where
         throwing_ _EvaluationFailure
     computeCek !unbudgetedSteps !ctx !env (Constr _ i es) = do
         !unbudgetedSteps' <- stepAndMaybeSpend BApply unbudgetedSteps
-        nacc <- CekM $ newAccumulator es
+        nacc <- CekM $ ArgQueue.newAcc es
         case nacc of
             Left res       -> returnCek unbudgetedSteps' ctx $ VConstr i res
             Right (t, acc) -> computeCek unbudgetedSteps' (FrameConstr env i acc ctx) env t
@@ -729,32 +707,31 @@ enterComputeCek = computeCek (toWordArray 0) where
     -- s , {_ A} ◅ abs α M  ↦  s ; ρ ▻ M [ α / A ]*
     returnCek !unbudgetedSteps (FrameForce ctx) fun = forceEvaluate unbudgetedSteps ctx fun
     -- s , [_ (M,ρ)] ◅ V  ↦  s , [V _] ; ρ ▻ M
-    returnCek !unbudgetedSteps (FrameEvalApp env todo done ctx) arg = do
-        let done' = done Seq.|> arg
-        case todo of
-            (next:todo') -> computeCek unbudgetedSteps (FrameEvalApp env todo' done' ctx) env next
-            -- we seeded the accumulator with the fun and a non-empty list of args, so they have to
-            -- be in there!
-            [] -> case done' of
-                (fun Seq.:<| (NESeq.nonEmptySeq -> Just args)) -> returnCek unbudgetedSteps (FrameApplyArgs args ctx) fun
-                -- TODO: maybe try and make this impossible in the types?
-                -- Or I guesss make an error for it, but it genuinely is impossible
-                _ -> error "impossible"
+    returnCek !unbudgetedSteps (FrameEvalApp env acc ctx) arg = do
+        r <- CekM $ ArgQueue.stepAcc acc arg
+        case r of
+            Right (next, acc') -> computeCek unbudgetedSteps (FrameEvalApp env acc' ctx) env next
+            Left done          ->
+                -- we seeded the accumulator with the fun and a non-empty list of args, so they have to
+                -- be in there!
+                case ArgQueue.uncons done of
+                    Just (fun, args) -> returnCek unbudgetedSteps (FrameApplyArgs args ctx) fun
+                    -- TODO: maybe try and make this impossible in the types?
+                    -- Or I guesss make an error for it, but it genuinely is impossible
+                    _                -> error "impossible"
     -- s , [(lam x (M,ρ)) _] ◅ V  ↦  s ; ρ [ x  ↦  V ] ▻ M
     -- FIXME: add rule for VBuiltin once it's in the specification.
     returnCek !unbudgetedSteps (FrameApplyArgs args ctx) fun =
         applyEvaluate unbudgetedSteps ctx fun args
     returnCek !unbudgetedSteps (FrameConstr env i acc ctx) e = do
-        r <- CekM $ stepAccumulator acc e
+        r <- CekM $ ArgQueue.stepAcc acc e
         case r of
             Right (next, acc') -> computeCek unbudgetedSteps (FrameConstr env i acc' ctx) env next
             Left done          -> returnCek unbudgetedSteps ctx $ VConstr i done
     returnCek !unbudgetedSteps (FrameCases env cs ctx) e = case e of
         (VConstr i args) -> case cs ^? ix i of
             -- TODO: terrible
-            Just t  -> case NESeq.nonEmptySeq $ Seq.fromList $ toList args of
-                Just args' -> computeCek unbudgetedSteps (FrameApplyArgs args' ctx) env t
-                Nothing    -> computeCek unbudgetedSteps ctx env t
+            Just t  -> computeCek unbudgetedSteps (FrameApplyArgs args ctx) env t
             Nothing -> throwingDischarged _MachineError (MissingCaseBranch i) e
         _ -> throwingDischarged _MachineError NonConstrScrutinized e
 
@@ -798,41 +775,40 @@ enterComputeCek = computeCek (toWordArray 0) where
         :: WordArray
         -> Context uni fun s
         -> CekValue uni fun   -- lhs of application
-        -> NESeq.NESeq (CekValue uni fun)   -- rhs of application
+        -> Args (CekValue uni fun)   -- rhs of application
         -> CekM uni fun s (Term NamedDeBruijn uni fun ())
+    applyEvaluate !unbudgetedSteps !ctx val !args | ArgQueue.null args = returnCek unbudgetedSteps ctx val
     applyEvaluate !unbudgetedSteps !ctx (VLam arity vars env body) !args =
         let
-            numArgs = NESeq.length args
+            numArgs = ArgQueue.length args
             remainingArity = arity-numArgs
-            (toApply, rest) = Seq.splitAt arity $ NESeq.toSeq args
-            env' = foldl' (\ev arg -> Env.cons arg ev) env toApply
-            ctx' = case NESeq.nonEmptySeq rest of
-                Just rest' -> FrameApplyArgs rest' ctx
-                Nothing    -> ctx
+            (rest, env') = ArgQueue.consUpTo arity args env
+            ctx' = FrameApplyArgs rest ctx
         -- TODO: slab env
         in if remainingArity > 0
         then returnCek unbudgetedSteps ctx' (VLam remainingArity vars env' body)
         else computeCek unbudgetedSteps ctx' env' body
     -- Annotating @f@ and @exF@ with bangs gave us some speed-up, but only until we added a bang to
     -- 'VCon'. After that the bangs here were making things a tiny bit slower and so we removed them.
-    applyEvaluate !unbudgetedSteps !ctx (VBuiltin fun term runtime) !args = do
-        let argTerms = fmap dischargeCekValue $ toNonEmpty args
+    applyEvaluate !unbudgetedSteps !ctx val@(VBuiltin fun term runtime) !args = do
+        -- TODO: partial!
+        let argTerms = fmap dischargeCekValue $ NE.fromList $ toList args
             -- @term@ and @argTerm@ are fully discharged, and so @term'@ is, hence we can put it
             -- in a 'VBuiltin'.
             term' = Apply () term argTerms
         -- TODO: inefficient because it just repeatedly calls applyEvaluate with fewer arguments each time,
         -- could apply them all in a loop here, perhaps.
-        let (arg NESeq.:<|| remaining) = args
-        case runtime of
-            -- It's only possible to apply a builtin application if the builtin expects a term
-            -- argument next.
-            BuiltinExpectArgument f -> do
-                res <- evalBuiltinApp fun term' $ f arg
-                case NESeq.nonEmptySeq remaining of
-                    Just remaining' -> applyEvaluate unbudgetedSteps ctx res remaining'
-                    Nothing         -> returnCek unbudgetedSteps ctx res
-            _ ->
-                throwingWithCause _MachineError UnexpectedBuiltinTermArgumentMachineError (Just term')
+        case ArgQueue.uncons args of
+          Just (arg, remaining) ->
+            case runtime of
+                -- It's only possible to apply a builtin application if the builtin expects a term
+                -- argument next.
+                BuiltinExpectArgument f -> do
+                    res <- evalBuiltinApp fun term' $ f arg
+                    applyEvaluate unbudgetedSteps ctx res remaining
+                _ ->
+                    throwingWithCause _MachineError UnexpectedBuiltinTermArgumentMachineError (Just term')
+          Nothing -> returnCek unbudgetedSteps ctx val
     applyEvaluate !_ !_ val !_ =
         throwingDischarged _MachineError NonFunctionalApplicationMachineError val
 
