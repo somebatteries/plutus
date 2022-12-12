@@ -70,6 +70,8 @@ data SrcSpan = SrcSpan
     }
     deriving stock (Eq, Ord, Generic, Show)
 
+instance Flat SrcSpan
+
 type SrcSpans = Set SrcSpan
 
 -- | 'CompiledCodeIn' instantiated with default built-in types and functions, and

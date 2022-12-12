@@ -497,6 +497,10 @@ stripTicks = \case
 mkCompiledCode :: forall a . BS.ByteString -> BS.ByteString -> BS.ByteString -> CompiledCode a
 mkCompiledCode plcBS pirBS ci = SerializedCode plcBS (Just pirBS) (fold . unflat $ ci)
 
+-- | Like `mkCompiledCode` but makes a `CompiledCodeDebug`.
+mkCompiledCodeDebug :: forall a . BS.ByteString -> BS.ByteString -> BS.ByteString -> CompiledCodeDebug a
+mkCompiledCodeDebug plcBS pirBS ci = SerializedCode plcBS (Just pirBS) (fold . unflat $ ci)
+
 -- | Make a 'NameInfo' mapping the given set of TH names to their
 -- 'GHC.TyThing's for later reference.
 makePrimitiveNameInfo :: [TH.Name] -> PluginM uni fun NameInfo

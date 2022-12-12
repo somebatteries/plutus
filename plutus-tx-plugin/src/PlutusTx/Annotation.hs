@@ -5,6 +5,7 @@ module PlutusTx.Annotation where
 
 import PlutusTx.Code
 
+import Flat (Flat)
 import GHC.Generics
 import Prettyprinter
 
@@ -28,8 +29,12 @@ data Inline
     | MayInline
     deriving stock (Eq, Ord, Generic, Show)
 
+instance Flat Inline
+
 instance Pretty Ann where
     pretty = viaShow
+
+instance Flat Ann
 
 -- | Create an `Ann` with `AlwaysInline`.
 annAlwaysInline :: Ann
