@@ -14,7 +14,7 @@
 
 -- | Functions for compiling GHC Core expressions into Plutus Core terms.
 module PlutusTx.Compiler.Expr (compileExpr, compileExprWithDefs, compileDataConRef) where
-
+import Control.Monad.IO.Class
 import GHC.Builtin.Names qualified as GHC
 import GHC.ByteCode.Types qualified as GHC
 import GHC.Core qualified as GHC
@@ -67,6 +67,7 @@ import Data.Set qualified as Set
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
 import Data.Traversable
+import System.IO.Unsafe
 
 {- Note [System FC and System FW]
 Haskell uses system FC, which includes type equalities and coercions.
@@ -175,21 +176,22 @@ findAlt dc alts t = case GHC.findAlt (GHC.DataAlt dc) alts of
 -- | Make alternatives with non-delayed and delayed bodies for a given 'CoreAlt'.
 compileAlt
     :: CompilingDefault uni fun m ann
-    => GHC.CoreAlt -- ^ The 'CoreAlt' representing the branch itself.
+    => Map.Map Int GHC.SrcSpan
+    -> GHC.CoreAlt -- ^ The 'CoreAlt' representing the branch itself.
     -> [GHC.Type] -- ^ The instantiated type arguments for the data constructor.
     -> m (PIRTerm uni fun, PIRTerm uni fun) -- ^ Non-delayed and delayed
-compileAlt (GHC.Alt alt vars body) instArgTys = withContextM 3 (sdToTxt $ "Creating alternative:" GHC.<+> GHC.ppr alt) $ case alt of
+compileAlt hpc (GHC.Alt alt vars body) instArgTys = withContextM 3 (sdToTxt $ "Creating alternative:" GHC.<+> GHC.ppr alt) $ case alt of
     GHC.LitAlt _  -> throwPlain $ UnsupportedError "Literal case"
     -- We just package it up as a lambda bringing all the
     -- vars into scope whose body is the body of the case alternative.
     -- See Note [Iterated abstraction and application]
     -- See Note [Case expressions and laziness]
     GHC.DataAlt _ -> withVarsScoped vars $ \vars' -> do
-        b <- compileExpr body
+        b <- compileExpr hpc body
         delayed <- delay b
         return (PLC.mkIterLamAbs vars' b, PLC.mkIterLamAbs vars' delayed)
     GHC.DEFAULT   -> do
-        compiledBody <- compileExpr body
+        compiledBody <- compileExpr hpc body
         nonDelayed <- wrapDefaultAlt compiledBody
         delayed <- delay compiledBody >>= wrapDefaultAlt
         return (nonDelayed, delayed)
@@ -448,8 +450,8 @@ ourselves before we start.
 
 hoistExpr
     :: CompilingDefault uni fun m ann
-    => GHC.Var -> GHC.CoreExpr -> m (PIRTerm uni fun)
-hoistExpr var t = do
+    => Map.Map Int GHC.SrcSpan -> GHC.Var -> GHC.CoreExpr -> m (PIRTerm uni fun)
+hoistExpr hpc var t = do
     let name = GHC.getName var
         lexName = LexName name
     -- See Note [Dependency tracking]
@@ -466,7 +468,7 @@ hoistExpr var t = do
                 (PIR.Def var' (PIR.mkVar annMayInline var', PIR.Strict))
                 mempty
 
-            t' <- maybeProfileRhs var' =<< compileExpr t
+            t' <- maybeProfileRhs var' =<< compileExpr hpc t
             ver <- asks ccBuiltinVer
             -- See Note [Non-strict let-bindings]
             let strict = PIR.isPure ver (const PIR.NonStrict) t'
@@ -631,8 +633,8 @@ entryExitTracing lamName displayName e ty =
 
 compileExpr
     :: CompilingDefault uni fun m ann
-    => GHC.CoreExpr -> m (PIRTerm uni fun)
-compileExpr e = withContextM 2 (sdToTxt $ "Compiling expr:" GHC.<+> GHC.ppr e) $ do
+    => Map.Map Int GHC.SrcSpan -> GHC.CoreExpr -> m (PIRTerm uni fun)
+compileExpr hpc e = withContextM 2 (sdToTxt $ "Compiling expr:" GHC.<+> GHC.ppr e) $ do
     -- See Note [Scopes]
     CompileContext {ccScopes=stack,ccNameInfo=nameInfo,ccModBreaks=maybeModBreaks, ccBuiltinVer=ver} <- ask
 
@@ -675,19 +677,19 @@ compileExpr e = withContextM 2 (sdToTxt $ "Compiling expr:" GHC.<+> GHC.ppr e) $
         GHC.Lit lit -> compileLiteral lit
         -- These are all wrappers around string and char literals, but keeping them allows us to give better errors
         -- unpackCString# is just a wrapper around a literal
-        GHC.Var n `GHC.App` expr | GHC.getName n == GHC.unpackCStringName -> compileExpr expr
+        GHC.Var n `GHC.App` expr | GHC.getName n == GHC.unpackCStringName -> compileExpr hpc expr
         -- See Note [unpackFoldrCString#]
         GHC.Var build `GHC.App` _ `GHC.App` GHC.Lam _ (GHC.Var unpack `GHC.App` _ `GHC.App` expr)
-            | GHC.getName build == GHC.buildName && GHC.getName unpack == GHC.unpackCStringFoldrName -> compileExpr expr
+            | GHC.getName build == GHC.buildName && GHC.getName unpack == GHC.unpackCStringFoldrName -> compileExpr hpc expr
         -- C# is just a wrapper around a literal
-        GHC.Var (GHC.idDetails -> GHC.DataConWorkId dc) `GHC.App` arg | dc == GHC.charDataCon -> compileExpr arg
+        GHC.Var (GHC.idDetails -> GHC.DataConWorkId dc) `GHC.App` arg | dc == GHC.charDataCon -> compileExpr hpc arg
 
         -- Unboxed unit, (##).
         GHC.Var (GHC.idDetails -> GHC.DataConWorkId dc) | dc == GHC.unboxedUnitDataCon -> pure (PIR.mkConstant annMayInline ())
 
         -- Ignore the magic 'noinline' function, it's the identity but has no unfolding.
         -- See Note [noinline hack]
-        GHC.Var n `GHC.App` GHC.Type _ `GHC.App` arg | GHC.getName n == GHC.noinlineIdName -> compileExpr arg
+        GHC.Var n `GHC.App` GHC.Type _ `GHC.App` arg | GHC.getName n == GHC.noinlineIdName -> compileExpr hpc arg
 
         -- See note [GHC runtime errors]
         -- <error func> <runtime rep> <overall type> <call stack> <message>
@@ -713,7 +715,7 @@ compileExpr e = withContextM 2 (sdToTxt $ "Compiling expr:" GHC.<+> GHC.ppr e) $
 
         -- See Note [Unfoldings]
         -- The "unfolding template" includes things with normal unfoldings and also dictionary functions
-        GHC.Var n@(GHC.maybeUnfoldingTemplate . GHC.realIdUnfolding -> Just unfolding) -> hoistExpr n unfolding
+        GHC.Var n@(GHC.maybeUnfoldingTemplate . GHC.realIdUnfolding -> Just unfolding) -> hoistExpr hpc n unfolding
         -- Class ops don't have unfoldings in general (although they do if they're for one-method classes, so we
         -- want to check the unfoldings case first), see the GHC Note [ClassOp/DFun selection] for why. That
         -- means we have to reconstruct the RHS ourselves, though, which is a pain.
@@ -726,7 +728,7 @@ compileExpr e = withContextM 2 (sdToTxt $ "Compiling expr:" GHC.<+> GHC.ppr e) $
                 Nothing -> throwSd CompilationError $ "Id not in class method list:" GHC.<+> GHC.ppr n
             let rhs = GHC.mkDictSelRhs cls val_index
 
-            hoistExpr n rhs
+            hoistExpr hpc n rhs
         GHC.Var n -> do
             -- Defined names, including builtin names
             let lexName = LexName $ GHC.getName n
@@ -740,50 +742,50 @@ compileExpr e = withContextM 2 (sdToTxt $ "Compiling expr:" GHC.<+> GHC.ppr e) $
                     GHC.$+$ (GHC.ppr $ GHC.realIdUnfolding n)
 
         -- ignoring applications to types of 'RuntimeRep' kind, see Note [Unboxed tuples]
-        l `GHC.App` GHC.Type t | GHC.isRuntimeRepKindedTy t -> compileExpr l
+        l `GHC.App` GHC.Type t | GHC.isRuntimeRepKindedTy t -> compileExpr hpc l
         -- arg can be a type here, in which case it's a type instantiation
-        l `GHC.App` GHC.Type t -> PIR.TyInst annMayInline <$> compileExpr l <*> compileTypeNorm t
+        l `GHC.App` GHC.Type t -> PIR.TyInst annMayInline <$> compileExpr hpc l <*> compileTypeNorm t
         -- otherwise it's a normal application
-        l `GHC.App` arg -> PIR.Apply annMayInline <$> compileExpr l <*> compileExpr arg
+        l `GHC.App` arg -> PIR.Apply annMayInline <$> compileExpr hpc l <*> compileExpr hpc arg
         -- if we're biding a type variable it's a type abstraction
-        GHC.Lam b@(GHC.isTyVar -> True) body -> mkTyAbsScoped b $ compileExpr body
+        GHC.Lam b@(GHC.isTyVar -> True) body -> mkTyAbsScoped b $ compileExpr hpc body
         -- otherwise it's a normal lambda
-        GHC.Lam b body -> mkLamAbsScoped b $ compileExpr body
+        GHC.Lam b body -> mkLamAbsScoped b $ compileExpr hpc body
 
         GHC.Let (GHC.NonRec b rhs) body -> do
             -- the binding is in scope for the body, but not for the arg
-            rhs' <- compileExpr rhs
+            rhs' <- compileExpr hpc rhs
             -- See Note [Non-strict let-bindings]
             let strict = PIR.isPure ver (const PIR.NonStrict) rhs'
             withVarScoped b $ \v -> do
                 rhs'' <- maybeProfileRhs v rhs'
                 let binds = pure $ PIR.TermBind annMayInline (if strict then PIR.Strict else PIR.NonStrict) v rhs''
-                body' <- compileExpr body
+                body' <- compileExpr hpc body
                 pure $ PIR.Let annMayInline PIR.NonRec binds body'
         GHC.Let (GHC.Rec bs) body ->
             withVarsScoped (fmap fst bs) $ \vars -> do
                 -- the bindings are scope in both the body and the args
                 -- TODO: this is a bit inelegant matching the vars back up
                 binds <- for (zip vars bs) $ \(v, (_, rhs)) -> do
-                    rhs' <- maybeProfileRhs v =<< compileExpr rhs
+                    rhs' <- maybeProfileRhs v =<< compileExpr hpc rhs
                     -- See Note [Non-strict let-bindings]
                     let strict = PIR.isPure ver (const PIR.NonStrict) rhs'
                     pure $ PIR.TermBind annMayInline (if strict then PIR.Strict else PIR.NonStrict) v rhs'
-                body' <- compileExpr body
+                body' <- compileExpr hpc body
                 pure $ PIR.mkLet annMayInline PIR.Rec binds body'
 
         -- See Note [Evaluation-only cases]
         GHC.Case scrutinee b _ [GHC.Alt _ bs body] | all (GHC.isDeadOcc . GHC.occInfo . GHC.idInfo) bs -> do
             -- See Note [At patterns]
-            scrutinee' <- compileExpr scrutinee
+            scrutinee' <- compileExpr hpc scrutinee
             withVarScoped b $ \v -> do
-                body' <- compileExpr body
+                body' <- compileExpr hpc body
                 -- See Note [At patterns]
                 let binds = [ PIR.TermBind annMayInline PIR.Strict v scrutinee' ]
                 pure $ PIR.mkLet annMayInline PIR.NonRec binds body'
         GHC.Case scrutinee b t alts -> do
             -- See Note [At patterns]
-            scrutinee' <- compileExpr scrutinee
+            scrutinee' <- compileExpr hpc scrutinee
             let scrutineeType = GHC.varType b
 
             -- the variable for the scrutinee is bound inside the cases, but not in the scrutinee expression itself
@@ -803,7 +805,7 @@ compileExpr e = withContextM 2 (sdToTxt $ "Compiling expr:" GHC.<+> GHC.ppr e) $
                         -- these are the instantiated type arguments, e.g. for the data constructor Just when
                         -- matching on Maybe Int it is [Int] (crucially, not [a])
                         instArgTys = GHC.scaledThing <$> GHC.dataConInstOrigArgTys dc argTys
-                    (nonDelayedAlt, delayedAlt) <- compileAlt alt instArgTys
+                    (nonDelayedAlt, delayedAlt) <- compileAlt hpc alt instArgTys
                     return (nonDelayedAlt, delayedAlt)
                 let
                     isPureAlt = compiledAlts <&> \(nonDelayed, _) -> PIR.isPure ver (const PIR.NonStrict) nonDelayed
@@ -824,21 +826,35 @@ compileExpr e = withContextM 2 (sdToTxt $ "Compiling expr:" GHC.<+> GHC.ppr e) $
                 let binds = pure $ PIR.TermBind annMayInline PIR.NonStrict v scrutinee'
                 pure $ PIR.Let annMayInline PIR.NonRec binds mainCase
 
+        -- GHC.Tick tick1 (GHC.Tick tick2 body) -> do
+        --     let dbg :: GHC.Outputable a => a -> String
+        --         dbg = GHC.showSDocUnsafe . GHC.ppr
+        --     error $ "DOUBLE TICK!!! " <> dbg e
+        --       <> "\n\n TICK1: " <> dbg tick1
+        --       <> "\n\n TICK2: " <> dbg tick2
         -- we can use source notes to get a better context for the inner expression
         -- these are put in when you compile with -g
         -- See Note [What source locations to cover]
-        GHC.Tick tick body | Just src <- getSourceSpan maybeModBreaks tick ->
+        GHC.Tick tick body | Just src <- getSourceSpan hpc maybeModBreaks tick ->
             withContextM 1 (sdToTxt $ "Compiling expr at:" GHC.<+> GHC.ppr src) $ do
+              _ <- unsafePerformIO $ do
+                putStrLn $ "\n=====GOT TICK: " ++ (GHC.showSDocUnsafe $ GHC.ppr e)
+                case body of
+                    GHC.Tick tick2 _ -> do
+                        putStrLn $ "********MULTI TICK: " ++
+                            (GHC.showSDocUnsafe $ GHC.ppr (tick, tick2))
+                    _ -> pure ()
+                pure (pure ())
               CompileContext {ccOpts=coverageOpts} <- ask
               -- See Note [Coverage annotations]
               let anns = Set.toList $ activeCoverageTypes coverageOpts
-              compiledBody <- fmap (addSrcSpan $ spanToSpan src) <$> compileExpr body
-              foldM (coverageCompile body (GHC.exprType body) src) compiledBody anns
+              compiledBody <- PIR.mapTermAnn (addSrcSpan $ spanToSpan src) <$> compileExpr hpc body
+              foldM (coverageCompile hpc body (GHC.exprType body) src) compiledBody anns
 
         -- ignore other annotations
-        GHC.Tick _ body -> compileExpr body
+        GHC.Tick _ body -> compileExpr hpc body
         -- See Note [Coercions and newtypes]
-        GHC.Cast body _ -> compileExpr body
+        GHC.Cast body _ -> compileExpr hpc body
         GHC.Type _ -> throwPlain $ UnsupportedError "Types as standalone expressions"
         GHC.Coercion _ -> throwPlain $ UnsupportedError "Coercions as expressions"
 
@@ -868,20 +884,22 @@ in each case, but since we operate on them in the same way, there's no problem.
 -- See Note [What source locations to cover]
 -- See Note [Partial type signature for getSourceSpan]
 -- | Do your best to try to extract a source span from a tick
-getSourceSpan :: Maybe GHC.ModBreaks -> _ -> Maybe GHC.RealSrcSpan
-getSourceSpan _ GHC.SourceNote{GHC.sourceSpan=src} = Just src
-getSourceSpan _ GHC.ProfNote{GHC.profNoteCC=cc} =
+getSourceSpan :: Map.Map Int GHC.SrcSpan -> Maybe GHC.ModBreaks -> _ -> Maybe GHC.RealSrcSpan
+getSourceSpan _ _ GHC.SourceNote{GHC.sourceSpan=src} = Just src
+getSourceSpan _ _ GHC.ProfNote{GHC.profNoteCC=cc} =
   case cc of
     GHC.NormalCC _ _ _ (GHC.RealSrcSpan sp _) -> Just sp
     GHC.AllCafsCC _ (GHC.RealSrcSpan sp _)    -> Just sp
     _                                         -> Nothing
-getSourceSpan mmb GHC.HpcTick{GHC.tickId=tid} = do
+getSourceSpan _ mmb GHC.Breakpoint{GHC.breakpointId=bid} = do
   mb <- mmb
   let arr = GHC.modBreaks_locs mb
       range = Array.bounds arr
-  GHC.RealSrcSpan sp _ <- if Array.inRange range tid  then Just $ arr Array.! tid else Nothing
+  GHC.RealSrcSpan sp _ <- if Array.inRange range bid  then Just $ arr Array.! bid else Nothing
   return sp
-getSourceSpan _ _ = Nothing
+getSourceSpan hpc _ GHC.HpcTick{GHC.tickId=tid} = do
+    GHC.RealSrcSpan sp _ <- Map.lookup tid hpc
+    pure sp
 
 spanToSpan :: GHC.RealSrcSpan -> SrcSpan
 spanToSpan sp = SrcSpan
@@ -905,13 +923,14 @@ toCovLoc sp = CovLoc (GHC.unpackFS $ GHC.srcSpanFile sp)
 -- See Note [Coverage order]
 -- | Annotate a term for coverage
 coverageCompile :: CompilingDefault uni fun m ann
-                => GHC.CoreExpr -- ^ The original expression
+                => Map.Map Int GHC.SrcSpan
+                -> GHC.CoreExpr -- ^ The original expression
                 -> GHC.Type -- ^ The type of the expression
                 -> GHC.RealSrcSpan -- ^ The source location of this expression
                 -> PIRTerm uni fun -- ^ The current term (this is what we add coverage tracking to)
                 -> CoverageType -- ^ The type of coverage to do next
                 -> m (PIRTerm uni fun)
-coverageCompile originalExpr exprType src compiledTerm covT =
+coverageCompile hpc originalExpr exprType src compiledTerm covT =
   case covT of
     -- Add a location coverage annotation to tell us "we've executed this piece of code"
     LocationCoverage -> do
@@ -943,7 +962,7 @@ coverageCompile originalExpr exprType src compiledTerm covT =
         traceBoolThing <- getThing 'traceBool
         case traceBoolThing of
           GHC.AnId traceBoolId -> do
-            traceBoolCompiled <- compileExpr $ GHC.Var traceBoolId
+            traceBoolCompiled <- compileExpr hpc $ GHC.Var traceBoolId
             let mkMetadata = CoverageMetadata . foldMap (Set.singleton . ApplicationHeadSymbol . GHC.getOccString)
             fc <- addBoolCaseToCoverageIndex (toCovLoc src) False (mkMetadata headSymName)
             tc <- addBoolCaseToCoverageIndex (toCovLoc src) True (mkMetadata headSymName)
@@ -965,8 +984,8 @@ coverageCompile originalExpr exprType src compiledTerm covT =
 
 compileExprWithDefs
     :: CompilingDefault uni fun m ann
-    => GHC.CoreExpr -> m (PIRTerm uni fun)
-compileExprWithDefs e = do
+    => Map.Map Int GHC.SrcSpan -> GHC.CoreExpr -> m (PIRTerm uni fun)
+compileExprWithDefs hpc e = do
     defineBuiltinTypes
     defineBuiltinTerms
-    compileExpr e
+    compileExpr hpc e

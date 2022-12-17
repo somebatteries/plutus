@@ -66,8 +66,11 @@ import Data.Map qualified as Map
 import Data.Set qualified as Set
 import ErrorCode (HasErrorCode (errorCode))
 import Prettyprinter qualified as PP
+import System.Directory.Extra
 import System.IO (openTempFile)
 import System.IO.Unsafe (unsafePerformIO)
+import Trace.Hpc.Mix
+import Trace.Hpc.Util
 
 data PluginCtx = PluginCtx
     { pcOpts            :: PluginOptions
@@ -191,10 +194,27 @@ comes with its own downsides however, because the user may have imported "plc" q
 -}
 
 
+getMixEntries :: String -> GHC.CoreM [GHC.SrcSpan]
+getMixEntries modu = do
+    dflags <- GHC.getDynFlags
+    let dir = GHC.hpcDir dflags
+    exists <- liftIO $ doesDirectoryExist dir
+    if exists
+        then do
+            Mix file _ _ _ entries <- liftIO $ readMix [dir] (Left modu)
+            let f = GHC.fsLit file
+            return [ GHC.mkSrcSpan (GHC.mkSrcLoc f l1 c1) (GHC.mkSrcLoc f l2 c2)
+                    | (hpc, _) <- entries
+                    , let (l1,c1,l2,c2) = fromHpcPos hpc
+                    ]
+        else pure []
+
 -- | Our plugin works at haskell-module level granularity; the plugin
 -- looks at the module's top-level bindings for plc markers and compiles their right-hand-side core expressions.
 mkPluginPass :: PluginOptions -> GHC.CoreToDo
 mkPluginPass opts = GHC.CoreDoPluginPass "Core to PLC" $ \ guts -> do
+    mixEntries <- getMixEntries "Plugin.Debug.Spec"
+    let hpc = Map.fromList $ zip [0::Int ..] mixEntries
     -- Family env code borrowed from SimplCore
     p_fam_env <- GHC.getPackageFamInstEnv
     -- See Note [Marker resolution]
@@ -211,7 +231,7 @@ mkPluginPass opts = GHC.CoreDoPluginPass "Core to PLC" $ \ guts -> do
                                  , pcAnnTy = GHC.unitTy
                                  }
                 -- start looking for plc calls from the top-level binds
-            in GHC.bindsOnlyPass (runPluginM pctx . traverse compileBind) guts
+            in GHC.bindsOnlyPass (runPluginM pctx . traverse (compileBind hpc)) guts
 
 -- | The monad where the plugin runs in for each module.
 -- It is a core->core compiler monad, called PluginM, augmented with pure errors.
@@ -229,11 +249,11 @@ runPluginM pctx act = do
             in liftIO $ GHC.throwGhcExceptionIO errInGhc
 
 -- | Compiles all the marked expressions in the given binder into PLC literals.
-compileBind :: GHC.CoreBind -> PluginM PLC.DefaultUni PLC.DefaultFun GHC.CoreBind
-compileBind = \case
-    GHC.NonRec b rhs -> GHC.NonRec b <$> compileMarkedExprs rhs
+compileBind :: Map.Map Int GHC.SrcSpan -> GHC.CoreBind -> PluginM PLC.DefaultUni PLC.DefaultFun GHC.CoreBind
+compileBind hpc = \case
+    GHC.NonRec b rhs -> GHC.NonRec b <$> compileMarkedExprs hpc rhs
     GHC.Rec bindsRhses -> GHC.Rec <$> (for bindsRhses $ \(b, rhs) -> do
-                                             rhs' <- compileMarkedExprs rhs
+                                             rhs' <- compileMarkedExprs hpc rhs
                                              pure (b, rhs'))
 
 {- Note [Hooking in the plugin]
@@ -256,8 +276,8 @@ with this, since you can't really specify a polymorphic type in a type applicati
 -}
 
 -- | Compiles all the core-expressions surrounded by plc in the given expression into PLC literals.
-compileMarkedExprs :: GHC.CoreExpr -> PluginM PLC.DefaultUni PLC.DefaultFun GHC.CoreExpr
-compileMarkedExprs expr = do
+compileMarkedExprs :: Map.Map Int GHC.SrcSpan -> GHC.CoreExpr -> PluginM PLC.DefaultUni PLC.DefaultFun GHC.CoreExpr
+compileMarkedExprs hpc expr = do
     markerName <- asks pcMarkerName
     case expr of
       _ | (fun, [GHC.Type annTy, GHC.Type locTy, GHC.Type codeTy, _proxy, code]) <- GHC.collectArgs expr,
@@ -267,18 +287,18 @@ compileMarkedExprs expr = do
           markerName == GHC.idName fid,
           Just fs_locStr <- GHC.isStrLitTy locTy ->
             local (\ctx -> ctx { pcAnnTy = annTy }) $
-                compileMarkedExprOrDefer (show fs_locStr) codeTy code
+                compileMarkedExprOrDefer hpc (show fs_locStr) codeTy code
       e@(GHC.Var fid) | markerName == GHC.idName fid -> throwError . NoContext . InvalidMarkerError . GHC.showSDocUnsafe $ GHC.ppr e
-      GHC.App e a -> GHC.App <$> compileMarkedExprs e <*> compileMarkedExprs a
-      GHC.Lam b e -> GHC.Lam b <$> compileMarkedExprs e
-      GHC.Let bnd e -> GHC.Let <$> compileBind bnd <*> compileMarkedExprs e
+      GHC.App e a -> GHC.App <$> compileMarkedExprs hpc e <*> compileMarkedExprs hpc a
+      GHC.Lam b e -> GHC.Lam b <$> compileMarkedExprs hpc e
+      GHC.Let bnd e -> GHC.Let <$> compileBind hpc bnd <*> compileMarkedExprs hpc e
       GHC.Case e b t alts -> do
-            e' <- compileMarkedExprs e
-            let expAlt (GHC.Alt a bs rhs) = GHC.Alt a bs <$> compileMarkedExprs rhs
+            e' <- compileMarkedExprs hpc e
+            let expAlt (GHC.Alt a bs rhs) = GHC.Alt a bs <$> compileMarkedExprs hpc rhs
             alts' <- mapM expAlt alts
             pure $ GHC.Case e' b t alts'
-      GHC.Cast e c -> flip GHC.Cast c <$> compileMarkedExprs e
-      GHC.Tick t e -> GHC.Tick t <$> compileMarkedExprs e
+      GHC.Cast e c -> flip GHC.Cast c <$> compileMarkedExprs hpc e
+      GHC.Tick t e -> GHC.Tick t <$> compileMarkedExprs hpc e
       e@(GHC.Coercion _) -> pure e
       e@(GHC.Lit _) -> pure e
       e@(GHC.Var _) -> pure e
@@ -288,10 +308,10 @@ compileMarkedExprs expr = do
 -- if a compilation error happens and the 'defer-errors' option is turned on,
 -- the compilation error is suppressed and the original hs expression is replaced with a
 -- haskell runtime-error expression.
-compileMarkedExprOrDefer :: String -> GHC.Type -> GHC.CoreExpr -> PluginM PLC.DefaultUni PLC.DefaultFun GHC.CoreExpr
-compileMarkedExprOrDefer locStr codeTy origE = do
+compileMarkedExprOrDefer :: Map.Map Int GHC.SrcSpan -> String -> GHC.Type -> GHC.CoreExpr -> PluginM PLC.DefaultUni PLC.DefaultFun GHC.CoreExpr
+compileMarkedExprOrDefer hpc locStr codeTy origE = do
     opts <- asks pcOpts
-    let compileAct = compileMarkedExpr locStr codeTy origE
+    let compileAct = compileMarkedExpr hpc locStr codeTy origE
     if _posDeferErrors opts
       -- TODO: we could perhaps move this catchError to the "runExceptT" module-level, but
       -- it leads to uglier code and difficulty of handling other pure errors
@@ -311,8 +331,8 @@ emitRuntimeError codeTy e = do
 -- | Compile the core expression that is surrounded by a 'plc' marker,
 -- and return a core expression which evaluates to the compiled plc AST as a serialized bytestring,
 -- to be injected back to the Haskell program.
-compileMarkedExpr :: String -> GHC.Type -> GHC.CoreExpr -> PluginM PLC.DefaultUni PLC.DefaultFun GHC.CoreExpr
-compileMarkedExpr locStr codeTy origE = do
+compileMarkedExpr :: Map.Map Int GHC.SrcSpan -> String -> GHC.Type -> GHC.CoreExpr -> PluginM PLC.DefaultUni PLC.DefaultFun GHC.CoreExpr
+compileMarkedExpr hpc locStr codeTy origE = do
     flags <- GHC.getDynFlags
     famEnvs <- asks pcFamEnvs
     opts <- asks pcOpts
@@ -346,7 +366,7 @@ compileMarkedExpr locStr codeTy origE = do
         if | GHC.eqType annTy GHC.unitTy -> do
             ((pirP, uplcP), covIdx) <- runWriterT . runQuoteT . flip runReaderT ctx $
                 withContextM 1 (sdToTxt $ "Compiling expr at" GHC.<+> GHC.text locStr) $
-                    runCompiler moduleNameStr opts origE'
+                    runCompiler hpc moduleNameStr opts origE'
             -- serialize the PIR, PLC, and coverageindex outputs into a bytestring.
             bsPir <- makeByteStringLiteral $ flat pirP
             bsPlc <- makeByteStringLiteral $ flat uplcP
@@ -357,7 +377,7 @@ compileMarkedExpr locStr codeTy origE = do
              base == baseSpans -> do
             ((pirPD, uplcPD), covIdx) <- runWriterT . runQuoteT . flip runReaderT ctx $
                 withContextM 1 (sdToTxt $ "Compiling expr at" GHC.<+> GHC.text locStr) $
-                    runCompilerDebug moduleNameStr opts origE'
+                    runCompilerDebug hpc moduleNameStr opts origE'
             bsPir <- makeByteStringLiteral $ flat pirPD
             bsPlc <- makeByteStringLiteral $ flat uplcPD
             pure (bsPir, bsPlc, covIdx)
@@ -399,11 +419,12 @@ runCompiler ::
     , MonadError (CompileError uni fun Ann) m
     , MonadIO m
     ) =>
+    Map.Map Int GHC.SrcSpan ->
     String ->
     PluginOptions ->
     GHC.CoreExpr ->
     m (PIRProgram uni fun, UPLCProgram uni fun)
-runCompiler moduleName opts = fmap (void *** void) . runCompilerDebug moduleName opts
+runCompiler hpc moduleName opts = fmap (void *** void) . runCompilerDebug hpc moduleName opts
 
 -- | Like `runCompiler`, but generates PIR and UPLC with annotated `SrcSpans`.
 runCompilerDebug ::
@@ -416,11 +437,12 @@ runCompilerDebug ::
     , MonadError (CompileError uni fun Ann) m
     , MonadIO m
     ) =>
+    Map.Map Int GHC.SrcSpan ->
     String ->
     PluginOptions ->
     GHC.CoreExpr ->
     m (PIRProgramDebug uni fun, UPLCProgramDebug uni fun)
-runCompilerDebug moduleName opts expr = do
+runCompilerDebug hpc moduleName opts expr = do
     -- Plc configuration
     plcTcConfig <- PLC.getDefTypeCheckConfig PIR.noProvenance
 
@@ -457,7 +479,9 @@ runCompilerDebug moduleName opts expr = do
             & set (PLC.coSimplifyOpts . UPLC.soInlineHints) hints
 
     -- GHC.Core -> Pir translation.
-    pirT <- PIR.runDefT annMayInline $ compileExprWithDefs expr
+    liftIO $ putStrLn $ "INITIAL EXPR === " <> GHC.showSDocUnsafe (GHC.ppr expr)
+    -- undefined
+    pirT <- PIR.runDefT annMayInline $ compileExprWithDefs hpc expr
     when (_posDumpPir opts) . liftIO $
         dumpFlat (PIR.Program () (void pirT)) "initial PIR program" (moduleName ++ ".pir-initial.flat")
 

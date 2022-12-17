@@ -91,7 +91,24 @@
         )
       )
     )
-    fromList [SrcSpan {srcSpanFile = "test/Plugin/Debug/Spec.hs", srcSpanSLine = 38, srcSpanSCol = 9, srcSpanELine = 38, srcSpanECol = 88},SrcSpan {srcSpanFile = "test/Plugin/Debug/Spec.hs", srcSpanSLine = 38, srcSpanSCol = 54, srcSpanELine = 38, srcSpanECol = 80}]
-    equalsInteger
+    (lam
+      fromList []
+      ds
+      (con fromList [] integer)
+      [
+        fromList [SrcSpan {srcSpanFile = "test/Plugin/Debug/Spec.hs", srcSpanSLine = 39, srcSpanSCol = 9, srcSpanELine = 39, srcSpanECol = 60}]
+        [
+          fromList []
+          fromList [] equalsInteger
+          fromList [SrcSpan {srcSpanFile = "test/Plugin/Debug/Spec.hs", srcSpanSLine = 39, srcSpanSCol = 54, srcSpanELine = 39, srcSpanECol = 57}]
+          ds
+        ]
+        (con
+          fromList [SrcSpan {srcSpanFile = "test/Plugin/Debug/Spec.hs", srcSpanSLine = 39, srcSpanSCol = 58, srcSpanELine = 39, srcSpanECol = 59}]
+          integer
+          3
+        )
+      ]
+    )
   )
 )

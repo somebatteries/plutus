@@ -1,5 +1,6 @@
 -- editorconfig-checker-disable-file
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeFamilies          #-}
@@ -22,6 +23,7 @@ module PlutusIR.Core.Type (
     Program (..),
     applyProgram,
     termAnn,
+    mapTermAnn,
     progAnn,
     progTerm,
     ) where
@@ -187,3 +189,17 @@ termAnn t = case t of
   Error a _      -> a
   IWrap a _ _ _  -> a
   Unwrap a _     -> a
+
+mapTermAnn :: (a -> a) -> Term tyname name uni fun a -> Term tyname name uni fun a
+mapTermAnn f = \case
+    Let a b c d    -> Let (f a) b c d
+    Var a b        -> Var (f a) b
+    TyAbs a b c d  -> TyAbs (f a) b c d
+    LamAbs a b c d -> LamAbs (f a) b c d
+    Apply a b c    -> Apply (f a) b c
+    Constant a b   -> Constant (f a) b
+    Builtin a b    -> Builtin (f a) b
+    TyInst a b c   -> TyInst (f a) b c
+    Error a b      -> Error (f a) b
+    IWrap a b c d  -> IWrap (f a) b c d
+    Unwrap a b     -> Unwrap (f a) b

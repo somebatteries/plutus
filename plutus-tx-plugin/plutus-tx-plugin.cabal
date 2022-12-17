@@ -80,6 +80,7 @@ library
     , either
     , extra
     , flat
+    , hpc
     , lens
     , mtl
     , plutus-core       ^>=1.1
@@ -131,29 +132,30 @@ test-suite plutus-tx-tests
   hs-source-dirs: test
   main-is:        Spec.hs
   other-modules:
-    Budget.Spec
-    IsData.Spec
-    Lib
-    Lift.Spec
-    Optimization.Spec
-    Plugin.Basic.Spec
-    Plugin.Coverage.Spec
-    Plugin.Data.Spec
     Plugin.Debug.Spec
-    Plugin.Errors.Spec
-    Plugin.Functions.Spec
-    Plugin.Laziness.Spec
-    Plugin.Lib
-    Plugin.NoTrace.Spec
-    Plugin.Primitives.Spec
-    Plugin.Profiling.Spec
     Plugin.Spec
-    Plugin.Strict.Spec
-    Plugin.Typeclasses.Lib
-    Plugin.Typeclasses.Spec
-    StdLib.Spec
-    TH.Spec
-    TH.TestTH
+
+  -- Budget.Spec
+  -- IsData.Spec
+  -- Lib
+  -- Lift.Spec
+  -- Optimization.Spec
+  -- Plugin.Basic.Spec
+  -- Plugin.Coverage.Spec
+  -- Plugin.Data.Spec
+  -- Plugin.Errors.Spec
+  -- Plugin.Functions.Spec
+  -- Plugin.Laziness.Spec
+  -- Plugin.Lib
+  -- Plugin.NoTrace.Spec
+  -- Plugin.Primitives.Spec
+  -- Plugin.Profiling.Spec
+  -- Plugin.Strict.Spec
+  -- Plugin.Typeclasses.Lib
+  -- Plugin.Typeclasses.Spec
+  -- StdLib.Spec
+  -- TH.Spec
+  -- TH.TestTH
 
   build-depends:
     , base                                            >=4.9 && <5
@@ -172,8 +174,8 @@ test-suite plutus-tx-tests
     , template-haskell
     , text
 
-  -- NOTE: -g makes the plugin give better errors
-  ghc-options:    -g
+-- NOTE: -g makes the plugin give better errors
+-- ghc-options:    -g
 
 test-suite size
   import:         lang

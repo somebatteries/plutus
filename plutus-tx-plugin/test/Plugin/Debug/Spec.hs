@@ -9,6 +9,8 @@
 {-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:max-simplifier-iterations-pir=0 #-}
 {-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:max-simplifier-iterations-uplc=0 #-}
 
+{-# OPTIONS_GHC -g #-}
+
 module Plugin.Debug.Spec where
 
 import Test.Tasty.Extras
@@ -22,36 +24,43 @@ import PlutusTx.Test
 import Data.Proxy
 
 debug :: TestNested
-debug =
+debug  =
     testNested
         "Debug"
         [ goldenPirBy config "letFun" letFun
-        , goldenPirBy config "fib" fib
+        -- , goldenPirBy config "fib" fib
         ]
   where
     config = PrettyConfigClassic defPrettyConfigName True
+
+-- letFun :: CompiledCodeDebug (Integer -> Bool)
+-- letFun =
+--     plc
+--         (Proxy @"letFun")
+--         (\(xxx :: Integer) -> Builtins.equalsInteger xxx 3)
 
 letFun :: CompiledCodeDebug (Integer -> Integer -> Bool)
 letFun =
     plc
         (Proxy @"letFun")
-        (\(x :: Integer) (y :: Integer) -> let f z = Builtins.equalsInteger x z in f y)
+        (\(xxx :: Integer) (yyy :: Integer) ->
+            let fff zzz = Builtins.equalsInteger zzz xxx in fff yyy)
 
-fib :: CompiledCodeDebug (Integer -> Integer)
--- not using case to avoid literal cases
-fib =
-    plc
-        (Proxy @"fib")
-        ( let fib :: Integer -> Integer
-              fib n =
-                if Builtins.equalsInteger n 0
-                    then 0
-                    else
-                        if Builtins.equalsInteger n 1
-                            then 1
-                            else
-                                Builtins.addInteger
-                                    (fib (Builtins.subtractInteger n 1))
-                                    (fib (Builtins.subtractInteger n 2))
-           in fib
-        )
+-- fib :: CompiledCodeDebug (Integer -> Integer)
+-- -- not using case to avoid literal cases
+-- fib =
+--     plc
+--         (Proxy @"fib")
+--         ( let fib :: Integer -> Integer
+--               fib n =
+--                 if Builtins.equalsInteger n 0
+--                     then 0
+--                     else
+--                         if Builtins.equalsInteger n 1
+--                             then 1
+--                             else
+--                                 Builtins.addInteger
+--                                     (fib (Builtins.subtractInteger n 1))
+--                                     (fib (Builtins.subtractInteger n 2))
+--            in fib
+--         )
