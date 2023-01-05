@@ -36,6 +36,9 @@ import PlutusIR.Transform.Rename ()
 
 import Control.Lens hiding (Strict)
 import Control.Monad ((<=<))
+import Data.List.Extra qualified as List
+import Data.List.NonEmpty.Extra (NonEmpty (..))
+import Data.List.NonEmpty.Extra qualified as NonEmpty
 import Data.Set (Set)
 import Data.Set qualified as Set
 
@@ -54,7 +57,7 @@ floatTerm ::
     m (Term tyname name uni fun a)
 floatTerm ver = pure . fmap fst . go <=< PLC.rename
   where
-    -- | Float bindings in the given `Term` inwards, and calculate the set of
+    -- \| Float bindings in the given `Term` inwards, and calculate the set of
     -- variable `Unique`s in the result `Term`.
     go ::
         Term tyname name uni fun a ->
@@ -97,7 +100,7 @@ floatTerm ver = pure . fmap fst . go <=< PLC.rename
         Builtin{} -> (,mempty) <$> t
         Error{} -> (,mempty) <$> t
 
-    -- | Float bindings in the given `Binding` inwards, and calculate the set of
+    -- \| Float bindings in the given `Binding` inwards, and calculate the set of
     -- variable `Unique`s in the result `Binding`.
     goBinding ::
         Binding tyname name uni fun a ->
@@ -171,10 +174,20 @@ floatAlg ver letAnn = go
                 -- type cannot mention the bound variable
                 TyInst (a, Set.union usBind usBody) (go b tyInstBody) ty
             Let (a, usBody) r bs letBody
-                -- The binding can be placed inside a `Let`, if the right hand sides of the
-                -- bindings of the `Let` do not mention `var`.
                 | (var ^. PLC.unique) `Set.notMember` foldMap bindingUniqs bs ->
+                    -- None of the RHSs mention `var`, so we can place the binding
+                    -- inside `letBody`.
                     Let (a, Set.union usBind usBody) r bs (go b letBody)
+                | (var ^. PLC.unique) `Set.notMember` termUniqs letBody
+                , Just (before, b', after) <-
+                    splitBindings (var ^. PLC.unique) (NonEmpty.toList bs)
+                , TermBind (a', usBind') s' var' rhs' <- b' ->
+                    -- `letBody` does not mention `var`, and there is exactly one
+                    -- RHS in `bs` that mentions `var`, so we can place `b`
+                    -- inside one of the RHSs in `bs`.
+                    let b'' = TermBind (a', Set.union usBind usBind') s' var' (go b rhs')
+                        bs' = NonEmpty.appendr before (b'' :| after)
+                     in Let (a, Set.union usBind usBody) r bs' letBody
             IWrap (a, usBody) ty1 ty2 iwrapBody ->
                 -- A binding can always be placed inside an `IWrap`.
                 IWrap (a, Set.union usBind usBody) ty1 ty2 (go b iwrapBody)
@@ -187,3 +200,27 @@ floatAlg ver letAnn = go
         _ ->
             let us = Set.union (termUniqs body) (bindingUniqs b)
              in Let (letAnn, us) NonRec (pure b) body
+
+{- | Split the given list of bindings, if possible.
+
+ If the input contains exactly one binding @b@ that mentions the given `PLC.TermUnique`,
+ return @Just (before_b, b, after_b)@.
+
+ Otherwise, return `Nothing`.
+-}
+splitBindings ::
+    PLC.TermUnique ->
+    [Binding tyname name uni fun (a, Uniques)] ->
+    Maybe
+        ( [Binding tyname name uni fun (a, Uniques)]
+        , Binding tyname name uni fun (a, Uniques)
+        , [Binding tyname name uni fun (a, Uniques)]
+        )
+splitBindings u bs = case is of
+    [i] -> Just (take i bs, bs !! i, drop (i + 1) bs)
+    _   -> Nothing
+  where
+    is = List.findIndices containsUniq bs
+    containsUniq = \case
+        TermBind _ _ _ rhs -> u `Set.member` termUniqs rhs
+        _                  -> False
