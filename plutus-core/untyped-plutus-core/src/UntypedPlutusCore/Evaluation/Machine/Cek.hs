@@ -92,12 +92,12 @@ A wrapper around the internal runCek to debruijn input and undebruijn output.
 *THIS FUNCTION IS PARTIAL if the input term contains free variables*
 -}
 runCek
-    :: (Ix fun, PrettyUni uni fun)
-    => MachineParameters CekMachineCosts CekValue uni fun
-    -> ExBudgetMode cost uni fun
-    -> EmitterMode uni fun
-    -> Term Name uni fun ()
-    -> (Either (CekEvaluationException Name uni fun) (Term Name uni fun ()), cost, [Text])
+    :: (Ix fun, PrettyUni uni fun, Pretty ann, Typeable ann)
+    => MachineParameters CekMachineCosts CekValue uni fun ann
+    -> ExBudgetMode cost uni fun ann
+    -> EmitterMode uni fun ann
+    -> Term Name uni fun ann
+    -> (Either (CekEvaluationException Name uni fun ann) (Term Name uni fun ann), cost, [Text])
 runCek params mode emitMode term =
     -- translating input
     case runExcept @FreeVariableError $ deBruijnTerm term of
@@ -110,12 +110,12 @@ runCek params mode emitMode term =
   where
     -- *GRACEFULLY* undebruijnifies: a) the error-cause-term (if it exists) or b) the success value-term.
     -- 'Graceful' means that the (a) && (b) undebruijnifications do not throw an error upon a free variable encounter.
-    unDeBruijnResult :: Either (CekEvaluationException NamedDeBruijn uni fun) (Term NamedDeBruijn uni fun ())
-                     -> Either (CekEvaluationException Name uni fun) (Term Name uni fun ())
+    unDeBruijnResult :: Either (CekEvaluationException NamedDeBruijn uni fun ann) (Term NamedDeBruijn uni fun ann)
+                     -> Either (CekEvaluationException Name uni fun ann) (Term Name uni fun ann)
     unDeBruijnResult = bimap (fmap gracefulUnDeBruijn) gracefulUnDeBruijn
 
     -- free debruijn indices will be turned to free, consistent uniques
-    gracefulUnDeBruijn :: Term NamedDeBruijn uni fun () -> Term Name uni fun ()
+    gracefulUnDeBruijn :: Term NamedDeBruijn uni fun ann -> Term Name uni fun ann
     gracefulUnDeBruijn t = runQuote
                            . flip evalStateT mempty
                            $ unDeBruijnTermWith freeIndexAsConsistentLevel t
@@ -123,11 +123,11 @@ runCek params mode emitMode term =
 -- | Evaluate a term using the CEK machine with logging disabled and keep track of costing.
 -- *THIS FUNCTION IS PARTIAL if the input term contains free variables*
 runCekNoEmit
-    :: (Ix fun, PrettyUni uni fun)
-    => MachineParameters CekMachineCosts CekValue uni fun
-    -> ExBudgetMode cost uni fun
-    -> Term Name uni fun ()
-    -> (Either (CekEvaluationException Name uni fun) (Term Name uni fun ()), cost)
+    :: (Ix fun, PrettyUni uni fun, Pretty ann, Typeable ann)
+    => MachineParameters CekMachineCosts CekValue uni fun ann
+    -> ExBudgetMode cost uni fun ann
+    -> Term Name uni fun ann
+    -> (Either (CekEvaluationException Name uni fun ann) (Term Name uni fun ann), cost)
 runCekNoEmit params mode =
     -- throw away the logs
     (\(res, cost, _logs) -> (res, cost)) . runCek params mode noEmitter
@@ -139,12 +139,12 @@ May throw a 'CekMachineException'.
 unsafeRunCekNoEmit
     :: ( Pretty (SomeTypeIn uni), Typeable uni
        , Closed uni, uni `Everywhere` PrettyConst
-       , Ix fun, Pretty fun, Typeable fun
+       , Ix fun, Pretty fun, Typeable fun, Pretty ann, Typeable ann
        )
-    => MachineParameters CekMachineCosts CekValue uni fun
-    -> ExBudgetMode cost uni fun
-    -> Term Name uni fun ()
-    -> (EvaluationResult (Term Name uni fun ()), cost)
+    => MachineParameters CekMachineCosts CekValue uni fun ann
+    -> ExBudgetMode cost uni fun ann
+    -> Term Name uni fun ann
+    -> (EvaluationResult (Term Name uni fun ann), cost)
 unsafeRunCekNoEmit params mode =
     -- Don't use 'first': https://github.com/input-output-hk/plutus/issues/3876
     (\(e, l) -> (unsafeExtractEvaluationResult e, l)) . runCekNoEmit params mode
@@ -152,11 +152,11 @@ unsafeRunCekNoEmit params mode =
 -- | Evaluate a term using the CEK machine with logging enabled.
 -- *THIS FUNCTION IS PARTIAL if the input term contains free variables*
 evaluateCek
-    :: (Ix fun, PrettyUni uni fun)
-    => EmitterMode uni fun
-    -> MachineParameters CekMachineCosts CekValue uni fun
-    -> Term Name uni fun ()
-    -> (Either (CekEvaluationException Name uni fun) (Term Name uni fun ()), [Text])
+    :: (Ix fun, PrettyUni uni fun, Pretty ann, Typeable ann)
+    => EmitterMode uni fun ann
+    -> MachineParameters CekMachineCosts CekValue uni fun ann
+    -> Term Name uni fun ann
+    -> (Either (CekEvaluationException Name uni fun ann) (Term Name uni fun ann), [Text])
 evaluateCek emitMode params =
     -- throw away the cost
     (\(res, _cost, logs) -> (res, logs)) . runCek params restrictingEnormous emitMode
@@ -164,10 +164,10 @@ evaluateCek emitMode params =
 -- | Evaluate a term using the CEK machine with logging disabled.
 -- *THIS FUNCTION IS PARTIAL if the input term contains free variables*
 evaluateCekNoEmit
-    :: (Ix fun, PrettyUni uni fun)
-    => MachineParameters CekMachineCosts CekValue uni fun
-    -> Term Name uni fun ()
-    -> Either (CekEvaluationException Name uni fun) (Term Name uni fun ())
+    :: (Ix fun, PrettyUni uni fun, Pretty ann, Typeable ann)
+    => MachineParameters CekMachineCosts CekValue uni fun ann
+    -> Term Name uni fun ann
+    -> Either (CekEvaluationException Name uni fun ann) (Term Name uni fun ann)
 evaluateCekNoEmit params = fst . runCekNoEmit params restrictingEnormous
 
 -- | Evaluate a term using the CEK machine with logging enabled. May throw a 'CekMachineException'.
@@ -175,12 +175,12 @@ evaluateCekNoEmit params = fst . runCekNoEmit params restrictingEnormous
 unsafeEvaluateCek
     :: ( Pretty (SomeTypeIn uni), Typeable uni
        , Closed uni, uni `Everywhere` PrettyConst
-       , Ix fun, Pretty fun, Typeable fun
+       , Ix fun, Pretty fun, Typeable fun, Pretty ann, Typeable ann
        )
-    => EmitterMode uni fun
-    -> MachineParameters CekMachineCosts CekValue uni fun
-    -> Term Name uni fun ()
-    -> (EvaluationResult (Term Name uni fun ()), [Text])
+    => EmitterMode uni fun ann
+    -> MachineParameters CekMachineCosts CekValue uni fun ann
+    -> Term Name uni fun ann
+    -> (EvaluationResult (Term Name uni fun ann), [Text])
 unsafeEvaluateCek emitTime params =
     -- Don't use 'first': https://github.com/input-output-hk/plutus/issues/3876
     (\(e, l) -> (unsafeExtractEvaluationResult e, l)) . evaluateCek emitTime params
@@ -190,20 +190,20 @@ unsafeEvaluateCek emitTime params =
 unsafeEvaluateCekNoEmit
     :: ( Pretty (SomeTypeIn uni), Typeable uni
        , Closed uni, uni `Everywhere` PrettyConst
-       , Ix fun, Pretty fun, Typeable fun
+       , Ix fun, Pretty fun, Typeable fun, Pretty ann, Typeable ann
        )
-    => MachineParameters CekMachineCosts CekValue uni fun
-    -> Term Name uni fun ()
-    -> EvaluationResult (Term Name uni fun ())
+    => MachineParameters CekMachineCosts CekValue uni fun ann
+    -> Term Name uni fun ann
+    -> EvaluationResult (Term Name uni fun ann)
 unsafeEvaluateCekNoEmit params = unsafeExtractEvaluationResult . evaluateCekNoEmit params
 
 -- | Unlift a value using the CEK machine.
 -- *THIS FUNCTION IS PARTIAL if the input term contains free variables*
 readKnownCek
-    :: ( ReadKnown (Term Name uni fun ()) a
-       , Ix fun, PrettyUni uni fun
+    :: ( ReadKnown (Term Name uni fun ann) a
+       , Ix fun, PrettyUni uni fun, Pretty ann, Typeable ann
        )
-    => MachineParameters CekMachineCosts CekValue uni fun
-    -> Term Name uni fun ()
-    -> Either (CekEvaluationException Name uni fun) a
+    => MachineParameters CekMachineCosts CekValue uni fun ann
+    -> Term Name uni fun ann
+    -> Either (CekEvaluationException Name uni fun ann) a
 readKnownCek params = evaluateCekNoEmit params >=> readKnownSelf

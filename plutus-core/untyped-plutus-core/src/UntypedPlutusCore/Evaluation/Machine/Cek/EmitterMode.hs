@@ -1,5 +1,4 @@
 -- editorconfig-checker-disable-file
-{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module UntypedPlutusCore.Evaluation.Machine.Cek.EmitterMode (noEmitter, logEmitter, logWithTimeEmitter, logWithBudgetEmitter) where
@@ -23,11 +22,11 @@ import PlutusCore.Evaluation.Machine.ExBudget
 import PlutusCore.Evaluation.Machine.ExMemory
 
 -- | No emitter.
-noEmitter :: EmitterMode uni fun
+noEmitter :: EmitterMode uni fun ann
 noEmitter = EmitterMode $ \_ -> pure $ CekEmitterInfo (\_ -> pure ()) (pure mempty)
 
 -- | Emits log only.
-logEmitter :: EmitterMode uni fun
+logEmitter :: EmitterMode uni fun ann
 logEmitter = EmitterMode $ \_ -> do
     logsRef <- newSTRef DList.empty
     let emitter logs = CekM $ modifySTRef logsRef (`DList.append` logs)
@@ -39,7 +38,7 @@ encodeRecord :: CSV.ToRecord a => a -> T.Text
 encodeRecord a = T.stripEnd $ T.decodeUtf8 $ BSL.toStrict $ BS.toLazyByteString $ CSV.encodeRecord a
 
 -- | Emits log with timestamp.
-logWithTimeEmitter :: EmitterMode uni fun
+logWithTimeEmitter :: EmitterMode uni fun ann
 logWithTimeEmitter = EmitterMode $ \_ -> do
     logsRef <- newSTRef DList.empty
     let emitter logs = CekM $ do
@@ -56,7 +55,7 @@ instance CSV.ToField ExMemory where
     toField (ExMemory t) = CSV.toField $ toInteger t
 
 -- | Emits log with the budget.
-logWithBudgetEmitter :: EmitterMode uni fun
+logWithBudgetEmitter :: EmitterMode uni fun ann
 logWithBudgetEmitter = EmitterMode $ \getBudget -> do
     logsRef <- newSTRef DList.empty
     let emitter logs = CekM $ do
