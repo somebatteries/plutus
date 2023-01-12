@@ -45,7 +45,7 @@ elaborateDebug = id
 --       If you still want a built-in function, add a dummy ‘()’ argument
 --     • In the expression: makeBuiltinMeaningDebug False
 -- >>> :t makeBuiltinMeaningDebug $ 0 + 42
--- <interactive>:1:27: error:
+-- <interactive>:1:29: error:
 --     • Built-in functions are not allowed to have constraints
 --       To fix this error instantiate all constrained type variables
 --     • In the second argument of ‘($)’, namely ‘0 + 42’
@@ -61,7 +61,8 @@ elaborateDebug = id
 --         alongside the instance for the built-in type.
 --       Otherwise you may need to add a new built-in type
 --         (provided you're doing something that can be supported in principle)
---     • In the expression: makeBuiltinMeaningDebug $ Just ()
+--     • In the first argument of ‘($)’, namely ‘makeBuiltinMeaningDebug’
+--       In the expression: makeBuiltinMeaningDebug $ Just ()
 -- >>> :t makeBuiltinMeaningDebug fst
 -- <interactive>:1:1: error:
 --     • An unwrapped built-in type constructor can't be applied to a type variable
@@ -77,11 +78,6 @@ elaborateDebug = id
 --     • In the expression: makeBuiltinMeaningDebug null
 -- >>> :t makeBuiltinMeaningDebug (undefined :: Opaque val (f Bool) -> ())
 -- <interactive>:1:1: error:
---     • A built-in function is not allowed to have applied type variables in its type
---       To fix this error apply type variables via explicit ‘TyAppRep’
---     • In the expression:
---         makeBuiltinMeaningDebug (undefined :: Opaque val (f Bool) -> ())
--- <interactive>:1:1: error:
 --     • No instance for ‘KnownTypeAst DefaultUni (TyVarRep
 --                                                   ('TyNameRep "f" 0) Bool)’
 --       Which means
@@ -92,6 +88,11 @@ elaborateDebug = id
 --         alongside the instance for the built-in type.
 --       Otherwise you may need to add a new built-in type
 --         (provided you're doing something that can be supported in principle)
+--     • In the expression:
+--         makeBuiltinMeaningDebug (undefined :: Opaque val (f Bool) -> ())
+-- <interactive>:1:1: error:
+--     • A built-in function is not allowed to have applied type variables in its type
+--       To fix this error apply type variables via explicit ‘TyAppRep’
 --     • In the expression:
 --         makeBuiltinMeaningDebug (undefined :: Opaque val (f Bool) -> ())
 makeBuiltinMeaningDebug

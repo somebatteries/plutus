@@ -1,3 +1,5 @@
+-- editorconfig-checker-disable-file
+{-# LANGUAGE AllowAmbiguousTypes      #-}
 {-# LANGUAGE ConstraintKinds          #-}
 {-# LANGUAGE DataKinds                #-}
 {-# LANGUAGE DefaultSignatures        #-}
@@ -19,6 +21,7 @@ module PlutusCore.Builtin.KnownTypeAst
     , RepHole
     , TypeHole
     , KnownBuiltinTypeAst
+    , mkTyBuiltin
     , KnownTypeAst (..)
     , Merge
     ) where
@@ -28,7 +31,6 @@ import PlutusCore.Builtin.KnownKind
 import PlutusCore.Builtin.Polymorphism
 import PlutusCore.Core
 import PlutusCore.Evaluation.Result
-import PlutusCore.MkPlc hiding (error)
 import PlutusCore.Name
 
 import Data.Kind qualified as GHC (Constraint, Type)
@@ -142,28 +144,17 @@ data family RepHole x
 type TypeHole :: forall hole. GHC.Type -> hole
 data family TypeHole a
 
--- | For annotating an uninstantiated built-in type, so that it gets handled by the right instance
--- or type family.
-type BuiltinHead :: forall k. k -> k
-data family BuiltinHead f
-
--- | Take an iterated application of a built-in type and elaborate every function application
--- inside of it to 'TypeAppRep', plus annotate the head with 'BuiltinHead'.
--- The idea is that we don't need to process built-in types manually if we simply add some
--- annotations for instance resolution to look for. Think what we'd have to do manually for, say,
--- 'ToHoles': traverse the spine of the application and collect all the holes into a list, which is
--- troubling, because type applications are left-nested and lists are right-nested, so we'd have to
--- use accumulators or an explicit 'Reverse' type family. And then we also have 'KnownTypeAst' and
--- 'ToBinds', so handling built-in types in a special way for each of those would be a hassle,
--- especially given the fact that type-level Haskell is not exactly good at computing things.
--- With the 'ElaborateBuiltin' approach we get 'KnownTypeAst', 'ToHoles' and 'ToBinds' for free.
-type ElaborateBuiltin :: forall k. k -> k
-type family ElaborateBuiltin a where
-    ElaborateBuiltin (f x) = ElaborateBuiltin f `TyAppRep` x
-    ElaborateBuiltin f     = BuiltinHead f
-
 -- | A constraint for \"@a@ is a 'KnownTypeAst' by means of being included in @uni@\".
-type KnownBuiltinTypeAst uni a = KnownTypeAst uni (ElaborateBuiltin a)
+type KnownBuiltinTypeAst uni a = AllBuiltinArgs (KnownTypeAst uni) a
+
+-- TODO: make it @forall {k}@ once we have that.
+-- (see https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0099-explicit-specificity.rst)
+-- | Embed a type (provided it's in the universe) into a PLC type.
+mkTyBuiltin
+    :: forall a (x :: a) uni ann. KnownTypeAst uni (ElaborateBuiltin x)
+    => ann -> Type TyName uni ann
+mkTyBuiltin ann = ann <$ toTypeAst (Proxy @(ElaborateBuiltin x))
+{-# INLINE mkTyBuiltin #-}
 
 type KnownTypeAst :: forall a. (GHC.Type -> GHC.Type) -> a -> GHC.Constraint
 class KnownTypeAst uni x where
@@ -184,8 +175,8 @@ class KnownTypeAst uni x where
 
     -- | The type representing @a@ used on the PLC side.
     toTypeAst :: proxy x -> Type TyName uni ()
-    default toTypeAst :: KnownBuiltinTypeAst uni x => proxy x -> Type TyName uni ()
-    toTypeAst _ = toTypeAst $ Proxy @(ElaborateBuiltin x)
+    default toTypeAst :: KnownTypeAst uni (ElaborateBuiltin x) => proxy x -> Type TyName uni ()
+    toTypeAst _ = mkTyBuiltin @_ @x ()
     {-# INLINE toTypeAst #-}
 
 instance KnownTypeAst uni a => KnownTypeAst uni (EvaluationResult a) where
@@ -229,7 +220,7 @@ instance uni `Contains` f => KnownTypeAst uni (BuiltinHead f) where
     type IsBuiltin (BuiltinHead f) = 'True
     type ToHoles (BuiltinHead f) = '[]
     type ToBinds (BuiltinHead f) = '[]
-    toTypeAst _ = mkTyBuiltin @_ @f ()
+    toTypeAst _ = TyBuiltin () $ someType @_ @f
     {-# INLINE toTypeAst #-}
 
 instance (KnownTypeAst uni a, KnownTypeAst uni b) => KnownTypeAst uni (a -> b) where

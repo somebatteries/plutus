@@ -24,8 +24,9 @@
 {-# LANGUAGE UndecidableInstances  #-}
 
 -- effectfully: to the best of my experimentation, -O2 here improves performance, however by
--- inspecting GHC Core I was only able to see a difference in how the 'KnownTypeIn' instance for
--- 'Int' is compiled (one more call is inlined with -O2). This needs to be investigated.
+-- inspecting GHC Core I was only able to see a difference in how the 'ReadKnownIn' and
+-- 'MakeKnownIn' instances for 'Int' and other integral types are compiled (one more call is inlined
+-- with -O2). This needs to be investigated.
 {-# OPTIONS_GHC -O2 #-}
 
 module PlutusCore.Default.Universe
@@ -43,11 +44,11 @@ import PlutusCore.Evaluation.Result
 
 import Control.Applicative
 import Data.Bits (toIntegralSized)
-import Data.ByteString qualified as BS
+import Data.ByteString (ByteString)
 import Data.Int
 import Data.IntCast (intCastEq)
 import Data.Proxy
-import Data.Text qualified as Text
+import Data.Text (Text)
 import Data.Word
 import GHC.Exts (inline, oneShot)
 import Text.Pretty
@@ -93,8 +94,8 @@ feature and have meta-constructors as built-in functions.
 -- | The universe used by default.
 data DefaultUni a where
     DefaultUniInteger    :: DefaultUni (Esc Integer)
-    DefaultUniByteString :: DefaultUni (Esc BS.ByteString)
-    DefaultUniString     :: DefaultUni (Esc Text.Text)
+    DefaultUniByteString :: DefaultUni (Esc ByteString)
+    DefaultUniString     :: DefaultUni (Esc Text)
     DefaultUniUnit       :: DefaultUni (Esc ())
     DefaultUniBool       :: DefaultUni (Esc Bool)
     DefaultUniProtoList  :: DefaultUni (Esc [])
@@ -158,84 +159,44 @@ instance Pretty (DefaultUni a) where
 instance Pretty (SomeTypeIn DefaultUni) where
     pretty (SomeTypeIn uni) = pretty uni
 
-instance DefaultUni `Contains` Integer       where knownUni = DefaultUniInteger
-instance DefaultUni `Contains` BS.ByteString where knownUni = DefaultUniByteString
-instance DefaultUni `Contains` Text.Text     where knownUni = DefaultUniString
-instance DefaultUni `Contains` ()            where knownUni = DefaultUniUnit
-instance DefaultUni `Contains` Bool          where knownUni = DefaultUniBool
-instance DefaultUni `Contains` []            where knownUni = DefaultUniProtoList
-instance DefaultUni `Contains` (,)           where knownUni = DefaultUniProtoPair
-instance DefaultUni `Contains` Data          where knownUni = DefaultUniData
-
 instance (DefaultUni `Contains` f, DefaultUni `Contains` a) => DefaultUni `Contains` f a where
     knownUni = knownUni `DefaultUniApply` knownUni
 
-instance KnownBuiltinTypeAst DefaultUni Integer       => KnownTypeAst DefaultUni Integer
-instance KnownBuiltinTypeAst DefaultUni BS.ByteString => KnownTypeAst DefaultUni BS.ByteString
-instance KnownBuiltinTypeAst DefaultUni Text.Text     => KnownTypeAst DefaultUni Text.Text
-instance KnownBuiltinTypeAst DefaultUni ()            => KnownTypeAst DefaultUni ()
-instance KnownBuiltinTypeAst DefaultUni Bool          => KnownTypeAst DefaultUni Bool
-instance KnownBuiltinTypeAst DefaultUni [a]           => KnownTypeAst DefaultUni [a]
-instance KnownBuiltinTypeAst DefaultUni (a, b)        => KnownTypeAst DefaultUni (a, b)
-instance KnownBuiltinTypeAst DefaultUni Data          => KnownTypeAst DefaultUni Data
+instance DefaultUni `Contains` Integer    where knownUni = DefaultUniInteger
+instance DefaultUni `Contains` ByteString where knownUni = DefaultUniByteString
+instance DefaultUni `Contains` Text       where knownUni = DefaultUniString
+instance DefaultUni `Contains` ()         where knownUni = DefaultUniUnit
+instance DefaultUni `Contains` Bool       where knownUni = DefaultUniBool
+instance DefaultUni `Contains` []         where knownUni = DefaultUniProtoList
+instance DefaultUni `Contains` (,)        where knownUni = DefaultUniProtoPair
+instance DefaultUni `Contains` Data       where knownUni = DefaultUniData
 
-{- Note [Constraints of ReadKnownIn and MakeKnownIn instances]
-For a monomorphic data type @X@ one only needs to add a @HasConstantIn DefaultUni term@ constraint
-in order to be able to provide a @ReadTypeIn DefaultUni term X@ instance and the same applies to
-'MakeKnownIn'.
+instance KnownBuiltinTypeAst DefaultUni Integer    => KnownTypeAst DefaultUni Integer
+instance KnownBuiltinTypeAst DefaultUni ByteString => KnownTypeAst DefaultUni ByteString
+instance KnownBuiltinTypeAst DefaultUni Text       => KnownTypeAst DefaultUni Text
+instance KnownBuiltinTypeAst DefaultUni ()         => KnownTypeAst DefaultUni ()
+instance KnownBuiltinTypeAst DefaultUni Bool       => KnownTypeAst DefaultUni Bool
+instance KnownBuiltinTypeAst DefaultUni [a]        => KnownTypeAst DefaultUni [a]
+instance KnownBuiltinTypeAst DefaultUni (a, b)     => KnownTypeAst DefaultUni (a, b)
+instance KnownBuiltinTypeAst DefaultUni Data       => KnownTypeAst DefaultUni Data
 
-For a polymorphic data type @Y@ in addition to the same @HasConstantIn DefaultUni term@ constraint
-one also needs to add @DefaultUni `Contains` Y@, where @Y@ contains all of its type variables.
+instance KnownBuiltinTypeIn DefaultUni term Integer    => MakeKnownIn DefaultUni term Integer
+instance KnownBuiltinTypeIn DefaultUni term ByteString => MakeKnownIn DefaultUni term ByteString
+instance KnownBuiltinTypeIn DefaultUni term Text       => MakeKnownIn DefaultUni term Text
+instance KnownBuiltinTypeIn DefaultUni term ()         => MakeKnownIn DefaultUni term ()
+instance KnownBuiltinTypeIn DefaultUni term Bool       => MakeKnownIn DefaultUni term Bool
+instance KnownBuiltinTypeIn DefaultUni term Data       => MakeKnownIn DefaultUni term Data
+instance KnownBuiltinTypeIn DefaultUni term [a]        => MakeKnownIn DefaultUni term [a]
+instance KnownBuiltinTypeIn DefaultUni term (a, b)     => MakeKnownIn DefaultUni term (a, b)
 
-See the reference site of this Note for examples.
-
-The difference is due to the fact that for any monomorphic type @X@ the @DefaultUni `Contains` X@
-constraint can be discharged statically, so we don't need it to provide the instance, while in
-the polymorphic case whether @Y@ is in the universe or not depends on whether its type arguments are
-in the universe or not, so the @DefaultUni `Contains` Y@ constraint can't be discharged statically.
-
-Could we still provide @DefaultUni `Contains` X@ even though it's redundant? That works, but then
-GHC does not attempt to discharge it statically and takes the type tag needed for unlifting from
-the provided constraint rather than the global scope, which makes the code measurably slower.
-
-Could we at least hide the discrepancy behind a type family? Unfortunately, that generates worse
-Core as some things don't get inlined properly. Somehow GHC is not able to see through the type
-family that it fully reduces anyway.
-
-Finally, instead of writing @DefaultUni `Contains` Y@ we could write @DefaultUni `Contains` a@
-for each argument type @a@ in @Y@ (because that implies @DefaultUni `Contains` Y@), however GHC
-creates a redundant @let@ in that case (@-fno-cse@ or some other technique for preventing GHC from
-doing CSE may solve that problem). For now we do the simplest thing and just write
-@DefaultUni `Contains` Y@.
-
-A call to 'geq' does not get inlined due to 'geq' being recursive. It's an obvious inefficiency and
-one that can be fixed, see https://github.com/input-output-hk/plutus/pull/4462
-It's some pretty annoying boilerplate and for now we've decided it's not worth it.
--}
-
--- See Note [Constraints of ReadKnownIn and MakeKnownIn instances].
-instance HasConstantIn DefaultUni term => MakeKnownIn DefaultUni term Integer
-instance HasConstantIn DefaultUni term => MakeKnownIn DefaultUni term BS.ByteString
-instance HasConstantIn DefaultUni term => MakeKnownIn DefaultUni term Text.Text
-instance HasConstantIn DefaultUni term => MakeKnownIn DefaultUni term ()
-instance HasConstantIn DefaultUni term => MakeKnownIn DefaultUni term Bool
-instance HasConstantIn DefaultUni term => MakeKnownIn DefaultUni term Data
-instance (HasConstantIn DefaultUni term, DefaultUni `Contains` [a]) =>
-    MakeKnownIn DefaultUni term [a]
-instance (HasConstantIn DefaultUni term, DefaultUni `Contains` (a, b)) =>
-    MakeKnownIn DefaultUni term (a, b)
-
--- See Note [Constraints of ReadKnownIn and MakeKnownIn instances].
-instance HasConstantIn DefaultUni term => ReadKnownIn DefaultUni term Integer
-instance HasConstantIn DefaultUni term => ReadKnownIn DefaultUni term BS.ByteString
-instance HasConstantIn DefaultUni term => ReadKnownIn DefaultUni term Text.Text
-instance HasConstantIn DefaultUni term => ReadKnownIn DefaultUni term ()
-instance HasConstantIn DefaultUni term => ReadKnownIn DefaultUni term Bool
-instance HasConstantIn DefaultUni term => ReadKnownIn DefaultUni term Data
-instance (HasConstantIn DefaultUni term, DefaultUni `Contains` [a]) =>
-    ReadKnownIn DefaultUni term [a]
-instance (HasConstantIn DefaultUni term, DefaultUni `Contains` (a, b)) =>
-    ReadKnownIn DefaultUni term (a, b)
+instance KnownBuiltinTypeIn DefaultUni term Integer    => ReadKnownIn DefaultUni term Integer
+instance KnownBuiltinTypeIn DefaultUni term ByteString => ReadKnownIn DefaultUni term ByteString
+instance KnownBuiltinTypeIn DefaultUni term Text       => ReadKnownIn DefaultUni term Text
+instance KnownBuiltinTypeIn DefaultUni term ()         => ReadKnownIn DefaultUni term ()
+instance KnownBuiltinTypeIn DefaultUni term Bool       => ReadKnownIn DefaultUni term Bool
+instance KnownBuiltinTypeIn DefaultUni term Data       => ReadKnownIn DefaultUni term Data
+instance KnownBuiltinTypeIn DefaultUni term [a]        => ReadKnownIn DefaultUni term [a]
+instance KnownBuiltinTypeIn DefaultUni term (a, b)     => ReadKnownIn DefaultUni term (a, b)
 
 -- If this tells you an instance is missing, add it right above, following the pattern.
 instance TestTypesFromTheUniverseAreAllKnown DefaultUni
@@ -335,8 +296,8 @@ See Note [Stable encoding of PLC]
 instance Closed DefaultUni where
     type DefaultUni `Everywhere` constr =
         ( constr `Permits` Integer
-        , constr `Permits` BS.ByteString
-        , constr `Permits` Text.Text
+        , constr `Permits` ByteString
+        , constr `Permits` Text
         , constr `Permits` ()
         , constr `Permits` Bool
         , constr `Permits` []

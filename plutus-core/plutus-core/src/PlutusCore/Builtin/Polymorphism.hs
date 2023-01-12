@@ -1,11 +1,13 @@
 -- editorconfig-checker-disable-file
-{-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PolyKinds             #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE TypeOperators         #-}
-{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE ConstraintKinds          #-}
+{-# LANGUAGE DataKinds                #-}
+{-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE MultiParamTypeClasses    #-}
+{-# LANGUAGE PolyKinds                #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE TypeFamilies             #-}
+{-# LANGUAGE TypeOperators            #-}
+{-# LANGUAGE UndecidableInstances     #-}
 
 module PlutusCore.Builtin.Polymorphism
     ( Opaque (..)
@@ -14,6 +16,10 @@ module PlutusCore.Builtin.Polymorphism
     , TyVarRep
     , TyAppRep
     , TyForallRep
+    , BuiltinHead
+    , ElaborateBuiltin
+    , AllElaboratedArgs
+    , AllBuiltinArgs
     ) where
 
 import PlutusPrelude
@@ -22,7 +28,7 @@ import PlutusCore.Builtin.HasConstant
 import PlutusCore.Core
 import PlutusCore.Evaluation.Machine.ExMemory
 
-import Data.Kind qualified as GHC (Type)
+import Data.Kind qualified as GHC (Constraint, Type)
 import GHC.Ix
 import GHC.TypeLits
 import Universe
@@ -169,6 +175,34 @@ data family TyAppRep (fun :: dom -> cod) (arg :: dom) :: cod
 
 -- | Representation of of an intrinsically-kinded universal quantifier: a bound name and a body.
 data family TyForallRep (name :: TyNameRep kind) (a :: GHC.Type) :: GHC.Type
+
+-- | For annotating an uninstantiated built-in type, so that it gets handled by the right instance
+-- or type family.
+type BuiltinHead :: forall k. k -> k
+data family BuiltinHead f
+
+-- | Take an iterated application of a built-in type and elaborate every function application
+-- inside of it to 'TypeAppRep', plus annotate the head with 'BuiltinHead'.
+-- The idea is that we don't need to process built-in types manually if we simply add some
+-- annotations for instance resolution to look for. Think what we'd have to do manually for, say,
+-- 'ToHoles': traverse the spine of the application and collect all the holes into a list, which is
+-- troubling, because type applications are left-nested and lists are right-nested, so we'd have to
+-- use accumulators or an explicit 'Reverse' type family. And then we also have 'KnownTypeAst' and
+-- 'ToBinds', so handling built-in types in a special way for each of those would be a hassle,
+-- especially given the fact that type-level Haskell is not exactly good at computing things.
+-- With the 'ElaborateBuiltin' approach we get 'KnownTypeAst', 'ToHoles' and 'ToBinds' for free.
+type ElaborateBuiltin :: forall k. k -> k
+type family ElaborateBuiltin a where
+    ElaborateBuiltin (f x) = ElaborateBuiltin f `TyAppRep` x
+    ElaborateBuiltin f     = BuiltinHead f
+
+type AllElaboratedArgs :: forall k. (GHC.Type -> GHC.Constraint) -> k -> GHC.Constraint
+type family AllElaboratedArgs constr a where
+    AllElaboratedArgs constr (f `TyAppRep` x) = (constr x, AllElaboratedArgs constr f)
+    AllElaboratedArgs _      (BuiltinHead _)  = ()
+
+type AllBuiltinArgs :: forall k. (GHC.Type -> GHC.Constraint) -> k -> GHC.Constraint
+type AllBuiltinArgs constr a = AllElaboratedArgs constr (ElaborateBuiltin a)
 
 -- Custom type errors to guide the programmer adding a new built-in function.
 
