@@ -1,8 +1,9 @@
-{-# LANGUAGE LambdaCase #-}
+-- editorconfig-checker-disable-file
+{-# LANGUAGE BangPatterns    #-}
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs           #-}
+{-# LANGUAGE LambdaCase      #-}
+{-# LANGUAGE ViewPatterns    #-}
 module UntypedPlutusCore.Evaluation.Machine.Cek.Debug.Driver
     ( Breakpoint (..)
     , Breakpoints
@@ -21,18 +22,19 @@ module UntypedPlutusCore.Evaluation.Machine.Cek.Debug.Driver
     ) where
 
 import Annotation
+import PlutusCore qualified as PLC
 import UntypedPlutusCore
 import UntypedPlutusCore.Evaluation.Machine.Cek.Debug.Internal
 
-import Data.RandomAccessList.Class qualified as Env
-import Data.Word64Array.Word8 hiding (Index, toList)
+import Control.Lens hiding (Context)
 import Control.Monad.Reader
 import Control.Monad.Trans.Free as F
-import Control.Lens hiding (Context)
-import Prettyprinter
-import Data.Ix
-import Data.Set
 import Data.Function
+import Data.Ix
+import Data.RandomAccessList.Class qualified as Env
+import Data.Set
+import Data.Word64Array.Word8 hiding (Index, toList)
+import Prettyprinter
 
 -- | Usually a breakpoint is just a line, but let's be  more generally as a srcspan
 newtype Breakpoint = Breakpoint { unBreakpoint :: SrcSpan }
@@ -40,9 +42,6 @@ newtype Breakpoint = Breakpoint { unBreakpoint :: SrcSpan }
 
 -- | Treat them as `Set`s like `SrcSpan`
 type Breakpoints = Set Breakpoint
-
--- | The `Term`s that makes sense to debug
-type DTerm uni fun = Term NamedDeBruijn uni fun SrcSpans
 
 -- commands that the debugger can receive fromthe debug-client (tui,cli,test,etc)
 data Cmd
@@ -81,7 +80,8 @@ runDriver :: MonadFree (DebugF uni fun) m
 runDriver = void . runReaderT driver . initState
     where
       initState :: DTerm uni fun -> DriverState uni fun
-      initState = Computing (toWordArray 0) NoFrame . flip Closure Env.empty
+      initState = Starting
+      -- initState = Computing (toWordArray 0) NoFrame . flip Closure Env.empty
 
 -- | The driver action. The driver repeatedly:
 ---
@@ -115,7 +115,7 @@ driver = inputF >>= \case
     cmpCtxs :: (c ~ Context uni fun, s ~ DriverState uni fun)
             => (c -> c -> Bool) -> s -> s -> Bool
     cmpCtxs cmp (preview cekStateContext -> Just curCtx) (preview cekStateContext -> Just newCtx) = curCtx `cmp` newCtx
-    cmpCtxs _ _ _ = True -- something is terminated. not necessarry if driver is lazy.
+    cmpCtxs _ _ _                                                                                 = True -- something is terminated. not necessarry if driver is lazy.
 
     -- | Do one or more cek steps until a condition on the 'DriverState' is met
     multiStepUntil :: Driving m uni fun
@@ -141,15 +141,15 @@ handleStep :: forall uni fun s.
            -> CekM uni fun s (CekState uni fun)
 handleStep = \case
         Computing !unbudgetedSteps ctx (Closure term env) -> computeCekStep unbudgetedSteps ctx (Closure term env)
-        Returning !unbudgetedSteps ctx val -> returnCekStep unbudgetedSteps ctx val
-        self@(Terminating _) -> pure self -- idempotent
-
+        Returning !unbudgetedSteps ctx val _              -> returnCekStep unbudgetedSteps ctx val
+        self@(Terminating _)                              -> pure self -- idempotent
+        Starting t -> pure $ Computing (toWordArray 0) NoFrame $ Closure t Env.empty
 
 -- | Given the debugger's state, have we reached a breakpoint?
 atBreakpoint :: Breakpoints -> DriverState uni fun -> Bool
 -- FIXME: stub, implement this, could we use PlutusLedgerAPI.V1.Interval api for it?
 atBreakpoint bs (preview (cekStateClosure . closureTerm . to termAnn) -> Just srcSpan) = False
-atBreakpoint _ _ = False
+atBreakpoint _ _                                                                       = False
 
 -- * boilerplate "suspension actions"
 -- Being in 'Driving' monad here is more constrained than necessary, but it's ok.

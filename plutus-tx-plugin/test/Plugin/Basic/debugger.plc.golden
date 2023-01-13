@@ -1,0 +1,26 @@
+(program
+  1.0.0
+  (force
+    [
+      [
+        (force
+          [
+            [
+              [
+                (force (builtin ifThenElse))
+                [
+                  [ (builtin lessThanEqualsInteger) (con integer 100) ]
+                  (con integer 99)
+                ]
+              ]
+              (delay (lam case_True_i0 (lam case_False_i0 case_False_i1)))
+            ]
+            (delay (lam case_True_i0 (lam case_False_i0 case_True_i2)))
+          ]
+        )
+        (delay [ [ (builtin addInteger) (con integer 1) ] (con integer 2) ])
+      ]
+      (delay (con integer 3))
+    ]
+  )
+)

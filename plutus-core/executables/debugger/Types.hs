@@ -3,11 +3,18 @@
 -- | Debugger TUI Types.
 module Types where
 
+import UntypedPlutusCore qualified as UPLC
+import UntypedPlutusCore.Evaluation.Machine.Cek.Debug.Driver qualified as D
+
 import Brick.Focus qualified as B
 import Brick.Types qualified as B
 import Brick.Widgets.Edit qualified as BE
 import Data.Text (Text)
 import Lens.Micro.TH
+
+data CustomBrickEvent =
+    UpdateClientEvent (D.DriverState UPLC.DefaultUni UPLC.DefaultFun)
+  | LogEvent String
 
 data KeyBindingsMode = KeyBindingsShown | KeyBindingsHidden
     deriving stock (Eq, Ord, Show)
@@ -38,6 +45,7 @@ data DebuggerState = DebuggerState
     , _dsCekStateEditor      :: BE.Editor Text ResourceName
     , _dsVLimitBottomEditors :: Int
     -- ^ Controls the height limit of the bottom windows.
+    , _dsHLimitRightEditors  :: Int
     }
 
 makeLenses ''DebuggerState

@@ -19,11 +19,11 @@
 {-# LANGUAGE RankNTypes               #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE TemplateHaskell          #-}
+{-# LANGUAGE TypeApplications         #-}
 {-# LANGUAGE TypeFamilies             #-}
 {-# LANGUAGE TypeOperators            #-}
-{-# LANGUAGE TypeApplications            #-}
 {-# LANGUAGE UndecidableInstances     #-}
-{-# LANGUAGE TemplateHaskell     #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -56,8 +56,11 @@ where
 
 import Annotation
 import ErrorCode
+import PlutusCore qualified as PLC
 import PlutusPrelude
 
+import PlutusCore.Pretty qualified as PLC
+import UntypedPlutusCore qualified as UPLC
 import UntypedPlutusCore.Core
 
 
@@ -66,8 +69,8 @@ import Data.RandomAccessList.SkewBinary qualified as Env
 import PlutusCore.Builtin
 import PlutusCore.DeBruijn
 import PlutusCore.Evaluation.Machine.ExBudget
-import PlutusCore.Evaluation.Machine.ExMemory
 import PlutusCore.Evaluation.Machine.Exception
+import PlutusCore.Evaluation.Machine.ExMemory
 import PlutusCore.Evaluation.Machine.MachineParameters
 import PlutusCore.Evaluation.Result
 import PlutusCore.Pretty
@@ -84,29 +87,50 @@ import Data.Array hiding (index)
 import Data.DList (DList)
 import Data.Hashable (Hashable)
 import Data.Kind qualified as GHC
+import Data.Maybe (fromJust)
 import Data.Semigroup (stimes)
+import Data.Set as S
 import Data.Text (Text)
 import Data.Word
 import Data.Word64Array.Word8 hiding (Index)
+import GHC.IO (ioToST, stToIO)
 import Prettyprinter
 import Universe
-import GHC.IO (stToIO, ioToST)
-import Data.Set as S
 
-import UntypedPlutusCore.Evaluation.Machine.Cek.Internal
-   (PrettyUni, CekUserError (..),   ExBudgetCategory (..), StepKind (..), cekStepCost, defaultSlippage, tryError, GivenCekSlippage, GivenCekCosts)
+import UntypedPlutusCore.Evaluation.Machine.Cek.Internal (CekUserError (..), ExBudgetCategory (..), GivenCekCosts,
+                                                          GivenCekSlippage, PrettyUni, StepKind (..), cekStepCost,
+                                                          defaultSlippage, tryError)
 -- import UntypedPlutusCore.Evaluation.Machine.Cek.Internal hiding
 --     ( spendBudgetCek, enterComputeCek, runCekDeBruijn, CekValue(..), CekValEnv, lookupVarName, Context (..)
 --     , dischargeCekValue, dischargeCekValEnv, evalBuiltinApp, CekEvaluationException, runCekM)
 
 -- ADDED
 
+data DebuggerSrcSpans = DebuggerSrcSpans
+  { _dssUplcPos     :: Maybe PLC.SourcePos
+  , _dssSourceSpans :: SrcSpans
+  } deriving stock (Show)
+
+makeLenses ''DebuggerSrcSpans
+
+instance Pretty DebuggerSrcSpans where
+    pretty = viaShow
+
+noSrcSpan :: DebuggerSrcSpans
+noSrcSpan = DebuggerSrcSpans Nothing mempty
+
+-- | The `Term`s that makes sense to debug
+type DTerm uni fun = Term NamedDeBruijn uni fun DebuggerSrcSpans
+
+getUplcPos :: DTerm uni fun -> PLC.SourcePos
+getUplcPos t = fromJust $ UPLC.termAnn t ^. dssUplcPos
+
 -- 'Values' for the modified CEK machine.
 data CekValue uni fun =
     -- This bang gave us a 1-2% speed-up at the time of writing.
     VCon !(Some (ValueOf uni))
-  | VDelay !(Term NamedDeBruijn uni fun SrcSpans) !(CekValEnv uni fun)
-  | VLamAbs !NamedDeBruijn !(Term NamedDeBruijn uni fun SrcSpans) !(CekValEnv uni fun)
+  | VDelay !(DTerm uni fun) !(CekValEnv uni fun)
+  | VLamAbs !NamedDeBruijn !(DTerm uni fun) !(CekValEnv uni fun)
     -- | A partial builtin application, accumulating arguments for eventual full application.
     -- We don't need a 'CekValEnv' here unlike in the other constructors, because 'VBuiltin'
     -- values always store their corresponding 'Term's fully discharged, see the comments at
@@ -118,7 +142,7 @@ data CekValue uni fun =
       -- consistently slowing evaluation down by half a percent. Might be noise, might be not, but
       -- at least we know that removing this @fun@ is not helpful anyway. See this commit reversing
       -- the change: https://github.com/input-output-hk/plutus/pull/4778/commits/86a3e24ca3c671cc27c6f4344da2bcd14f961706
-      (Term NamedDeBruijn uni fun SrcSpans)
+      (DTerm uni fun)
       -- ^ This must be lazy. It represents the fully discharged partial application of the builtin
       -- function that we're going to run when it's fully saturated.  We need the 'Term' to be able
       -- to return it in case full saturation is never achieved and a partial application needs to
@@ -161,16 +185,23 @@ Morally, this is a stack of frames, but we use the "intrusive list" representati
 we can match on context and the top frame in a single, strict pattern match.
 -}
 data Context uni fun
-    = FrameApplyFun !(CekValue uni fun) !(Context uni fun)                         -- ^ @[V _]@
-    | FrameApplyArg !(CekValEnv uni fun) !(Term NamedDeBruijn uni fun SrcSpans) !(Context uni fun) -- ^ @[_ N]@
-    | FrameForce !(Context uni fun)                                               -- ^ @(force _)@
+    = FrameApplyFun PLC.SourcePos !(CekValue uni fun) !(Context uni fun)                         -- ^ @[V _]@
+    | FrameApplyArg PLC.SourcePos !(CekValEnv uni fun) !(DTerm uni fun) !(Context uni fun) -- ^ @[_ N]@
+    | FrameForce PLC.SourcePos !(Context uni fun)                                               -- ^ @(force _)@
     | NoFrame
     deriving stock (Show)
 
+ctxPos :: Context uni fun -> Maybe PLC.SourcePos
+ctxPos = \case
+    FrameApplyFun pos _ _   -> Just pos
+    FrameApplyArg pos _ _ _ -> Just pos
+    FrameForce pos _        -> Just pos
+    _                       -> Nothing
+
 -- | Context is only available if we are not done (Terminating)
 data Closure uni fun = Closure
-    { _closureTerm :: Term NamedDeBruijn uni fun SrcSpans
-    , _closureEnv :: CekValEnv uni fun
+    { _closureTerm :: DTerm uni fun
+    , _closureEnv  :: CekValEnv uni fun
     }
 makeLenses ''Closure
 
@@ -178,10 +209,21 @@ data CekState uni fun =
     -- the next state is computing
     Computing WordArray (Context uni fun) (Closure uni fun)
     -- the next state is returning
-    | Returning WordArray (Context uni fun) (CekValue uni fun)
+    | Returning WordArray (Context uni fun) (CekValue uni fun) PLC.SourcePos
     -- evaluation finished
-    | Terminating (Term NamedDeBruijn uni fun SrcSpans)
+    | Terminating (DTerm uni fun)
+    | Starting (DTerm uni fun)
 makePrisms ''CekState
+
+showSt :: CekState PLC.DefaultUni PLC.DefaultFun -> String
+showSt = \case
+    Computing _ _ c -> "COMPUTING: "
+      <> "\n=======Term being computed:\n" <> PLC.displayPlcDef (c ^. closureTerm)
+    Returning _ _ v _ -> "RETURNING:"
+      <> "\n*******Value being returned:\n" <>
+        PLC.displayPlcDef (dischargeCekValue v)
+    Terminating t -> "TERMINATING with value " <> PLC.displayPlcDef t
+    Starting _ -> "Not yet started"
 
 -- helpers
 ioToCekM :: IO a -> CekM uni fun RealWorld a
@@ -192,33 +234,33 @@ cekMToIO = stToIO . unCekM
 
 cekStateContext :: Traversal' (CekState uni fun) (Context uni fun)
 cekStateContext f = \case
-    Computing w k c -> Computing w `flip` c <$> f k
-    Returning w k v -> Returning w `flip` v <$> f k
-    x -> pure x
+    Computing w k c     -> Computing w `flip` c <$> f k
+    Returning w k v pos -> Returning w `flip` v <$> f k <*> pure pos
+    x                   -> pure x
 
 -- | Closure is only available if we are Computing (not Returning, or Terminating)
 cekStateClosure :: Traversal' (CekState uni fun) (Closure uni fun)
 cekStateClosure f = \case
     Computing w k c -> Computing w k <$> f c
-    x -> pure x
+    x               -> pure x
 
 upContext :: Word -> Context uni fun -> Maybe (Context uni fun)
 upContext 0 = Just
 upContext n = \case
-    FrameApplyFun _ k -> upContext (n-1) k
-    FrameApplyArg _ _ k -> upContext (n-1) k
-    FrameForce k -> upContext (n-1) k
-    _ -> Nothing
+    FrameApplyFun _ _ k   -> upContext (n-1) k
+    FrameApplyArg _ _ _ k -> upContext (n-1) k
+    FrameForce _ k        -> upContext (n-1) k
+    _                     -> Nothing
 
 lenContext :: Context uni fun -> Word
 lenContext = go 0
     where
       go :: Word -> Context uni fun -> Word
       go n = \case
-              FrameApplyFun _ k -> go (n+1) k
-              FrameApplyArg _ _ k -> go (n+1) k
-              FrameForce k -> go (n+1) k
-              _ -> 0
+              FrameApplyFun _ _ k   -> go (n+1) k
+              FrameApplyArg _ _ _ k -> go (n+1) k
+              FrameForce _ k        -> go (n+1) k
+              _                     -> 0
 
 -- | Spend the budget that has been accumulated for a number of machine steps.
 spendAccumulatedBudget ::
@@ -269,27 +311,27 @@ computeCekStep
     -> Closure uni fun
     -> CekM uni fun s (CekState uni fun)
 -- s ; ρ ▻ {L A}  ↦ s , {_ A} ; ρ ▻ L
-computeCekStep !unbudgetedSteps !ctx (Closure (Var _ varName) !env) = do
+computeCekStep !unbudgetedSteps !ctx (Closure term@(Var _ varName) !env) = do
     !unbudgetedSteps' <- stepAndMaybeSpend BVar unbudgetedSteps
     val <- lookupVarName varName env
-    pure $ Returning unbudgetedSteps' ctx val
-computeCekStep !unbudgetedSteps !ctx (Closure (Constant _ val) !_) = do
+    pure $ Returning unbudgetedSteps' ctx val (getUplcPos term)
+computeCekStep !unbudgetedSteps !ctx (Closure term@(Constant _ val) !_) = do
     !unbudgetedSteps' <- stepAndMaybeSpend BConst unbudgetedSteps
-    pure $ Returning unbudgetedSteps' ctx (VCon val)
-computeCekStep !unbudgetedSteps !ctx (Closure (LamAbs _ name body) !env) = do
+    pure $ Returning unbudgetedSteps' ctx (VCon val) (getUplcPos term)
+computeCekStep !unbudgetedSteps !ctx (Closure term@(LamAbs _ name body) !env) = do
     !unbudgetedSteps' <- stepAndMaybeSpend BLamAbs unbudgetedSteps
-    pure $ Returning unbudgetedSteps' ctx (VLamAbs name body env)
-computeCekStep !unbudgetedSteps !ctx (Closure (Delay _ body) !env) = do
+    pure $ Returning unbudgetedSteps' ctx (VLamAbs name body env) (getUplcPos term)
+computeCekStep !unbudgetedSteps !ctx (Closure term@(Delay _ body) !env) = do
     !unbudgetedSteps' <- stepAndMaybeSpend BDelay unbudgetedSteps
-    pure $ Returning unbudgetedSteps' ctx (VDelay body env)
+    pure $ Returning unbudgetedSteps' ctx (VDelay body env) (getUplcPos term)
 -- s ; ρ ▻ lam x L  ↦  s ◅ lam x (L , ρ)
 computeCekStep !unbudgetedSteps !ctx (Closure (Force _ body) !env) = do
     !unbudgetedSteps' <- stepAndMaybeSpend BForce unbudgetedSteps
-    pure $ Computing unbudgetedSteps' (FrameForce ctx) (Closure body env)
+    pure $ Computing unbudgetedSteps' (FrameForce (getUplcPos body) ctx) (Closure body env)
 -- s ; ρ ▻ [L M]  ↦  s , [_ (M,ρ)]  ; ρ ▻ L
 computeCekStep !unbudgetedSteps !ctx (Closure (Apply _ fun arg) !env) = do
     !unbudgetedSteps' <- stepAndMaybeSpend BApply unbudgetedSteps
-    pure $ Computing unbudgetedSteps' (FrameApplyArg env arg ctx) (Closure fun env)
+    pure $ Computing unbudgetedSteps' (FrameApplyArg (getUplcPos fun) env arg ctx) (Closure fun env)
 -- s ; ρ ▻ abs α L  ↦  s ◅ abs α (L , ρ)
 -- s ; ρ ▻ con c  ↦  s ◅ con c
 -- s ; ρ ▻ builtin bn  ↦  s ◅ builtin bn arity arity [] [] ρ
@@ -297,7 +339,7 @@ computeCekStep !unbudgetedSteps !ctx (Closure term@(Builtin _ bn) !_) = do
     !unbudgetedSteps' <- stepAndMaybeSpend BBuiltin unbudgetedSteps
     meaning <- lookupBuiltin bn ?cekRuntime
     -- The @term@ is a 'Builtin', so it's fully discharged.
-    pure $ Returning unbudgetedSteps' ctx (VBuiltin bn term meaning)
+    pure $ Returning unbudgetedSteps' ctx (VBuiltin bn term meaning) (getUplcPos term)
 -- s ; ρ ▻ error A  ↦  <> A
 computeCekStep !_ !_ (Closure (Error _) !_) =
     throwing_ _EvaluationFailure
@@ -315,14 +357,14 @@ returnCekStep !unbudgetedSteps NoFrame val = do
     spendAccumulatedBudget unbudgetedSteps
     pure $ Terminating $ dischargeCekValue val
 -- s , {_ A} ◅ abs α M  ↦  s ; ρ ▻ M [ α / A ]*
-returnCekStep !unbudgetedSteps (FrameForce ctx) fun = forceEvaluateStep unbudgetedSteps ctx fun
+returnCekStep !unbudgetedSteps (FrameForce pos ctx) fun = forceEvaluateStep unbudgetedSteps ctx fun pos
 -- s , [_ (M,ρ)] ◅ V  ↦  s , [V _] ; ρ ▻ M
-returnCekStep !unbudgetedSteps (FrameApplyArg argVarEnv arg ctx) fun =
-    pure $ Computing unbudgetedSteps (FrameApplyFun fun ctx) (Closure arg argVarEnv)
+returnCekStep !unbudgetedSteps (FrameApplyArg pos argVarEnv arg ctx) fun =
+    pure $ Computing unbudgetedSteps (FrameApplyFun (getUplcPos arg) fun ctx) (Closure arg argVarEnv)
 -- s , [(lam x (M,ρ)) _] ◅ V  ↦  s ; ρ [ x  ↦  V ] ▻ M
 -- FIXME: add rule for VBuiltin once it's in the specification.
-returnCekStep !unbudgetedSteps (FrameApplyFun fun ctx) arg =
-    applyEvaluateStep unbudgetedSteps ctx fun arg
+returnCekStep !unbudgetedSteps (FrameApplyFun pos fun ctx) arg =
+    applyEvaluateStep unbudgetedSteps ctx fun arg pos
 
 -- | @force@ a term and proceed.
 -- If v is a delay then compute the body of v;
@@ -336,10 +378,11 @@ forceEvaluateStep
     => WordArray
     -> Context uni fun
     -> CekValue uni fun
+    -> PLC.SourcePos
     -> CekM uni fun s (CekState uni fun)
-forceEvaluateStep !unbudgetedSteps !ctx (VDelay body env) =
+forceEvaluateStep !unbudgetedSteps !ctx (VDelay body env) pos =
     pure $ Computing unbudgetedSteps ctx (Closure body env)
-forceEvaluateStep !unbudgetedSteps !ctx (VBuiltin fun term runtime) = do
+forceEvaluateStep !unbudgetedSteps !ctx (VBuiltin fun term runtime) pos = do
     -- @term@ is fully discharged, and so @term'@ is, hence we can put it in a 'VBuiltin'.
     let term' = Force (termAnn term) term
     case runtime of
@@ -350,10 +393,10 @@ forceEvaluateStep !unbudgetedSteps !ctx (VBuiltin fun term runtime) = do
             -- otherwise we could just assemble a 'VBuiltin' without trying to evaluate the
             -- application.
             res <- evalBuiltinApp fun term' runtime'
-            pure $ Returning unbudgetedSteps ctx res
+            pure $ Returning unbudgetedSteps ctx res pos
         _ ->
             throwingWithCause _MachineError BuiltinTermArgumentExpectedMachineError (Just term')
-forceEvaluateStep !_ !_ val =
+forceEvaluateStep !_ !_ val pos =
     throwingDischarged _MachineError NonPolymorphicInstantiationMachineError val
 
 -- | Apply a function to an argument and proceed.
@@ -370,12 +413,13 @@ applyEvaluateStep
     -> Context uni fun
     -> CekValue uni fun   -- lhs of application
     -> CekValue uni fun   -- rhs of application
+    -> PLC.SourcePos
     -> CekM uni fun s (CekState uni fun)
-applyEvaluateStep !unbudgetedSteps !ctx (VLamAbs _ body env) arg =
+applyEvaluateStep !unbudgetedSteps !ctx (VLamAbs _ body env) arg pos =
     pure $ Computing unbudgetedSteps ctx (Closure body (Env.cons arg env))
 -- Annotating @f@ and @exF@ with bangs gave us some speed-up, but only until we added a bang to
 -- 'VCon'. After that the bangs here were making things a tiny bit slower and so we removed them.
-applyEvaluateStep !unbudgetedSteps !ctx (VBuiltin fun term runtime) arg = do
+applyEvaluateStep !unbudgetedSteps !ctx (VBuiltin fun term runtime) arg pos = do
     let argTerm = dischargeCekValue arg
         -- @term@ and @argTerm@ are fully discharged, and so @term'@ is, hence we can put it
         -- in a 'VBuiltin'.
@@ -385,10 +429,10 @@ applyEvaluateStep !unbudgetedSteps !ctx (VBuiltin fun term runtime) arg = do
         -- argument next.
         BuiltinExpectArgument f -> do
             res <- evalBuiltinApp fun term' $ f arg
-            pure $ Returning unbudgetedSteps ctx res
+            pure $ Returning unbudgetedSteps ctx res pos
         _ ->
             throwingWithCause _MachineError UnexpectedBuiltinTermArgumentMachineError (Just term')
-applyEvaluateStep !_ !_ val _ =
+applyEvaluateStep !_ !_ val _ _ =
     throwingDischarged _MachineError NonFunctionalApplicationMachineError val
 
 -- See Note [Compilation peculiarities].
@@ -398,8 +442,8 @@ runCekDeBruijn
     => MachineParameters CekMachineCosts CekValue uni fun
     -> ExBudgetMode cost uni fun
     -> EmitterMode uni fun
-    -> Term NamedDeBruijn uni fun SrcSpans
-    -> (Either (CekEvaluationException NamedDeBruijn uni fun) (Term NamedDeBruijn uni fun SrcSpans), cost, [Text])
+    -> DTerm uni fun
+    -> (Either (CekEvaluationException NamedDeBruijn uni fun) (DTerm uni fun), cost, [Text])
 runCekDeBruijn params mode emitMode term =
     runCekM params mode emitMode $ do
         spendBudgetCek BStartup (cekStartupCost ?cekCosts)
@@ -412,18 +456,18 @@ enterComputeCek
     . (Ix fun, PrettyUni uni fun, GivenCekReqs uni fun s)
     => Context uni fun
     -> Closure uni fun
-    -> CekM uni fun s (Term NamedDeBruijn uni fun SrcSpans)
+    -> CekM uni fun s (DTerm uni fun)
 enterComputeCek ctx (Closure term env) = continue $ Computing (toWordArray 0) ctx (Closure term env)
 
 
 continue :: forall uni fun s
     . (Ix fun, PrettyUni uni fun, GivenCekReqs uni fun s)
     => CekState uni fun
-    -> CekM uni fun s (Term NamedDeBruijn uni fun SrcSpans)
+    -> CekM uni fun s (DTerm uni fun)
 continue (Computing !unbudgetedSteps ctx (Closure term env)) = do
     state <- computeCekStep unbudgetedSteps ctx (Closure term env)
     continue state
-continue (Returning !unbudgetedSteps ctx val) = do
+continue (Returning !unbudgetedSteps ctx val _) = do
     state <- returnCekStep unbudgetedSteps ctx val
     continue state
 continue (Terminating term) = pure term
@@ -432,12 +476,12 @@ continue (Terminating term) = pure term
 -- see Note [Scoping].
 -- | Instantiate all the free variables of a term by looking them up in an environment.
 -- Mutually recursive with dischargeCekVal.
-dischargeCekValEnv :: forall uni fun. CekValEnv uni fun -> Term NamedDeBruijn uni fun SrcSpans -> Term NamedDeBruijn uni fun SrcSpans
+dischargeCekValEnv :: forall uni fun. CekValEnv uni fun -> DTerm uni fun -> DTerm uni fun
 dischargeCekValEnv valEnv = go 0
  where
   -- The lamCnt is just a counter that measures how many lambda-abstractions
   -- we have descended in the `go` loop.
-  go :: Word64 -> Term NamedDeBruijn uni fun SrcSpans -> Term NamedDeBruijn uni fun SrcSpans
+  go :: Word64 -> DTerm uni fun -> DTerm uni fun
   go !lamCnt =  \case
     LamAbs ann name body -> LamAbs ann name $ go (lamCnt+1) body
     var@(Var _ (NamedDeBruijn _ ndbnIx)) -> let ix = coerce ndbnIx :: Word64  in
@@ -459,16 +503,16 @@ dischargeCekValEnv valEnv = go 0
 
 -- | Convert a 'CekValue' into a 'Term' by replacing all bound variables with the terms
 -- they're bound to (which themselves have to be obtain by recursively discharging values).
-dischargeCekValue :: CekValue uni fun -> Term NamedDeBruijn uni fun SrcSpans
+dischargeCekValue :: CekValue uni fun -> DTerm uni fun
 dischargeCekValue = \case
-    VCon     val                         -> Constant mempty val
-    VDelay   body env                    -> dischargeCekValEnv env $ Delay mempty body
+    VCon     val                         -> Constant noSrcSpan val
+    VDelay   body env                    -> dischargeCekValEnv env $ Delay noSrcSpan body
     -- 'computeCek' turns @LamAbs _ name body@ into @VLamAbs name body env@ where @env@ is an
     -- argument of 'computeCek' and hence we need to start discharging outside of the reassembled
     -- lambda, otherwise @name@ could clash with the names that we have in @env@.
     VLamAbs (NamedDeBruijn n _ix) body env ->
         -- The index on the binder is meaningless, we put `0` by convention, see 'Binder'.
-        dischargeCekValEnv env $ LamAbs mempty (NamedDeBruijn n deBruijnInitIndex) body
+        dischargeCekValEnv env $ LamAbs noSrcSpan (NamedDeBruijn n deBruijnInitIndex) body
     -- We only return a discharged builtin application when (a) it's being returned by the machine,
     -- or (b) it's needed for an error message.
     -- @term@ is fully discharged, so we can return it directly without any further discharging.
@@ -480,7 +524,7 @@ dischargeCekValue = \case
 evalBuiltinApp
     :: (GivenCekReqs uni fun s, PrettyUni uni fun)
     => fun
-    -> Term NamedDeBruijn uni fun SrcSpans
+    -> DTerm uni fun
     -> BuiltinRuntime (CekValue uni fun)
     -> CekM uni fun s (CekValue uni fun)
 evalBuiltinApp fun term runtime = case runtime of
@@ -497,7 +541,7 @@ evalBuiltinApp fun term runtime = case runtime of
 
 -- | The CEK machine-specific 'EvaluationException'.
 type CekEvaluationException name uni fun =
-    EvaluationException CekUserError (MachineError fun) (Term name uni fun SrcSpans)
+    EvaluationException CekUserError (MachineError fun) (Term name uni fun DebuggerSrcSpans)
 
 runCekM
     :: forall a cost uni fun.
@@ -620,5 +664,5 @@ lookupVarName :: forall uni fun s . (PrettyUni uni fun) => NamedDeBruijn -> CekV
 lookupVarName varName@(NamedDeBruijn _ varIx) varEnv =
     case varEnv `Env.indexOne` coerce varIx of
         Nothing  -> throwingWithCause _MachineError OpenTermEvaluatedMachineError $ Just var where
-            var = Var (mempty @SrcSpans) varName
+            var = Var noSrcSpan varName
         Just val -> pure val

@@ -64,13 +64,13 @@ common lang
 library
   import:          lang
   exposed-modules:
+    Annotation
     Crypto
     Data.ByteString.Hash
     Data.Either.Extras
     Data.MultiSet.Lens
     Data.SatInt
     ErrorCode
-    Annotation
     PlutusCore
     PlutusCore.Builtin
     PlutusCore.Builtin.Debug
@@ -186,10 +186,9 @@ library
     UntypedPlutusCore.DeBruijn
     UntypedPlutusCore.Evaluation.Machine.Cek
     UntypedPlutusCore.Evaluation.Machine.Cek.CekMachineCosts
-    UntypedPlutusCore.Evaluation.Machine.Cek.Internal
-    UntypedPlutusCore.Evaluation.Machine.Cek.Debug.Internal
     UntypedPlutusCore.Evaluation.Machine.Cek.Debug.Driver
-
+    UntypedPlutusCore.Evaluation.Machine.Cek.Debug.Internal
+    UntypedPlutusCore.Evaluation.Machine.Cek.Internal
     UntypedPlutusCore.MkUPlc
     UntypedPlutusCore.Parser
     UntypedPlutusCore.Rename
@@ -302,6 +301,7 @@ library
     , extra
     , filepath
     , flat                        <0.5
+    , free
     , ghc-prim
     , hashable                    >=1.4
     , hedgehog                    >=1.0
@@ -334,7 +334,6 @@ library
     , unordered-containers
     , witherable
     , word-array                  ^>=1.1
-    , free
 
   if impl(ghc <9.0)
     build-depends: integer-gmp
@@ -542,11 +541,11 @@ test-suite untyped-plutus-core-test
     Evaluation.Builtins.Definition
     Evaluation.Builtins.MakeRead
     Evaluation.Builtins.SignatureVerification
+    Evaluation.Debug
     Evaluation.FreeVars
     Evaluation.Golden
     Evaluation.Machines
     Evaluation.Regressions
-    Evaluation.Debug
     Generators
     Transform.Simplify
 
@@ -590,13 +589,13 @@ executable uplc
   build-depends:
     , base                  >=4.9 && <5
     , deepseq
+    , haskeline
+    , mtl
     , optparse-applicative
     , plutus-core           ^>=1.1
     , plutus-core-execlib
     , split
     , text
-    , mtl
-    , haskeline
 
 executable pir
   import:         lang
@@ -645,13 +644,18 @@ executable debugger
   ghc-options:    -O2 -threaded -rtsopts -with-rtsopts=-N
   build-depends:
     , base                  >=4.9 && <5
-    , plutus-core           ^>=1.1
     , brick
+    , bytestring
     , extra
+    , flat
+    , lens
+    , megaparsec
     , microlens
     , microlens-th
     , mtl
     , optparse-applicative
+    , plutus-core           ^>=1.1
+    , prettyprinter
     , text
     , vty
 

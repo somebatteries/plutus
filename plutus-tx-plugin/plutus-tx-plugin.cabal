@@ -131,6 +131,7 @@ test-suite plutus-tx-tests
   main-is:        Spec.hs
   other-modules:
     Budget.Spec
+    DebuggerDemo
     IsData.Spec
     Lib
     Lift.Spec
