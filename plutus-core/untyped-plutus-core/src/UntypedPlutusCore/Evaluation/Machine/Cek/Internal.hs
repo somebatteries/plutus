@@ -663,82 +663,81 @@ enterComputeCek = computeCek (toWordArray 0) where
         -> Context uni fun
         -> CekValue uni fun
         -> CekM uni fun s (Term NamedDeBruijn uni fun ())
-    --- Instantiate all the free variable of the resulting term in case there are any.
-    -- . ◅ V           ↦  [] V
-    returnCek !unbudgetedSteps NoFrame val = do
-        spendAccumulatedBudget unbudgetedSteps
-        pure $ dischargeCekValue val
-    -- s , {_ A} ◅ abs α M  ↦  s ; ρ ▻ M [ α / A ]*
-    returnCek !unbudgetedSteps (FrameForce ctx) fun = forceEvaluate unbudgetedSteps ctx fun
-    -- s , [_ (M,ρ)] ◅ V  ↦  s , [V _] ; ρ ▻ M
-    returnCek !unbudgetedSteps (FrameApplyArg argVarEnv arg ctx) fun =
-        computeCek unbudgetedSteps (FrameApplyFun fun ctx) argVarEnv arg
-    -- s , [(lam x (M,ρ)) _] ◅ V  ↦  s ; ρ [ x  ↦  V ] ▻ M
-    -- FIXME: add rule for VBuiltin once it's in the specification.
-    returnCek !unbudgetedSteps (FrameApplyFun fun ctx) arg =
-        applyEvaluate unbudgetedSteps ctx fun arg
+    returnCek !unbudgetedSteps = returnCek'
+      where
+        --- Instantiate all the free variable of the resulting term in case there are any.
+        -- . ◅ V           ↦  [] V
+        returnCek' NoFrame val = do
+            spendAccumulatedBudget unbudgetedSteps
+            pure $ dischargeCekValue val
+        -- s , {_ A} ◅ abs α M  ↦  s ; ρ ▻ M [ α / A ]*
+        returnCek' (FrameForce ctx) fun = forceEvaluate ctx fun
+        -- s , [_ (M,ρ)] ◅ V  ↦  s , [V _] ; ρ ▻ M
+        returnCek' (FrameApplyArg argVarEnv arg ctx) fun =
+            computeCek unbudgetedSteps (FrameApplyFun fun ctx) argVarEnv arg
+        -- s , [(lam x (M,ρ)) _] ◅ V  ↦  s ; ρ [ x  ↦  V ] ▻ M
+        -- FIXME: add rule for VBuiltin once it's in the specification.
+        returnCek' (FrameApplyFun fun ctx) arg = applyEvaluate ctx fun arg
 
-    -- | @force@ a term and proceed.
-    -- If v is a delay then compute the body of v;
-    -- if v is a builtin application then check that it's expecting a type argument,
-    -- and either calculate the builtin application or stick a 'Force' on top of its 'Term'
-    -- representation depending on whether the application is saturated or not,
-    -- if v is anything else, fail.
-    forceEvaluate
-        :: WordArray
-        -> Context uni fun
-        -> CekValue uni fun
-        -> CekM uni fun s (Term NamedDeBruijn uni fun ())
-    forceEvaluate !unbudgetedSteps !ctx (VDelay body env) = computeCek unbudgetedSteps ctx env body
-    forceEvaluate !unbudgetedSteps !ctx (VBuiltin fun term runtime) = do
-        -- @term@ is fully discharged, and so @term'@ is, hence we can put it in a 'VBuiltin'.
-        let term' = Force () term
-        case runtime of
-            -- It's only possible to force a builtin application if the builtin expects a type
-            -- argument next.
-            BuiltinExpectForce runtime' -> do
-                -- We allow a type argument to appear last in the type of a built-in function,
-                -- otherwise we could just assemble a 'VBuiltin' without trying to evaluate the
-                -- application.
-                res <- evalBuiltinApp fun term' runtime'
-                returnCek unbudgetedSteps ctx res
-            _ ->
-                throwingWithCause _MachineError BuiltinTermArgumentExpectedMachineError (Just term')
-    forceEvaluate !_ !_ val =
-        throwingDischarged _MachineError NonPolymorphicInstantiationMachineError val
+        -- | @force@ a term and proceed.
+        -- If v is a delay then compute the body of v;
+        -- if v is a builtin application then check that it's expecting a type argument,
+        -- and either calculate the builtin application or stick a 'Force' on top of its 'Term'
+        -- representation depending on whether the application is saturated or not,
+        -- if v is anything else, fail.
+        forceEvaluate
+            :: Context uni fun
+            -> CekValue uni fun
+            -> CekM uni fun s (Term NamedDeBruijn uni fun ())
+        forceEvaluate !ctx (VDelay body env) = computeCek unbudgetedSteps ctx env body
+        forceEvaluate !ctx (VBuiltin fun term runtime) = do
+            -- @term@ is fully discharged, and so @term'@ is, hence we can put it in a 'VBuiltin'.
+            let term' = Force () term
+            case runtime of
+                -- It's only possible to force a builtin application if the builtin expects a type
+                -- argument next.
+                BuiltinExpectForce runtime' -> do
+                    -- We allow a type argument to appear last in the type of a built-in function,
+                    -- otherwise we could just assemble a 'VBuiltin' without trying to evaluate the
+                    -- application.
+                    res <- evalBuiltinApp fun term' runtime'
+                    returnCek' ctx res
+                _ ->
+                    throwingWithCause _MachineError BuiltinTermArgumentExpectedMachineError (Just term')
+        forceEvaluate !_ val =
+            throwingDischarged _MachineError NonPolymorphicInstantiationMachineError val
 
-    -- | Apply a function to an argument and proceed.
-    -- If the function is a lambda 'lam x ty body' then extend the environment with a binding of @v@
-    -- to x@ and call 'computeCek' on the body.
-    -- If the function is a builtin application then check that it's expecting a term argument,
-    -- and either calculate the builtin application or stick a 'Apply' on top of its 'Term'
-    -- representation depending on whether the application is saturated or not.
-    -- If v is anything else, fail.
-    applyEvaluate
-        :: WordArray
-        -> Context uni fun
-        -> CekValue uni fun   -- lhs of application
-        -> CekValue uni fun   -- rhs of application
-        -> CekM uni fun s (Term NamedDeBruijn uni fun ())
-    applyEvaluate !unbudgetedSteps !ctx (VLamAbs _ body env) arg =
-        computeCek unbudgetedSteps ctx (Env.cons arg env) body
-    -- Annotating @f@ and @exF@ with bangs gave us some speed-up, but only until we added a bang to
-    -- 'VCon'. After that the bangs here were making things a tiny bit slower and so we removed them.
-    applyEvaluate !unbudgetedSteps !ctx (VBuiltin fun term runtime) arg = do
-        let argTerm = dischargeCekValue arg
-            -- @term@ and @argTerm@ are fully discharged, and so @term'@ is, hence we can put it
-            -- in a 'VBuiltin'.
-            term' = Apply () term argTerm
-        case runtime of
-            -- It's only possible to apply a builtin application if the builtin expects a term
-            -- argument next.
-            BuiltinExpectArgument f -> do
-                res <- evalBuiltinApp fun term' $ f arg
-                returnCek unbudgetedSteps ctx res
-            _ ->
-                throwingWithCause _MachineError UnexpectedBuiltinTermArgumentMachineError (Just term')
-    applyEvaluate !_ !_ val _ =
-        throwingDischarged _MachineError NonFunctionalApplicationMachineError val
+        -- | Apply a function to an argument and proceed.
+        -- If the function is a lambda 'lam x ty body' then extend the environment with a binding of @v@
+        -- to x@ and call 'computeCek' on the body.
+        -- If the function is a builtin application then check that it's expecting a term argument,
+        -- and either calculate the builtin application or stick a 'Apply' on top of its 'Term'
+        -- representation depending on whether the application is saturated or not.
+        -- If v is anything else, fail.
+        applyEvaluate
+            :: Context uni fun
+            -> CekValue uni fun   -- lhs of application
+            -> CekValue uni fun   -- rhs of application
+            -> CekM uni fun s (Term NamedDeBruijn uni fun ())
+        applyEvaluate !ctx (VLamAbs _ body env) arg =
+            computeCek unbudgetedSteps ctx (Env.cons arg env) body
+        -- Annotating @f@ and @exF@ with bangs gave us some speed-up, but only until we added a bang to
+        -- 'VCon'. After that the bangs here were making things a tiny bit slower and so we removed them.
+        applyEvaluate !ctx (VBuiltin fun term runtime) arg = do
+            let argTerm = dischargeCekValue arg
+                -- @term@ and @argTerm@ are fully discharged, and so @term'@ is, hence we can put it
+                -- in a 'VBuiltin'.
+                term' = Apply () term argTerm
+            case runtime of
+                -- It's only possible to apply a builtin application if the builtin expects a term
+                -- argument next.
+                BuiltinExpectArgument f -> do
+                    res <- evalBuiltinApp fun term' $ f arg
+                    returnCek' ctx res
+                _ ->
+                    throwingWithCause _MachineError UnexpectedBuiltinTermArgumentMachineError (Just term')
+        applyEvaluate !_ val _ =
+            throwingDischarged _MachineError NonFunctionalApplicationMachineError val
 
     -- | Spend the budget that has been accumulated for a number of machine steps.
     spendAccumulatedBudget :: WordArray -> CekM uni fun s ()
