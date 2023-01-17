@@ -66,8 +66,6 @@ data TypeScheme val (args :: [GHC.Type]) res where
         => TypeScheme val args res -> TypeScheme val (arg ': args) res
     TypeSchemeAll
         :: (KnownSymbol text, KnownNat uniq, KnownKind kind)
-           -- Here we require the user to manually provide the unique of a type variable.
-           -- That's nothing but silly, but I do not see what else we can do with the current design.
         => Proxy '(text, uniq, kind)
         -> TypeScheme val args res
         -> TypeScheme val args res

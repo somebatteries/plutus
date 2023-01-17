@@ -39,7 +39,6 @@ module PlutusCore.Default.Universe
 import PlutusCore.Builtin
 import PlutusCore.Data
 import PlutusCore.Evaluation.Machine.Exception
-import PlutusCore.Evaluation.Result
 
 import Control.Applicative
 import Data.Bits (toIntegralSized)
@@ -244,12 +243,12 @@ instance TestTypesFromTheUniverseAreAllKnown DefaultUni
 Technically our universe only contains 'Integer', but many of the builtin functions that we would
 like to use work over 'Int' and 'Word8'.
 
-This is inconvenient and also error-prone: dealing with a function that takes an 'Int' or 'Word8' means carefully
-downcasting the 'Integer', running the function, potentially upcasting at the end. And it's easy to get
-wrong by e.g. blindly using 'fromInteger'.
+This is inconvenient and also error-prone: dealing with a function that takes an 'Int' or 'Word8'
+means carefully downcasting the 'Integer', running the function, potentially upcasting at the
+end. And it's easy to get wrong by e.g. blindly using 'fromInteger'.
 
-Moreover, there is a latent risk here: if we *were* to build on a 32-bit platform, then programs which
-use arguments between @maxBound :: Int32@ and @maxBound :: Int64@ would behave differently!
+Moreover, there is a latent risk here: if we *were* to build on a 32-bit platform, then programs
+which use arguments between @maxBound :: Int32@ and @maxBound :: Int64@ would behave differently!
 
 So, what to do? We adopt the following strategy:
 - We allow lifting/unlifting 'Int64' via 'Integer', including a safe downcast in 'readKnown'.
@@ -265,10 +264,6 @@ which can sometimes interfere with optimization and inling.)
 
 Doing this effectively bans builds on 32-bit systems, but that's fine, since we don't care about
 supporting 32-bit systems anyway, and this way any attempts to build on them will fail fast.
-
-Note: we couldn't fail the bounds check with 'AsUnliftingError', because an out-of-bounds error is not an
-internal one -- it's a normal evaluation failure, but unlifting errors have this connotation of
-being "internal".
 -}
 
 instance KnownTypeAst DefaultUni Int64 where
@@ -290,7 +285,7 @@ instance HasConstantIn DefaultUni term => ReadKnownIn DefaultUni term Int64 wher
             -- OPTIMIZE: benchmark an alternative `integerToIntMaybe`, modified from 'ghc-bignum'
             if fromIntegral (minBound :: Int64) <= i && i <= fromIntegral (maxBound :: Int64)
                 then pure $ fromIntegral i
-                else throwing_ _EvaluationFailure
+                else throwing _UnliftingError "Out of bounds of 'Int64'"
     {-# INLINE readKnown #-}
 
 instance KnownTypeAst DefaultUni Int where
@@ -320,7 +315,7 @@ instance HasConstantIn DefaultUni term => ReadKnownIn DefaultUni term Word8 wher
         inline readKnownConstant term >>= oneShot \(i :: Integer) ->
            case toIntegralSized i of
                Just w8 -> pure w8
-               _       -> throwing_ _EvaluationFailure
+               _       -> throwing _UnliftingError "Out of bounds of 'Word8'"
     {-# INLINE readKnown #-}
 
 
