@@ -221,7 +221,7 @@ instance (Typeable res, KnownTypeAst (UniOf val) res, MakeKnown val res) =>
             -- inside, but that would slow things down a bit and the current strategy is
             -- reasonable enough.
             (BuiltinResult mempty . MakeKnownFailure mempty)
-            (\(x, cost) -> BuiltinResult cost $ makeKnown x)
+            (\(x, cost) -> lazy . BuiltinResult cost $ makeKnown x)
     {-# INLINE toMonoF #-}
 
 {- Note [One-shotting runtime denotations]
