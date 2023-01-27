@@ -20,9 +20,10 @@
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 -- | Functions for working with scripts on the ledger.
-module Plutus.V1.Ledger.Scripts(
+module Plutus.V1.Ledger.Scripts (
     -- * Scripts
     Script (..),
+    unScript',
     scriptSize,
     fromCompiledCode,
     ScriptError (..),
@@ -69,6 +70,7 @@ import Control.Monad.Except (MonadError, throwError)
 import Data.ByteString.Lazy qualified as BSL
 import Data.String
 import Data.Text (Text)
+import Debug.Trace (trace)
 import GHC.Generics (Generic)
 import Plutus.V1.Ledger.Bytes (LedgerBytes (..))
 import PlutusCore qualified as PLC
@@ -80,6 +82,7 @@ import PlutusTx (CompiledCode, FromData (..), ToData (..), UnsafeFromData (..), 
 import PlutusTx.Builtins as Builtins
 import PlutusTx.Builtins.Internal as BI
 import PlutusTx.Prelude
+import Prelude (error)
 import Prettyprinter
 import Prettyprinter.Extras
 import UntypedPlutusCore qualified as UPLC
@@ -94,6 +97,9 @@ newtype Script = Script { unScript :: UPLC.Program UPLC.DeBruijn PLC.DefaultUni 
   -- Currently, this is off because the old implementation didn't actually work, so we need to be careful
   -- about introducing a working version
   deriving Serialise via (SerialiseViaFlat (UPLC.Program UPLC.DeBruijn PLC.DefaultUni PLC.DefaultFun ()))
+
+unScript' :: Script -> UPLC.Program UPLC.DeBruijn PLC.DefaultUni PLC.DefaultFun ()
+unScript' _ = Prelude.error "NO!" -- Debug.Trace.trace "unScript'" . unScript
 
 {-| Note [Using Flat inside CBOR instance of Script]
 `plutus-ledger` uses CBOR for data serialisation and `plutus-core` uses Flat. The
@@ -161,12 +167,12 @@ applyArguments :: Script -> [PLC.Data] -> Script
 applyArguments (Script p) args =
     let termArgs = Haskell.fmap (PLC.mkConstant ()) args
         applied t = PLC.mkIterApp () t termArgs
-    in Script $ over UPLC.progTerm applied p
+    in Debug.Trace.trace "APPLY!" $ Script $ over UPLC.progTerm applied p
 
 -- | Evaluate a script, returning the trace log.
 evaluateScript :: forall m . (MonadError ScriptError m) => Script -> m (PLC.ExBudget, [Text])
 evaluateScript s =
-    let namedT = UPLC.termMapNames UPLC.fakeNameDeBruijn $ UPLC._progTerm $ unScript s
+    let namedT = Debug.Trace.trace "evaluateScript" $ UPLC.termMapNames UPLC.fakeNameDeBruijn $ UPLC._progTerm $ unScript s
     in case UPLC.checkScope @UPLC.FreeVariableError namedT of
         Left fvError -> throwError $ EvaluationError [] ("FreeVariableFailure of" ++ Haskell.show fvError)
         _ -> let (result, UPLC.TallyingSt _ budget, logOut) = UPLC.runCekDeBruijn PLC.defaultCekParameters UPLC.tallying UPLC.logEmitter namedT
