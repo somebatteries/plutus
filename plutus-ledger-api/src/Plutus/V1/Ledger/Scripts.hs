@@ -99,7 +99,7 @@ newtype Script = Script { unScript :: UPLC.Program UPLC.DeBruijn PLC.DefaultUni 
   deriving Serialise via (SerialiseViaFlat (UPLC.Program UPLC.DeBruijn PLC.DefaultUni PLC.DefaultFun ()))
 
 unScript' :: Script -> UPLC.Program UPLC.DeBruijn PLC.DefaultUni PLC.DefaultFun ()
-unScript' _ = Prelude.error "NO!" -- Debug.Trace.trace "unScript'" . unScript
+unScript' x = Debug.Trace.trace "unScript'" . unScript $ x
 
 {-| Note [Using Flat inside CBOR instance of Script]
 `plutus-ledger` uses CBOR for data serialisation and `plutus-core` uses Flat. The
