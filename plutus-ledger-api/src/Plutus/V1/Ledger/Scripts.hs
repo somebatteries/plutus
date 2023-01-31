@@ -58,6 +58,7 @@ module Plutus.V1.Ledger.Scripts (
     -- * Example scripts
     unitRedeemer,
     unitDatum,
+    defaultPIRprog
     ) where
 
 import Prelude qualified as Haskell
@@ -71,6 +72,7 @@ import Data.ByteString.Lazy qualified as BSL
 import Data.String
 import Data.Text (Text)
 import Debug.Trace (trace)
+import Flat qualified
 import GHC.Generics (Generic)
 import Plutus.V1.Ledger.Bytes (LedgerBytes (..))
 import PlutusCore qualified as PLC
@@ -78,25 +80,47 @@ import PlutusCore.Data qualified as PLC
 import PlutusCore.Evaluation.Machine.ExBudget qualified as PLC
 import PlutusCore.Evaluation.Machine.Exception (ErrorWithCause (..), EvaluationError (..))
 import PlutusCore.MkPlc qualified as PLC
-import PlutusTx (CompiledCode, FromData (..), ToData (..), UnsafeFromData (..), getPlc, makeLift)
+import PlutusIR as PIR
+import PlutusIR.Core as PIR
+import PlutusIR.MkPir as PIR
+import PlutusTx (CompiledCode, CompiledCodeIn, FromData (..), ToData (..), UnsafeFromData (..), getPir, getPlc,
+                 makeLift)
 import PlutusTx.Builtins as Builtins
 import PlutusTx.Builtins.Internal as BI
 import PlutusTx.Prelude
-import Prelude (error)
+import Prelude (error, show, (<$>), (<*>), (<>))
 import Prettyprinter
 import Prettyprinter.Extras
 import UntypedPlutusCore qualified as UPLC
 import UntypedPlutusCore.Check.Scope qualified as UPLC
 import UntypedPlutusCore.Evaluation.Machine.Cek qualified as UPLC
 
+type NamedPIRProgram = PIR.Program PLC.TyName PLC.Name PLC.DefaultUni PLC.DefaultFun ()
+type PlcProgram = UPLC.Program UPLC.DeBruijn PLC.DefaultUni PLC.DefaultFun ()
+
+defaultPIRprog :: NamedPIRProgram
+defaultPIRprog = PIR.Program () (PLC.mkConstant @ Integer () 5)
+getPir'
+    :: (PLC.Everywhere uni Flat.Flat, PLC.Closed uni, Flat.Flat fun)
+    => CompiledCodeIn uni fun a
+    -> Program TyName Name uni fun ()
+getPir' a =
+    case getPir a of
+      Nothing -> Prelude.error "Failed to get PIR from CompiledCode"
+      Just p  -> p
+
+
 -- | A script on the chain. This is an opaque type as far as the chain is concerned.
-newtype Script = Script { unScript :: UPLC.Program UPLC.DeBruijn PLC.DefaultUni PLC.DefaultFun () }
+data Script = Script { unScript :: PlcProgram, unPir :: NamedPIRProgram }
   deriving stock (Generic)
   deriving anyclass (NFData)
   -- See Note [Using Flat inside CBOR instance of Script]
   -- Currently, this is off because the old implementation didn't actually work, so we need to be careful
   -- about introducing a working version
-  deriving Serialise via (SerialiseViaFlat (UPLC.Program UPLC.DeBruijn PLC.DefaultUni PLC.DefaultFun ()))
+  deriving Serialise via (SerialiseViaFlat Script)
+instance Flat.Flat Script where
+    encode (Script p q) = Flat.encode p Prelude.<> Flat.encode q
+    decode = Script Prelude.<$> Flat.decode Prelude.<*> Flat.decode
 
 unScript' :: Script -> UPLC.Program UPLC.DeBruijn PLC.DefaultUni PLC.DefaultFun ()
 unScript' x = Debug.Trace.trace "unScript'" . unScript $ x
@@ -147,11 +171,11 @@ instance Haskell.Show Script where
 -- | The size of a 'Script'. No particular interpretation is given to this, other than that it is
 -- proportional to the serialized size of the script.
 scriptSize :: Script -> Integer
-scriptSize (Script s) = UPLC.programSize s
+scriptSize (Script s _) = UPLC.programSize s
 
 -- | Turn a 'CompiledCode' (usually produced by 'compile') into a 'Script' for use with this package.
 fromCompiledCode :: CompiledCode a -> Script
-fromCompiledCode = Script . toNameless . getPlc
+fromCompiledCode a = Script (toNameless . getPlc $ a) (getPir' a)
     where
       toNameless :: UPLC.Program UPLC.NamedDeBruijn PLC.DefaultUni PLC.DefaultFun ()
                  -> UPLC.Program UPLC.DeBruijn PLC.DefaultUni PLC.DefaultFun ()
@@ -164,10 +188,12 @@ data ScriptError =
     deriving anyclass (NFData)
 
 applyArguments :: Script -> [PLC.Data] -> Script
-applyArguments (Script p) args =
+applyArguments (Script p q) args =
     let termArgs = Haskell.fmap (PLC.mkConstant ()) args
         applied t = PLC.mkIterApp () t termArgs
-    in Debug.Trace.trace "APPLY!" $ Script $ over UPLC.progTerm applied p
+        termArgs' = Haskell.fmap (PLC.mkConstant ()) args
+        applied' t = PIR.mkIterApp () t termArgs'
+    in Script (over UPLC.progTerm applied p) (over PIR.progTerm applied' q)
 
 -- | Evaluate a script, returning the trace log.
 evaluateScript :: forall m . (MonadError ScriptError m) => Script -> m (PLC.ExBudget, [Text])

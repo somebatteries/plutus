@@ -33,7 +33,7 @@ main = benchWith mkDecBM
             (unsaturated, _args) = peelDataArguments fullyApplied
 
             -- we then have to re-encode it
-            bslCBOR :: BSL.ByteString = Serialise.serialise (Script $ UPLC.Program () v unsaturated)
+            bslCBOR :: BSL.ByteString = Serialise.serialise (Script (UPLC.Program () v unsaturated) defaultPIRprog)
             -- strictify and "short" the result cbor to create a real `SerializedScript`
 
             benchScript :: SerializedScript = toShort . BSL.toStrict $ bslCBOR

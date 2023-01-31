@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
@@ -50,6 +51,7 @@ terms can thus be used as backwards compatibility is not required.
 
 data Datatype tyname name uni fun a = Datatype a (TyVarDecl tyname a) [TyVarDecl tyname a] name [VarDecl tyname name uni fun a]
     deriving stock (Functor, Show, Generic)
+    deriving anyclass (NFData)
 
 varDeclNameString :: VarDecl tyname Name uni fun a -> String
 varDeclNameString = T.unpack . PLC.nameString . _varDeclName
@@ -68,6 +70,7 @@ datatypeNameString (Datatype _ tn _ _ _) = tyVarDeclNameString tn
 -- thus permitting (mutual) recursion.
 data Recursivity = NonRec | Rec
     deriving stock (Show, Eq, Generic, Ord)
+    deriving anyclass (NFData)
 
 -- | Recursivity can form a 'Semigroup' / lattice, where 'NonRec' < 'Rec'.
 -- The lattice is ordered by "power": a non-recursive binding group can be made recursive and it will still work, but not vice versa.
@@ -78,12 +81,13 @@ instance Semigroup Recursivity where
 
 data Strictness = NonStrict | Strict
     deriving stock (Show, Eq, Generic)
+    deriving anyclass (NFData)
 
 data Binding tyname name uni fun a = TermBind a Strictness (VarDecl tyname name uni fun a) (Term tyname name uni fun a)
                            | TypeBind a (TyVarDecl tyname a) (Type tyname uni a)
                            | DatatypeBind a (Datatype tyname name uni fun a)
     deriving stock (Functor, Show, Generic)
-
+    deriving anyclass (NFData)
 -- Terms
 
 {- Note [PIR as a PLC extension]
@@ -126,6 +130,7 @@ data Term tyname name uni fun a =
                         | IWrap a (Type tyname uni a) (Type tyname uni a) (Term tyname name uni fun a)
                         | Unwrap a (Term tyname name uni fun a)
                         deriving stock (Functor, Show, Generic)
+                        deriving anyclass (NFData)
 
 type instance UniOf (Term tyname name uni fun ann) = uni
 
@@ -155,6 +160,7 @@ data Program tyname name uni fun ann = Program
     , _progTerm :: Term tyname name uni fun ann
     }
     deriving stock Generic
+    deriving anyclass (NFData)
 makeLenses ''Program
 
 type instance PLC.HasUniques (Term tyname name uni fun ann) = (PLC.HasUnique tyname PLC.TypeUnique, PLC.HasUnique name PLC.TermUnique)

@@ -4,7 +4,6 @@ import Plutus.V1.Ledger.Api
 import Plutus.V1.Ledger.EvaluationContext (evalCtxForTesting)
 import Plutus.V1.Ledger.Scripts
 
-
 import Codec.Serialise qualified as Serialise (serialise)
 import Common
 import Criterion
@@ -41,7 +40,7 @@ main = benchWith mkFullBM
             -- of them are policy scripts with only 2.
             (term, args) = peelDataArguments body
 
-            bslCBOR :: BSL.ByteString = Serialise.serialise (Script $ UPLC.Program () v term)
+            bslCBOR :: BSL.ByteString = Serialise.serialise (Script (UPLC.Program () v term) defaultPIRprog)
             -- strictify and "short" the result cbor to create a real `SerializedScript`
             benchScript :: SerializedScript = toShort . BSL.toStrict $ bslCBOR
 

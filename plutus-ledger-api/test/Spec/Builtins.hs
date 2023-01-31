@@ -24,8 +24,8 @@ serialiseDataExScript :: SerializedScript
 serialiseDataExScript = toShort . toStrict $ serialise serialiseDataEx
     where
       serialiseDataEx :: Script
-      serialiseDataEx = Script $ UPLC.Program () (PLC.defaultVersion ()) $
-                             UPLC.Apply () (UPLC.Builtin () PLC.SerialiseData) (PLC.mkConstant () $ I 1)
+      serialiseDataEx = Script (UPLC.Program () (PLC.defaultVersion ()) $
+                             UPLC.Apply () (UPLC.Builtin () PLC.SerialiseData) (PLC.mkConstant () $ I 1)) defaultPIRprog
 
 tests :: TestTree
 tests =

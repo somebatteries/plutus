@@ -117,6 +117,7 @@ data TyVarDecl tyname ann = TyVarDecl
     , _tyVarDeclName :: tyname
     , _tyVarDeclKind :: Kind ann
     } deriving stock (Functor, Show, Generic)
+    deriving anyclass (NFData)
 makeLenses ''TyVarDecl
 
 -- | A "variable declaration", i.e. a name and a type for a variable.
@@ -125,6 +126,7 @@ data VarDecl tyname name uni fun ann = VarDecl
     , _varDeclName :: name
     , _varDeclType :: Type tyname uni ann
     } deriving stock (Functor, Show, Generic)
+    deriving anyclass (NFData)
 makeLenses ''VarDecl
 
 -- | A "type declaration", i.e. a kind for a type.
