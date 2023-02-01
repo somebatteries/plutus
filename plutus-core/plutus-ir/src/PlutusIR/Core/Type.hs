@@ -159,7 +159,7 @@ data Program tyname name uni fun ann = Program
     { _progAnn  :: ann
     , _progTerm :: Term tyname name uni fun ann
     }
-    deriving stock Generic
+    deriving stock (Generic, Show)
     deriving anyclass (NFData)
 makeLenses ''Program
 

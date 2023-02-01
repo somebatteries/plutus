@@ -23,7 +23,6 @@
 module Plutus.V1.Ledger.Scripts (
     -- * Scripts
     Script (..),
-    unScript',
     scriptSize,
     fromCompiledCode,
     ScriptError (..),
@@ -58,7 +57,11 @@ module Plutus.V1.Ledger.Scripts (
     -- * Example scripts
     unitRedeemer,
     unitDatum,
-    defaultPIRprog
+    defaultPIRprog,
+    testScript,
+    testScript2,
+    PlcProgram,
+    NamedPIRProgram
     ) where
 
 import Prelude qualified as Haskell
@@ -72,7 +75,7 @@ import Data.ByteString.Lazy qualified as BSL
 import Data.String
 import Data.Text (Text)
 import Debug.Trace (trace)
-import Flat qualified
+import Flat
 import GHC.Generics (Generic)
 import Plutus.V1.Ledger.Bytes (LedgerBytes (..))
 import PlutusCore qualified as PLC
@@ -87,21 +90,23 @@ import PlutusTx (CompiledCode, CompiledCodeIn, FromData (..), ToData (..), Unsaf
                  makeLift)
 import PlutusTx.Builtins as Builtins
 import PlutusTx.Builtins.Internal as BI
-import PlutusTx.Prelude
+import PlutusTx.Prelude hiding ((<$>), (<*>), (<>))
 import Prelude (error, show, (<$>), (<*>), (<>))
-import Prettyprinter
+import Prettyprinter hiding ((<>))
 import Prettyprinter.Extras
 import UntypedPlutusCore qualified as UPLC
 import UntypedPlutusCore.Check.Scope qualified as UPLC
 import UntypedPlutusCore.Evaluation.Machine.Cek qualified as UPLC
+import UntypedPlutusCore.MkUPlc qualified as UPLC
 
 type NamedPIRProgram = PIR.Program PLC.TyName PLC.Name PLC.DefaultUni PLC.DefaultFun ()
 type PlcProgram = UPLC.Program UPLC.DeBruijn PLC.DefaultUni PLC.DefaultFun ()
 
 defaultPIRprog :: NamedPIRProgram
 defaultPIRprog = PIR.Program () (PLC.mkConstant @ Integer () 5)
+
 getPir'
-    :: (PLC.Everywhere uni Flat.Flat, PLC.Closed uni, Flat.Flat fun)
+    :: (PLC.Everywhere uni Flat, PLC.Closed uni, Flat fun)
     => CompiledCodeIn uni fun a
     -> Program TyName Name uni fun ()
 getPir' a =
@@ -109,21 +114,28 @@ getPir' a =
       Nothing -> Prelude.error "Failed to get PIR from CompiledCode"
       Just p  -> p
 
-
 -- | A script on the chain. This is an opaque type as far as the chain is concerned.
 data Script = Script { unScript :: PlcProgram, unPir :: NamedPIRProgram }
-  deriving stock (Generic)
+  deriving stock (Generic, Haskell.Show)
   deriving anyclass (NFData)
   -- See Note [Using Flat inside CBOR instance of Script]
   -- Currently, this is off because the old implementation didn't actually work, so we need to be careful
   -- about introducing a working version
   deriving Serialise via (SerialiseViaFlat Script)
-instance Flat.Flat Script where
-    encode (Script p q) = Flat.encode p Prelude.<> Flat.encode q
-    decode = Script Prelude.<$> Flat.decode Prelude.<*> Flat.decode
+instance Flat Script where
+    encode (Script p q) = encode p <> encode q
+    decode = Script <$> decode <*> decode
 
-unScript' :: Script -> UPLC.Program UPLC.DeBruijn PLC.DefaultUni PLC.DefaultFun ()
-unScript' x = Debug.Trace.trace "unScript'" . unScript $ x
+testScript :: Script
+testScript = Script (UPLC.Program () (PLC.defaultVersion ()) (PLC.mkConstant @ Integer () 111))
+             (PIR.Program () (PLC.mkConstant @ Integer () 555))
+
+testScript2 :: Script
+testScript2 = Script
+              (UPLC.Program () (PLC.defaultVersion ()) plcterm )
+              (PIR.Program () pirterm)
+             where plcterm = UPLC.Apply () (UPLC.Builtin () PLC.AddInteger) (PLC.mkConstant () True)
+                   pirterm = PIR.Apply () (PIR.Builtin () PLC.AddInteger) (PLC.mkConstant () True)
 
 {-| Note [Using Flat inside CBOR instance of Script]
 `plutus-ledger` uses CBOR for data serialisation and `plutus-core` uses Flat. The
@@ -165,8 +177,6 @@ instance Haskell.Eq Script where
 instance Haskell.Ord Script where
     a `compare` b = Builtins.toBuiltin (BSL.toStrict (serialise a)) `compare` Builtins.toBuiltin (BSL.toStrict (serialise b))
 
-instance Haskell.Show Script where
-    showsPrec _ _ = Haskell.showString "<Script>"
 
 -- | The size of a 'Script'. No particular interpretation is given to this, other than that it is
 -- proportional to the serialized size of the script.
