@@ -777,6 +777,7 @@ enterComputeCek = computeCek (toWordArray 0) where
                 throwingWithCause _MachineError UnexpectedBuiltinTermArgumentMachineError (Just term')
     applyEvaluate !_ !_ val _ =
         throwingDischarged _MachineError NonFunctionalApplicationMachineError val
+    {-# INLINE applyEvaluate #-}
 
     -- | Spend the budget that has been accumulated for a number of machine steps.
     spendAccumulatedBudget :: WordArray -> CekM uni fun s ()
