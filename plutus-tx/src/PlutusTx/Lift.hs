@@ -76,18 +76,35 @@ safeLift x = do
     db <- UPLC.deBruijnTerm =<< UPLC.simplifyTerm usOpts erased
     pure $ void db
 
+
 -- | Get a Plutus Core program corresponding to the given value.
 safeLiftProgram
     :: (Lift.Lift uni a
        , PIR.AsTypeError e (PIR.Term TyName Name uni fun ()) uni fun (Provenance ()),  PLC.GEq uni
        , PIR.AsTypeErrorExt e uni (Provenance ())
        , PLC.AsFreeVariableError e
-       , AsError e uni fun (Provenance ()), MonadError e m, MonadQuote m
+       , AsError e uni fun (Provenance ())
+       , MonadError e m
+       , MonadQuote m
        , PLC.Typecheckable uni fun
        , PrettyPrintable uni fun
        )
     => a -> m (UPLC.Program UPLC.NamedDeBruijn uni fun ())
 safeLiftProgram x = UPLC.Program () (PLC.defaultVersion ()) <$> safeLift x
+
+safeLiftToPIR
+    :: ( Lift.Lift uni a
+       , MonadQuote m
+       )
+    => a -> m (PIR.Term PLC.TyName PLC.Name uni fun ())
+safeLiftToPIR x = liftQuote $ runDefT () $ Lift.lift x
+
+safeLiftToPIRProgram
+    :: ( Lift.Lift uni a
+       , MonadQuote m
+       )
+    => a -> m (PIR.Program PLC.TyName PLC.Name uni fun ())
+safeLiftToPIRProgram x = PIR.Program () <$> safeLiftToPIR x
 
 safeLiftCode
     :: (Lift.Lift uni a
@@ -99,7 +116,7 @@ safeLiftCode
        , PrettyPrintable uni fun
        )
     => a -> m (CompiledCodeIn uni fun a)
-safeLiftCode x = DeserializedCode <$> safeLiftProgram x <*> pure Nothing <*> pure mempty
+safeLiftCode x = DeserializedCode <$> safeLiftProgram x <*> (Just <$> safeLiftToPIRProgram x) <*> pure mempty
 
 unsafely
     :: Throwable uni fun
