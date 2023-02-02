@@ -1,4 +1,6 @@
+{-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications  #-}
 
@@ -11,13 +13,16 @@
 -- | Common types and functions used across all the ledger API modules.
 module Plutus.ApiCommon where
 
+import Plutus.V1.Ledger.Scripts
 import PlutusCore as Plutus hiding (Version)
 import PlutusCore as ScriptPlutus (Version)
+import PlutusCore qualified as PLC
 import PlutusCore.Data as Plutus
 import PlutusCore.Evaluation.Machine.CostModelInterface as Plutus
 import PlutusCore.Evaluation.Machine.ExBudget as Plutus
 import PlutusCore.Evaluation.Machine.MachineParameters as Plutus
 import PlutusCore.MkPlc qualified as UPLC
+import PlutusIR as PIR
 import UntypedPlutusCore qualified as UPLC
 import UntypedPlutusCore.Check.Scope qualified as UPLC
 import UntypedPlutusCore.Evaluation.Machine.Cek qualified as UPLC
@@ -25,11 +30,12 @@ import UntypedPlutusCore.Evaluation.Machine.Cek qualified as UPLC
 import Codec.CBOR.Decoding qualified as CBOR
 import Codec.CBOR.Extras
 import Codec.CBOR.Read qualified as CBOR
+import Codec.Serialise (deserialise)
 import Control.DeepSeq
 import Control.Monad.Except
 import Control.Monad.Writer
 import Data.Bifunctor
-import Data.ByteString.Lazy (fromStrict)
+import Data.ByteString.Lazy (ByteString, fromStrict)
 import Data.ByteString.Short
 import Data.Coerce
 import Data.Either
@@ -38,6 +44,7 @@ import Data.Map qualified as Map
 import Data.Set qualified as Set
 import Data.Text
 import Data.Tuple
+import Flat (decode)
 import GHC.Exts (inline)
 import GHC.Generics
 import NoThunks.Class
@@ -175,9 +182,34 @@ scriptCBORDecoder lv pv =
         -- TODO: optimize this by using a better datastructure e.g. 'IntSet'
         flatDecoder = UPLC.decodeProgram (\f -> f `Set.member` availableBuiltins)
     in do
-        -- Deserialize using 'FakeNamedDeBruijn' to get the fake names added
-        (p :: UPLC.Program UPLC.FakeNamedDeBruijn DefaultUni DefaultFun ()) <- decodeViaFlat flatDecoder
-        pure $ coerce p
+      -- Deserialize using 'FakeNamedDeBruijn' to get the fake names added
+      (p :: UPLC.Program UPLC.FakeNamedDeBruijn DefaultUni DefaultFun ()) <- decodeViaFlat flatDecoder
+      -- (_q ::  PIR.Program PLC.TyName PLC.Name DefaultUni DefaultFun ()) <- decodeViaFlat Flat.decode
+      pure $ coerce p
+
+
+checkBuiltins availableBuiltins (UPLC.Program _ _ body) = checkTerm body
+    where checkTerm =
+              \case
+               UPLC.Var      _ _     -> True
+               UPLC.LamAbs   _ _ t   -> checkTerm t
+               UPLC.Apply    _ t1 t2 -> checkTerm t1 && checkTerm t2
+               UPLC.Force    _ t     -> checkTerm t
+               UPLC.Delay    _ t     -> checkTerm t
+               UPLC.Constant _ _     -> True
+               UPLC.Error _          -> True
+               UPLC.Builtin  _ f     ->
+                   if f `Set.member` availableBuiltins
+                   then True
+                   else error $ "Forbidden builtin function: " ++ show (prettyPlcDef f)
+
+scriptDecoder :: LedgerPlutusVersion -> ProtocolVersion -> ByteString -> ScriptForExecution
+scriptDecoder lv pv bs =
+    let availableBuiltins = builtinsAvailableIn lv pv
+        Script p _q = deserialise bs
+        !_ = checkBuiltins availableBuiltins p
+        p' =  UPLC.programMapNames UPLC.fakeNameDeBruijn p
+    in ScriptForExecution p'
 
 {-| Check if a 'Script' is "valid" according to a protocol version. At the moment this means "deserialises correctly", which in particular
 implies that it is (almost certainly) an encoded script and the script does not mention any builtins unavailable in the given protocol version.
@@ -221,7 +253,7 @@ mkTermToEvaluate
     -> m (UPLC.Term UPLC.NamedDeBruijn DefaultUni DefaultFun ())
 mkTermToEvaluate lv pv bs args = do
     -- It decodes the program through the optimized ScriptForExecution. See `ScriptForExecution`.
-    (_, ScriptForExecution (UPLC.Program _ v t)) <- liftEither $ first CodecError $ CBOR.deserialiseFromBytes (scriptCBORDecoder lv pv) $ fromStrict $ fromShort bs
+    let ScriptForExecution (UPLC.Program _ v t) = scriptDecoder lv pv $ fromStrict $ fromShort bs
     unless (v == Plutus.defaultVersion ()) $ throwError $ IncompatibleVersionError v
     let termArgs = fmap (UPLC.mkConstant ()) args
         appliedT = UPLC.mkIterApp () t termArgs
