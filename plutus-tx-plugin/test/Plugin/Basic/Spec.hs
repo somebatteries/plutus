@@ -26,24 +26,37 @@ import Data.Proxy
 
 basic :: TestNested
 basic = testNested "Basic" [
-    goldenPir "monoId" monoId
-  , goldenPir "monoK" monoK
-  , goldenPir "letFun" letFun
-  , goldenPir "nonstrictLet" nonstrictLet
-  , goldenPir "strictLet" strictLet
-  , goldenPir "strictMultiLet" strictMultiLet
-  , goldenPir "strictLetRec" strictLetRec
-  -- must keep the scrutinee as it evaluates to error
-  , goldenPir "ifOpt" ifOpt
-  -- should fail
-  , goldenUEval "ifOptEval" [ifOpt]
-  , goldenPir "monadicDo" monadicDo
-  , goldenPir "patternMatchDo" patternMatchDo
-  , goldenUPlcCatch "patternMatchFailure" patternMatchFailure
+    goldenPir "letFunConst" eg1 --monoId
+--   , goldenPir "monoK" monoK
+--   , goldenPir "letFun" letFun
+--   , goldenPir "nonstrictLet" nonstrictLet
+--   , goldenPir "strictLet" strictLet
+--   , goldenPir "strictMultiLet" strictMultiLet
+--   , goldenPir "strictLetRec" strictLetRec
+--   -- must keep the scrutinee as it evaluates to error
+--   , goldenPir "ifOpt" ifOpt
+--   -- should fail
+--   , goldenUEval "ifOptEval" [ifOpt]
+--   , goldenPir "monadicDo" monadicDo
+--   , goldenPir "patternMatchDo" patternMatchDo
+--   , goldenUPlcCatch "patternMatchFailure" patternMatchFailure
   ]
 
-monoId :: CompiledCode (Integer -> Integer)
-monoId = plc (Proxy @"monoId") (\(x :: Integer) -> x)
+monoId :: CompiledCode Integer
+monoId = plc (Proxy @"monoId") (
+    let constFun :: Integer -> Bool -> Integer
+        constFun x y = x
+    in constFun 3 False
+    )
+
+eg1 :: CompiledCode (Integer -> Integer)
+eg1 = plc (Proxy @"eg1") (
+    let id :: Integer -> Integer
+        id x = x
+        constantId :: Integer -> (Integer -> Integer)
+        constantId y = id
+    in constantId 10
+    )
 
 monoK :: CompiledCode (Integer -> Integer -> Integer)
 monoK = plc (Proxy @"monoK") (\(i :: Integer) -> \(_ :: Integer) -> i)

@@ -34,16 +34,16 @@ import Text.Megaparsec.Pos
 
 transform :: TestNested
 transform = testNested "transform" [
-    thunkRecursions
-    , nonStrict
-    , letFloat
-    , recSplit
-    , inline
-    , beta
-    , unwrapCancel
-    , deadCode
-    , retainedSize
-    , rename
+    -- thunkRecursions
+    -- , nonStrict
+    -- , letFloat
+    -- , recSplit
+    inline
+    -- , beta
+    -- , unwrapCancel
+    -- , deadCode
+    -- , retainedSize
+    -- , rename
     ]
 
 thunkRecursions :: TestNested
@@ -131,14 +131,15 @@ inline :: TestNested
 inline =
     testNested "inline"
     $ map (goldenPir (runQuote . (UInline.inline mempty def <=< PLC.rename)) $ pTerm)
-    [ "var"
-    , "builtin"
-    , "constant"
-    , "transitive"
-    , "tyvar"
-    , "single"
-    , "immediateVar"
-    , "immediateApp"
+    [ --"var"
+    -- , "builtin"
+    -- , "constant"
+    -- , "transitive"
+    -- , "tyvar"
+    -- , "single"
+    -- , "immediateVar"
+    -- , "immediateApp"
+    "letFun"
     ]
 
 

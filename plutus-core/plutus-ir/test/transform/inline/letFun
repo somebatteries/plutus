@@ -1,20 +1,11 @@
--- let f = \x . x
---     g = \y . f
---    in g a
 (let
   (nonrec)
 
   (termbind
     (strict)
-    (vardecl x (lam z ]))
-    (()))
+    (vardecl x (fun Bool Bool))
+    ((lam x Bool x))
   )
 
-  (termbind
-    (strict)
-    (vardecl y (con integer))
-    (con integer 1)
-  )
-
-  [ x y ]
+  x
 )

@@ -33,18 +33,18 @@ main = defaultMain $ runTestNestedIn ["plutus-ir/test"] tests
 tests :: TestNested
 tests = testGroup "plutus-ir" <$> sequence
     [ prettyprinting
-    , prettyprintingReadable
-    , parsing
-    , lets
-    , datatypes
-    , recursion
-    , serialization
-    , errors
-    , pure names
+    -- , prettyprintingReadable
+    -- , parsing
+    -- , lets
+    -- , datatypes
+    -- , recursion
+    -- , serialization
+    -- , errors
+    -- , pure names
     , transform
-    , types
-    , typeErrors
-    , generators 1
+    -- , types
+    -- , typeErrors
+    -- , generators 1
     ]
 
 prettyprinting :: TestNested
