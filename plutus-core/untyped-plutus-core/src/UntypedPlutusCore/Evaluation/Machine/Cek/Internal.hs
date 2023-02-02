@@ -24,7 +24,9 @@
 {-# LANGUAGE UndecidableInstances     #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# OPTIONS_GHC -ddump-simpl -ddump-to-file -dsuppress-uniques -dsuppress-coercions -dsuppress-type-applications -dsuppress-unfoldings -dsuppress-idinfo -dumpdir /tmp/dumps #-}
+{-# OPTIONS_GHC -O2 #-}
+
+{-# OPTIONS_GHC -ddump-simpl -ddump-to-file -dsuppress-uniques -dsuppress-coercions -dsuppress-type-applications -dsuppress-unfoldings -dsuppress-idinfo -dppr-cols=200 -dumpdir /tmp/dumps #-}
 
 module UntypedPlutusCore.Evaluation.Machine.Cek.Internal
     -- See Note [Compilation peculiarities].
@@ -777,7 +779,6 @@ enterComputeCek = computeCek (toWordArray 0) where
                 throwingWithCause _MachineError UnexpectedBuiltinTermArgumentMachineError (Just term')
     applyEvaluate !_ !_ val _ =
         throwingDischarged _MachineError NonFunctionalApplicationMachineError val
-    {-# INLINE applyEvaluate #-}
 
     -- | Spend the budget that has been accumulated for a number of machine steps.
     spendAccumulatedBudget :: WordArray -> CekM uni fun s ()
