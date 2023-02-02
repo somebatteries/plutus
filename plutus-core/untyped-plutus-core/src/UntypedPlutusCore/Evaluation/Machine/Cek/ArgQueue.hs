@@ -29,10 +29,10 @@ class Foldable e => ArgQueue (e :: Type -> Type) where
   consEnv :: (RAL.Element env ~ a, RAL.RandomAccessList env) => e a -> env -> env
   consEnv v env = foldl' (\ev arg -> RAL.cons arg ev) env v
 
-  data Acc e i o s :: Type
-  newNEAcc :: NE.NonEmpty i -> ST s (i, Acc e i o s)
-  newAcc :: [i] -> ST s (Either (e o) (i, Acc e i o s))
-  stepAcc :: Acc e i o s -> o -> ST s (Either (e o) (i, Acc e i o s))
+  data Acc e i o :: Type
+  newNEAcc :: NE.NonEmpty i -> (i, Acc e i o)
+  newAcc :: [i] -> Either (e o) (i, Acc e i o)
+  stepAcc :: Acc e i o -> o -> Either (e o) (i, Acc e i o)
 
 -- implementation of consUpTo based on using 'splitAt' and 'consEnv'
 consUpToSplit
@@ -60,6 +60,7 @@ consUpToUncons = go
       Just (e, es) -> go (n-1) es (RAL.cons e env)
       Nothing      -> (q, env)
 
+{-
 instance ArgQueue V.Vector where
   splitAt = V.splitAt
   uncons = V.uncons
@@ -69,6 +70,7 @@ instance ArgQueue V.Vector where
   consUpTo = consUpToSplit
 
   data Acc V.Vector i o s = VectorAcc {-# UNPACK #-} !Int ![i] {-# UNPACK #-} !(MV.MVector s o)
+  type AccM e = ST s
 
   {-# INLINE newNEAcc #-}
   newNEAcc ts@(t NE.:| rest) = do
@@ -86,6 +88,7 @@ instance ArgQueue V.Vector where
       case todo of
           []     -> Left <$> V.unsafeFreeze arr
           t : ts -> pure $ Right (t, VectorAcc (nextIndex+1) ts arr)
+-}
 
 instance ArgQueue [] where
   splitAt = List.splitAt
@@ -95,21 +98,21 @@ instance ArgQueue [] where
 
   consUpTo = consUpToUncons
 
-  data Acc [] i o s = ListAcc ![i] (DList.DList o)
+  data Acc [] i o = ListAcc ![i] (DList.DList o)
 
   {-# INLINE newAcc #-}
-  newAcc []       = pure $ Left mempty
-  newAcc (t : ts) = Right <$> newNEAcc (t NE.:| ts)
+  newAcc []       = Left mempty
+  newAcc (t : ts) = Right $ newNEAcc (t NE.:| ts)
 
   {-# INLINE newNEAcc #-}
-  newNEAcc (t NE.:| rest) = pure (t, ListAcc rest mempty)
+  newNEAcc (t NE.:| rest) = (t, ListAcc rest mempty)
 
   {-# INLINE stepAcc #-}
   stepAcc (ListAcc todo done) next =
     let done' = done `DList.snoc` next
     in case todo of
-      []     -> pure $ Left $ DList.toList done'
-      t : ts -> pure $ Right (t, ListAcc ts done')
+      []     -> Left $ DList.toList done'
+      t : ts -> Right (t, ListAcc ts done')
 
 instance ArgQueue Seq.Seq where
   splitAt = Seq.splitAt
@@ -120,21 +123,21 @@ instance ArgQueue Seq.Seq where
 
   consUpTo = consUpToUncons
 
-  data Acc Seq.Seq i o s = SeqAcc ![i] (Seq.Seq o)
+  data Acc Seq.Seq i o = SeqAcc ![i] (Seq.Seq o)
 
   {-# INLINE newAcc #-}
-  newAcc []       = pure $ Left mempty
-  newAcc (t : ts) = Right <$> newNEAcc (t NE.:| ts)
+  newAcc []       = Left mempty
+  newAcc (t : ts) = Right $ newNEAcc (t NE.:| ts)
 
   {-# INLINE newNEAcc #-}
-  newNEAcc (t NE.:| rest) = pure (t, SeqAcc rest mempty)
+  newNEAcc (t NE.:| rest) = (t, SeqAcc rest mempty)
 
   {-# INLINE stepAcc #-}
   stepAcc (SeqAcc todo done) next =
     let done' = done Seq.|> next
     in case todo of
-      []     -> pure $ Left done'
-      t : ts -> pure $ Right (t, SeqAcc ts done')
+      []     -> Left done'
+      t : ts -> Right (t, SeqAcc ts done')
 
 -- Possibly not useful, just a list with a tagged length to
 -- avoid O(n) length checks
@@ -163,18 +166,18 @@ instance ArgQueue ListWithLen where
       go _ [] env     = (ListWithLen 0 [], env)
       go n (a:as) env = go (n-1) as (RAL.cons a env)
 
-  data Acc ListWithLen i o s = ListWithLenAcc {-# UNPACK #-} !Int ![i] (DList.DList o)
+  data Acc ListWithLen i o = ListWithLenAcc {-# UNPACK #-} !Int ![i] (DList.DList o)
 
   {-# INLINE newAcc #-}
-  newAcc []       = pure $ Left (ListWithLen 0 mempty)
-  newAcc (t : ts) = Right <$> newNEAcc (t NE.:| ts)
+  newAcc []       = Left (ListWithLen 0 mempty)
+  newAcc (t : ts) = Right $ newNEAcc (t NE.:| ts)
 
   {-# INLINE newNEAcc #-}
-  newNEAcc l@(t NE.:| rest) = pure (t, ListWithLenAcc (NE.length l) rest mempty)
+  newNEAcc l@(t NE.:| rest) = (t, ListWithLenAcc (NE.length l) rest mempty)
 
   {-# INLINE stepAcc #-}
   stepAcc (ListWithLenAcc len todo done) next =
     let done' = done `DList.snoc` next
     in case todo of
-      []     -> pure $ Left $ ListWithLen len $ DList.toList done'
-      t : ts -> pure $ Right (t, ListWithLenAcc len ts done')
+      []     -> Left $ ListWithLen len $ DList.toList done'
+      t : ts -> Right (t, ListWithLenAcc len ts done')

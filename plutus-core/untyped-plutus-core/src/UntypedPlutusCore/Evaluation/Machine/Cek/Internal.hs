@@ -535,13 +535,13 @@ The context in which the machine operates.
 Morally, this is a stack of frames, but we use the "intrusive list" representation so that
 we can match on context and the top frame in a single, strict pattern match.
 -}
-data Context uni fun ann s
-    = FrameApplyFun !(CekValue uni fun ann) !(Context uni fun ann s)                         -- ^ @[V _]@
-    | FrameApplyArg !(CekValEnv uni fun ann) !(Term NamedDeBruijn uni fun ann) !(Context uni fun ann s) -- ^ @[_ N]@
-    | FrameApplyValues {-# UNPACK #-} !(Args (CekValue uni fun ann)) !(Context uni fun ann s) -- ^ @[_ N]@
-    | FrameForce !(Context uni fun ann s)                                               -- ^ @(force _)@
-    | FrameConstr !(CekValEnv uni fun ann) {-# UNPACK #-} !Int {-# UNPACK #-} !(ArgQueue.Acc Args (Term NamedDeBruijn uni fun ann) (CekValue uni fun ann) s) !(Context uni fun ann s)
-    | FrameCases !(CekValEnv uni fun ann) ![Term NamedDeBruijn uni fun ann] !(Context uni fun ann s)
+data Context uni fun ann
+    = FrameApplyFun !(CekValue uni fun ann) !(Context uni fun ann)                         -- ^ @[V _]@
+    | FrameApplyArg !(CekValEnv uni fun ann) !(Term NamedDeBruijn uni fun ann) !(Context uni fun ann) -- ^ @[_ N]@
+    | FrameApplyValues {-# UNPACK #-} !(Args (CekValue uni fun ann)) !(Context uni fun ann) -- ^ @[_ N]@
+    | FrameForce !(Context uni fun ann)                                               -- ^ @(force _)@
+    | FrameConstr !(CekValEnv uni fun ann) {-# UNPACK #-} !Int {-# UNPACK #-} !(ArgQueue.Acc Args (Term NamedDeBruijn uni fun ann) (CekValue uni fun ann)) !(Context uni fun ann)
+    | FrameCases !(CekValEnv uni fun ann) ![Term NamedDeBruijn uni fun ann] !(Context uni fun ann)
     | NoFrame
     -- deriving stock (Show)
 
@@ -614,7 +614,7 @@ evalBuiltinApp fun term runtime = case runtime of
 enterComputeCek
     :: forall uni fun ann s
     . (PrettyUni uni fun, GivenCekReqs uni fun ann s)
-    => Context uni fun ann s
+    => Context uni fun ann
     -> CekValEnv uni fun ann
     -> Term NamedDeBruijn uni fun ann
     -> CekM uni fun s (Term NamedDeBruijn uni fun ())
@@ -627,7 +627,7 @@ enterComputeCek = computeCek (toWordArray 0) where
     -- 4. looks up a variable in the environment and calls 'returnCek' ('Var')
     computeCek
         :: WordArray
-        -> Context uni fun ann s
+        -> Context uni fun ann
         -> CekValEnv uni fun ann
         -> Term NamedDeBruijn uni fun ann
         -> CekM uni fun s (Term NamedDeBruijn uni fun ())
@@ -666,7 +666,7 @@ enterComputeCek = computeCek (toWordArray 0) where
         throwing_ _EvaluationFailure
     computeCek !unbudgetedSteps !ctx !env (Constr _ i es) = do
         !unbudgetedSteps' <- stepAndMaybeSpend BApply unbudgetedSteps
-        acc <- CekM $ ArgQueue.newAcc es
+        let acc = ArgQueue.newAcc es
         case acc of
             Left res        -> returnCek unbudgetedSteps ctx $ VConstr i res
             Right (t, acc') -> computeCek unbudgetedSteps' (FrameConstr env i acc' ctx) env t
@@ -685,7 +685,7 @@ enterComputeCek = computeCek (toWordArray 0) where
     -}
     returnCek
         :: WordArray
-        -> Context uni fun ann s
+        -> Context uni fun ann
         -> CekValue uni fun ann
         -> CekM uni fun s (Term NamedDeBruijn uni fun ())
     --- Instantiate all the free variable of the resulting term in case there are any.
@@ -703,7 +703,7 @@ enterComputeCek = computeCek (toWordArray 0) where
     returnCek !unbudgetedSteps (FrameApplyFun fun ctx) arg =
         applyEvaluate unbudgetedSteps ctx fun arg
     returnCek !unbudgetedSteps (FrameConstr env i acc ctx) e = do
-        r <- CekM $ ArgQueue.stepAcc acc e
+        let r = ArgQueue.stepAcc acc e
         case r of
             Right (next, acc') -> computeCek unbudgetedSteps (FrameConstr env i acc' ctx) env next
             Left done          -> returnCek unbudgetedSteps ctx $ VConstr i done
@@ -724,7 +724,7 @@ enterComputeCek = computeCek (toWordArray 0) where
     -- if v is anything else, fail.
     forceEvaluate
         :: WordArray
-        -> Context uni fun ann s
+        -> Context uni fun ann
         -> CekValue uni fun ann
         -> CekM uni fun s (Term NamedDeBruijn uni fun ())
     forceEvaluate !unbudgetedSteps !ctx (VDelay body env) = computeCek unbudgetedSteps ctx env body
@@ -754,7 +754,7 @@ enterComputeCek = computeCek (toWordArray 0) where
     -- If v is anything else, fail.
     applyEvaluate
         :: WordArray
-        -> Context uni fun ann s
+        -> Context uni fun ann
         -> CekValue uni fun ann  -- lhs of application
         -> CekValue uni fun ann  -- rhs of application
         -> CekM uni fun s (Term NamedDeBruijn uni fun ())
