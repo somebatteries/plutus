@@ -139,7 +139,7 @@ inline =
     -- , "single"
     -- , "immediateVar"
     -- , "immediateApp"
-    "letFun"
+    "letFunConst"
     ]
 
 
