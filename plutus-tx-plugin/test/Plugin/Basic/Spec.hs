@@ -9,7 +9,8 @@
 {-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:max-simplifier-iterations-pir=0 #-}
 {-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:max-simplifier-iterations-uplc=0 #-}
 {-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:context-level=0 #-}
-
+{-# OPTIONS_GHC -fmax-simplifier-iterations=0 #-}
+{-# OPTIONS_GHC -fno-specialise -O0 #-}
 module Plugin.Basic.Spec where
 
 import Test.Tasty.Extras
@@ -26,7 +27,7 @@ import Data.Proxy
 
 basic :: TestNested
 basic = testNested "Basic" [
-    goldenPir "letFunConst" eg1 --monoId
+    goldenPir "letFunConst" monoId
 --   , goldenPir "monoK" monoK
 --   , goldenPir "letFun" letFun
 --   , goldenPir "nonstrictLet" nonstrictLet
@@ -43,8 +44,10 @@ basic = testNested "Basic" [
   ]
 
 monoId :: CompiledCode Integer
+{-# NOINLINE monoId #-}
 monoId = plc (Proxy @"monoId") (
     let constFun :: Integer -> Bool -> Integer
+        {-# NOINLINE constFun #-}
         constFun x y = x
     in constFun 3 False
     )

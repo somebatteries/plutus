@@ -1,0 +1,19 @@
+(program
+  (let
+    (nonrec)
+    (datatypebind
+      (datatype
+        (tyvardecl Bool (type))
+
+        Bool_match
+        (vardecl True Bool) (vardecl False Bool)
+      )
+    )
+    (termbind
+      (strict)
+      (vardecl constFun (fun (con integer) (fun Bool (con integer))))
+      (lam x (con integer) (lam y Bool x))
+    )
+    [ [ constFun (con integer 3) ] False ]
+  )
+)
