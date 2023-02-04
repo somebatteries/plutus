@@ -1,7 +1,9 @@
 {-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE ViewPatterns      #-}
 
 {- | Float bindings inwards.
@@ -16,11 +18,17 @@ import PlutusCore qualified as PLC
 import PlutusCore.Builtin qualified as PLC
 import PlutusCore.Name qualified as PLC
 import PlutusIR
+import PlutusIR.Analysis.Usages qualified as Usages
 import PlutusIR.Purity (isPure)
 import PlutusIR.Transform.Rename ()
 
 import Control.Lens hiding (Strict)
-import Control.Monad ((<=<))
+import Control.Monad.Extra (ifM)
+import Control.Monad.Trans.Reader
+import Data.Foldable (foldrM)
+import Data.List.Extra qualified as List
+import Data.List.NonEmpty.Extra (NonEmpty (..))
+import Data.List.NonEmpty.Extra qualified as NonEmpty
 import Data.Set (Set)
 import Data.Set qualified as Set
 
@@ -159,6 +167,13 @@ expensive, can be evaluated more times. This is not the case for PIR.
 
 type Uniques = Set PLC.TermUnique
 
+data FloatInContext = FloatInContext
+    { _ctxtInManyOccRhs :: Bool
+    , _ctxtUsages       :: Usages.Usages
+    }
+
+makeLenses ''FloatInContext
+
 -- | Float bindings in the given `Term` inwards.
 floatTerm ::
     forall m tyname name uni fun a.
@@ -170,61 +185,71 @@ floatTerm ::
     PLC.BuiltinVersion fun ->
     Term tyname name uni fun a ->
     m (Term tyname name uni fun a)
-floatTerm ver = pure . fmap fst . go <=< PLC.rename
+floatTerm ver t0 = do
+    t1 <- PLC.rename t0
+    pure . fmap fst $ floatTermInner (Usages.termUsages t1) t1
   where
-    -- \| Float bindings in the given `Term` inwards, and calculate the set of
-    -- variable `Unique`s in the result `Term`.
-    go ::
+    floatTermInner ::
+        Usages.Usages ->
         Term tyname name uni fun a ->
         Term tyname name uni fun (a, Uniques)
-    go t = case t of
-        Apply a fun0 arg0 ->
-            let fun = go fun0
-                arg = go arg0
-                us = termUniqs fun `Set.union` termUniqs arg
-             in Apply (a, us) fun arg
-        LamAbs a n ty body0 ->
-            let body = go body0
-             in LamAbs (a, termUniqs body) n (noUniq ty) body
-        TyAbs a n k body0 ->
-            let body = go body0
-             in TyAbs (a, termUniqs body) n (noUniq k) body
-        TyInst a body0 ty ->
-            let body = go body0
-             in TyInst (a, termUniqs body) body (noUniq ty)
-        IWrap a ty1 ty2 body0 ->
-            let body = go body0
-             in IWrap (a, termUniqs body) (noUniq ty1) (noUniq ty2) body
-        Unwrap a body0 ->
-            let body = go body0
-             in Unwrap (a, termUniqs body) body
-        Let a NonRec bs0 body0 ->
-            let bs = goBinding <$> bs0
-                body = go body0
-             in -- The bindings in `bs` should be processed from right to left, since
-                -- a binding may depend on another binding to its left.
-                foldr (floatInBinding ver a) body bs
-        Let a Rec bs0 body0 ->
-            -- Currently we don't move recursive bindings, so we simply descend into the body.
-            let bs = goBinding <$> bs0
-                body = go body0
-                us = Set.union (termUniqs body) (foldMap bindingUniqs bs)
-             in Let (a, us) Rec bs body
-        Var a n -> Var (a, Set.singleton (n ^. PLC.unique)) n
-        Constant{} -> (,mempty) <$> t
-        Builtin{} -> (,mempty) <$> t
-        Error{} -> (,mempty) <$> t
+    floatTermInner usgs = go
+      where
+        -- \| Float bindings in the given `Term` inwards, and calculate the set of
+        -- variable `Unique`s in the result `Term`.
+        go ::
+            Term tyname name uni fun a ->
+            Term tyname name uni fun (a, Uniques)
+        go t = case t of
+            Apply a fun0 arg0 ->
+                let fun = go fun0
+                    arg = go arg0
+                    us = termUniqs fun `Set.union` termUniqs arg
+                 in Apply (a, us) fun arg
+            LamAbs a n ty body0 ->
+                let body = go body0
+                 in LamAbs (a, termUniqs body) n (noUniq ty) body
+            TyAbs a n k body0 ->
+                let body = go body0
+                 in TyAbs (a, termUniqs body) n (noUniq k) body
+            TyInst a body0 ty ->
+                let body = go body0
+                 in TyInst (a, termUniqs body) body (noUniq ty)
+            IWrap a ty1 ty2 body0 ->
+                let body = go body0
+                 in IWrap (a, termUniqs body) (noUniq ty1) (noUniq ty2) body
+            Unwrap a body0 ->
+                let body = go body0
+                 in Unwrap (a, termUniqs body) body
+            Let a NonRec bs0 body0 ->
+                let bs = goBinding <$> bs0
+                    body = go body0
+                 in -- The bindings in `bs` should be processed from right to left, since
+                    -- a binding may depend on another binding to its left.
+                    runReader
+                        (foldrM (floatInBinding ver a) body bs)
+                        (FloatInContext False usgs)
+            Let a Rec bs0 body0 ->
+                -- Currently we don't move recursive bindings, so we simply descend into the body.
+                let bs = goBinding <$> bs0
+                    body = go body0
+                    us = Set.union (termUniqs body) (foldMap bindingUniqs bs)
+                 in Let (a, us) Rec bs body
+            Var a n -> Var (a, Set.singleton (n ^. PLC.unique)) n
+            Constant{} -> (,mempty) <$> t
+            Builtin{} -> (,mempty) <$> t
+            Error{} -> (,mempty) <$> t
 
-    -- \| Float bindings in the given `Binding` inwards, and calculate the set of
-    -- variable `Unique`s in the result `Binding`.
-    goBinding ::
-        Binding tyname name uni fun a ->
-        Binding tyname name uni fun (a, Uniques)
-    goBinding = \case
-        TermBind a s var rhs ->
-            let rhs' = go rhs
-             in TermBind (a, termUniqs rhs') s (noUniq var) rhs'
-        other -> noUniq other
+        -- \| Float bindings in the given `Binding` inwards, and calculate the set of
+        -- variable `Unique`s in the result `Binding`.
+        goBinding ::
+            Binding tyname name uni fun a ->
+            Binding tyname name uni fun (a, Uniques)
+        goBinding = \case
+            TermBind a s var rhs ->
+                let rhs' = go rhs
+                 in TermBind (a, termUniqs rhs') s (noUniq var) rhs'
+            other -> noUniq other
 
 termUniqs :: Term tyname name uni fun (a, Uniques) -> Uniques
 termUniqs = snd . termAnn
@@ -270,60 +295,123 @@ floatInBinding ::
     a ->
     Binding tyname name uni fun (a, Uniques) ->
     Term tyname name uni fun (a, Uniques) ->
-    Term tyname name uni fun (a, Uniques)
+    Reader FloatInContext (Term tyname name uni fun (a, Uniques))
 floatInBinding ver letAnn = \b ->
     if floatable ver b
         then go b
         else \body ->
             let us = Set.union (termUniqs body) (bindingUniqs b)
-             in Let (letAnn, us) NonRec (pure b) body
+             in pure $ Let (letAnn, us) NonRec (pure b) body
   where
     go ::
         Binding tyname name uni fun (a, Uniques) ->
         Term tyname name uni fun (a, Uniques) ->
-        Term tyname name uni fun (a, Uniques)
+        Reader FloatInContext (Term tyname name uni fun (a, Uniques))
     go b !body = case b of
         TermBind (_, usBind) _s var _rhs -> case body of
             Apply (a, usBody) fun arg
-                | (var ^. PLC.unique) `Set.notMember` termUniqs fun ->
+                | (var ^. PLC.unique) `Set.notMember` termUniqs fun -> do
                     -- `fun` does not mention `var`, so we can place the binding inside `arg`.
                     -- See Note [Where can a binding be floated into?].
-                    Apply (a, Set.union usBind usBody) fun (go b arg)
+                    usgs <- asks _ctxtUsages
+                    let inManyOccRhs = case fun of
+                            LamAbs _ name _ _ ->
+                                Usages.getUsageCount name usgs > 1
+                            Builtin{} -> False
+                            _ -> True
+                    Apply (a, Set.union usBind usBody) fun
+                        <$> local (over ctxtInManyOccRhs (|| inManyOccRhs)) (go b arg)
                 | (var ^. PLC.unique) `Set.notMember` termUniqs arg ->
                     -- `arg` does not mention `var`, so we can place the binding inside `fun`.
-                    Apply (a, Set.union usBind usBody) (go b fun) arg
+                    Apply (a, Set.union usBind usBody) <$> go b fun <*> pure arg
             LamAbs (a, usBody) n ty lamAbsBody ->
                 -- A lazy binding, or a strict binding whose RHS is pure, can always
                 -- be placed inside a `LamAbs`.
                 -- See Note [Where can a binding be floated into?].
-                LamAbs (a, Set.union usBind usBody) n ty (go b lamAbsBody)
+                ifM
+                    (asks _ctxtInManyOccRhs)
+                    giveup
+                    (LamAbs (a, Set.union usBind usBody) n ty <$> go b lamAbsBody)
             TyAbs (a, usBody) n k tyAbsBody ->
                 -- A lazy binding, or a strict binding whose RHS is pure, can always
                 -- be placed inside a `TyAbs`.
                 -- See Note [Where can a binding be floated into?].
-                TyAbs (a, Set.union usBind usBody) n k (go b tyAbsBody)
+                ifM
+                    (asks _ctxtInManyOccRhs)
+                    giveup
+                    (TyAbs (a, Set.union usBind usBody) n k <$> go b tyAbsBody)
             TyInst (a, usBody) tyInstBody ty ->
                 -- A term binding can always be placed inside the body a `TyInst` because the
                 -- type cannot mention the bound variable
-                TyInst (a, Set.union usBind usBody) (go b tyInstBody) ty
-            Let (a, usBody) r bs letBody
+                TyInst (a, Set.union usBind usBody) <$> go b tyInstBody <*> pure ty
+            Let (a, usBody) NonRec bs letBody
                 -- The binding can be placed inside a `Let`, if the right hand sides of the
                 -- bindings of the `Let` do not mention `var`.
-                --
-                -- Note that we do *not* float the binding into one of the bindings here.
-                -- See Note [Where can a binding be floated into?]
                 | (var ^. PLC.unique) `Set.notMember` foldMap bindingUniqs bs ->
-                    Let (a, Set.union usBind usBody) r bs (go b letBody)
+                    Let (a, Set.union usBind usBody) NonRec bs <$> go b letBody
+                | (var ^. PLC.unique) `Set.notMember` termUniqs letBody -> do
+                    splitBindings (var ^. PLC.unique) (NonEmpty.toList bs) >>= \case
+                        Just
+                            ( before
+                                , TermBind (a', usBind') s' var' rhs'
+                                , after
+                                , inManyOccRhs
+                                ) -> do
+                                -- `letBody` does not mention `var`, and there is exactly one
+                                -- RHS in `bs` that mentions `var`, so we can place `b`
+                                -- inside one of the RHSs in `bs`.
+                                b'' <-
+                                    TermBind (a', Set.union usBind usBind') s' var'
+                                        <$> local
+                                            (over ctxtInManyOccRhs (|| inManyOccRhs))
+                                            (go b rhs')
+                                let bs' = NonEmpty.appendr before (b'' :| after)
+                                pure $ Let (a, Set.union usBind usBody) NonRec bs' letBody
+                        _ -> giveup
             IWrap (a, usBody) ty1 ty2 iwrapBody ->
                 -- A binding can always be placed inside an `IWrap`.
-                IWrap (a, Set.union usBind usBody) ty1 ty2 (go b iwrapBody)
+                IWrap (a, Set.union usBind usBody) ty1 ty2 <$> go b iwrapBody
             Unwrap (a, usBody) unwrapBody ->
                 -- A binding can always be placed inside an `Unwrap`.
-                Unwrap (a, Set.union usBind usBody) (go b unwrapBody)
-            _ ->
-                let us = Set.union (termUniqs body) (bindingUniqs b)
-                 in Let (letAnn, us) NonRec (pure b) body
+                Unwrap (a, Set.union usBind usBody) <$> go b unwrapBody
+            _ -> giveup
         -- TODO: implement float-in for type and datatype bindings.
-        _ ->
+        _ -> giveup
+      where
+        giveup =
             let us = Set.union (termUniqs body) (bindingUniqs b)
-             in Let (letAnn, us) NonRec (pure b) body
+             in pure $ Let (letAnn, us) NonRec (pure b) body
+
+{- | Split the given list of bindings, if possible.
+ If the input contains exactly one binding @b@ that mentions the given `PLC.TermUnique`,
+ return @Just (before_b, b, after_b)@.
+ Otherwise, return `Nothing`.
+-}
+splitBindings ::
+    PLC.HasUnique name PLC.TermUnique =>
+    PLC.TermUnique ->
+    [Binding tyname name uni fun (a, Uniques)] ->
+    Reader
+        FloatInContext
+        ( Maybe
+            ( [Binding tyname name uni fun (a, Uniques)]
+            , Binding tyname name uni fun (a, Uniques)
+            , [Binding tyname name uni fun (a, Uniques)]
+            , Bool
+            )
+        )
+splitBindings u bs = case is of
+    [(TermBind _ Strict _ _, i)] -> pure $ Just (take i bs, bs !! i, drop (i + 1) bs, False)
+    [(TermBind _ NonStrict var _, i)] -> do
+        ctxt <- ask
+        pure $
+            if (ctxt ^. ctxtInManyOccRhs)
+                || Usages.getUsageCount var (ctxt ^. ctxtUsages) > 1
+                then Nothing
+                else Just (take i bs, bs !! i, drop (i + 1) bs, True)
+    _ -> pure Nothing
+  where
+    is = List.filter containsUniq (bs `zip` [0 ..])
+    containsUniq = \case
+        (TermBind _ _ _ rhs, _) -> u `Set.member` termUniqs rhs
+        _                       -> False
