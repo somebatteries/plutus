@@ -21,6 +21,7 @@
 module UntypedPlutusCore.Evaluation.Machine.Cek.Debug.Internal
     ( CekState (..)
     , Context (..)
+    , contextAnn
     , ioToCekM
     , cekMToIO
     , lenContext
@@ -225,7 +226,7 @@ applyEvaluate !_ !_ val _ =
 -- MAYBE: runCekDeBruijn can be shared between original&debug ceks by passing a `enterComputeCek` func.
 runCekDeBruijn
     :: (PrettyUni uni fun)
-    => MachineParameters CekMachineCosts CekValue uni fun ann
+    => MachineParameters CekMachineCosts fun (CekValue uni fun ann)
     -> ExBudgetMode cost uni fun
     -> EmitterMode uni fun
     -> Term NamedDeBruijn uni fun ann
@@ -288,10 +289,10 @@ cekStateAnn = \case
 
 contextAnn :: Context uni fun ann -> Maybe ann
 contextAnn = \case
-  FrameApplyFun ann _ _   -> pure ann
-  FrameApplyArg ann _ _ _ -> pure ann
-  FrameForce ann _        -> pure ann
-  NoFrame                 -> empty
+    FrameApplyFun ann _ _   -> pure ann
+    FrameApplyArg ann _ _ _ -> pure ann
+    FrameForce ann _        -> pure ann
+    NoFrame                 -> empty
 
 lenContext :: Context uni fun ann -> Word
 lenContext = go 0
@@ -340,7 +341,7 @@ defaultSlippage = 200
 runCekM
     :: forall a cost uni fun ann.
     (PrettyUni uni fun)
-    => MachineParameters CekMachineCosts CekValue uni fun ann
+    => MachineParameters CekMachineCosts fun (CekValue uni fun ann)
     -> ExBudgetMode cost uni fun
     -> EmitterMode uni fun
     -> (forall s. GivenCekReqs uni fun ann s => CekM uni fun s a)
@@ -417,4 +418,3 @@ stepAndMaybeSpend !kind !unbudgetedSteps = do
     if unbudgetedStepsTotal >= ?cekSlippage
     then spendAccumulatedBudget unbudgetedSteps' >> pure (toWordArray 0)
     else pure unbudgetedSteps'
-
