@@ -329,7 +329,7 @@ isPure :: Term name uni fun a -> Bool
 isPure = go True
     where
         go delayIsPure = \case
-            Var {}                        -> True
+            Var {}                        -> delayIsPure
             -- These are syntactically values that won't reduce further
             LamAbs {}                     -> True
             Constant {}                   -> True
