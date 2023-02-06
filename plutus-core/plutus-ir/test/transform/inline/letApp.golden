@@ -1,0 +1,24 @@
+[
+  (lam
+    eta
+    (con integer)
+    [
+      [
+        [
+          {
+            (abs a (type) (lam v [ (lam a (type) (fun a (fun a a))) a ] v))
+            (con integer)
+          }
+          (lam
+            x
+            (con integer)
+            (lam y (con integer) [ [ (builtin addInteger) x ] y ])
+          )
+        ]
+        (con integer 4)
+      ]
+      eta
+    ]
+  )
+  (con integer 5)
+]
