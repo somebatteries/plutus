@@ -11,6 +11,8 @@
 {-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:context-level=0 #-}
 {-# OPTIONS_GHC -fmax-simplifier-iterations=0 #-}
 {-# OPTIONS_GHC -fno-specialise -O0 #-}
+{-# OPTIONS_GHC -fforce-recomp #-}
+
 module Plugin.Basic.Spec where
 
 import Test.Tasty.Extras
@@ -23,11 +25,13 @@ import PlutusTx.Prelude as P
 import PlutusTx.Test
 
 import Data.Proxy
+import Prelude hiding ((+))
 
 
 basic :: TestNested
 basic = testNested "Basic" [
-    goldenPir "letFunConst" monoId
+    goldenPir "letFunEg1" monoId
+    , goldenPir "letFunEg2" letFun2
 --   , goldenPir "monoK" monoK
 --   , goldenPir "letFun" letFun
 --   , goldenPir "nonstrictLet" nonstrictLet
@@ -46,19 +50,25 @@ basic = testNested "Basic" [
 monoId :: CompiledCode Integer
 {-# NOINLINE monoId #-}
 monoId = plc (Proxy @"monoId") (
-    let constFun :: Integer -> Bool -> Integer
-        {-# NOINLINE constFun #-}
-        constFun x y = x
-    in constFun 3 False
+    let appNum :: Integer
+        {-# NOINLINE appNum #-}
+        appNum = 4
+        funApp :: Integer -> Integer
+        {-# NOINLINE funApp #-}
+        funApp = (\x y -> x P.+ y) appNum
+    in funApp 5
     )
 
-eg1 :: CompiledCode (Integer -> Integer)
-eg1 = plc (Proxy @"eg1") (
-    let id :: Integer -> Integer
-        id x = x
-        constantId :: Integer -> (Integer -> Integer)
-        constantId y = id
-    in constantId 10
+letFun2 :: CompiledCode Integer
+{-# NOINLINE letFun2 #-}
+letFun2 = plc (Proxy @"monoId") (
+    let idFun :: Integer -> Integer
+        {-# NOINLINE idFun #-}
+        idFun = \x -> x
+        funApp :: Integer -> (Integer -> Integer)
+        {-# NOINLINE funApp #-}
+        funApp = \x -> idFun
+    in funApp 5 6
     )
 
 monoK :: CompiledCode (Integer -> Integer -> Integer)
