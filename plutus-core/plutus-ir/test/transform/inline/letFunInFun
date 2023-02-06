@@ -5,5 +5,10 @@
       (vardecl idFun (fun (con integer) (con integer)))
       (lam x (con integer) x)
     )
-    idFun
+    (termbind
+      (strict)
+      (vardecl g (fun (con integer) (fun (con integer) (con integer))))
+      (lam eta (con integer) idFun)
+    )
+    [ g (con integer 3) ]
 )
