@@ -10,6 +10,10 @@
 module UntypedPlutusCore.Core.Type
     ( TPLC.UniOf
     , TPLC.Version (..)
+    , TPLC.verAnn
+    , TPLC.verMajor
+    , TPLC.verMinor
+    , TPLC.verPatch
     , TPLC.Binder (..)
     , Term (..)
     , Program (..)

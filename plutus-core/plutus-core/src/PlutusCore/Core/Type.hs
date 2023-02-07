@@ -50,6 +50,10 @@ module PlutusCore.Core.Type
     , progAnn
     , progVer
     , progTerm
+    , verAnn
+    , verMajor
+    , verMinor
+    , verPatch
     )
 where
 
@@ -141,10 +145,15 @@ Compatibility is about compatibility for specific scripts, not about e.g. tools 
 Adding a new kind of term does not change how existing scripts behave, but does change what
 tools would need to do to process scripts.
 -}
-data Version ann
-    = Version ann Natural Natural Natural
+data Version ann = Version
+    { _verAnn   :: ann
+    , _verMajor :: Natural
+    , _verMinor :: Natural
+    , _verPatch :: Natural
+    }
     deriving stock (Eq, Show, Functor, Generic)
     deriving anyclass (NFData, Hashable)
+makeLenses ''Version
 
 -- | A 'Program' is simply a 'Term' coupled with a 'Version' of the core language.
 data Program tyname name uni fun ann = Program
