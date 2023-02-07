@@ -139,13 +139,12 @@ inline =
     , "single"
     , "immediateVar"
     , "immediateApp"
-    -- these tests are all let bindings of functions, for testing call site inlining of fully
-    -- applied functions.
+    -- these tests are all let bindings of functions that occur only once
     ,"letFunConst" -- const fun fully applied
     , "letFunInFun" -- fully applied fn inside another let: let f = id, g = \x.f in g 3
-    , "letIdFunForall" -- id function fully applied
+    , "letIdFunForall" -- polymorphic id function fully applied
     , "letApp" -- function application in rhs
-    , "letOverApp" -- over-application of a let
+    , "letOverApp" -- over-application of a function
     ]
 
 

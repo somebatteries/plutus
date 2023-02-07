@@ -1,9 +1,4 @@
 [
-  [
-    (lam
-      eta (con integer) (lam eta (con integer) [ (lam x (con integer) x) eta ])
-    )
-    (con integer 5)
-  ]
+  [ (lam x (con integer) (lam y (con integer) y)) (con integer 5) ]
   (con integer 6)
 ]
