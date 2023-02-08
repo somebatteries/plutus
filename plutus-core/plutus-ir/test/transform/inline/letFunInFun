@@ -1,3 +1,14 @@
+{- 
+Single occurrence of a function (g) that calls another let binding.
+The unconditional inlining optimization should inline g and idFun because they only occur once.
+
+let 
+  idFun :: Integer -> Integer
+  idFun x = x
+  g :: Integer -> (Integer -> Integer)
+  g y = idFun
+in g 3
+ -}
 (let
     (nonrec)
     (termbind
@@ -8,7 +19,7 @@
     (termbind
       (strict)
       (vardecl g (fun (con integer) (fun (con integer) (con integer))))
-      (lam eta (con integer) idFun)
+      (lam y (con integer) idFun)
     )
     [ g (con integer 3) ]
 )

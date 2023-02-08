@@ -139,12 +139,19 @@ inline =
     , "single"
     , "immediateVar"
     , "immediateApp"
-    -- these tests are all let bindings of functions that occur only once
-    ,"letFunConst" -- const fun fully applied
-    , "letFunInFun" -- fully applied fn inside another let: let f = id, g = \x.f in g 3
+    -- these tests are all let bindings of functions
+    , "letFunConstInt" -- const fn fully applied (integer)
+    , "letFunConstBool" -- const fn fully applied (bool)
+    , "letFunInFun" -- fully applied fn inside another let
+    , "letFunInFunAllMulti"
+    , "letFunInFunMulti"
+    , "letFunInFunMultiFullyApplied"
     , "letIdFunForall" -- polymorphic id function fully applied
-    , "letApp" -- function application in rhs
-    , "letOverApp" -- over-application of a function
+    , "letApp" -- single occurrence of a function application in rhs
+    , "letAppMulti" -- multiple occurrences of a function application in rhs
+    , "letOverApp" -- over-application of a function, single occurrence
+    , "letOverAppMultiId" -- like "letOverApp" but with its argument occurring more than once
+    , "letOverAppMulti" -- multiple occurrences of an over-application of a function
     ]
 
 

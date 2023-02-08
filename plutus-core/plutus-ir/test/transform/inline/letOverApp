@@ -1,6 +1,12 @@
--- let idFun = \y.y
---     funApp = \x.idFun
--- in funApp 5 6
+{- 
+Single occurrence let bindings that are functions.
+idFun and funApp both get inlined because they only occur once.
+
+let idFun = \y.y
+    funApp = \x.idFun
+in funApp 5 6
+ -}
+
 (let
   (nonrec)
   

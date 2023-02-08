@@ -1,6 +1,6 @@
-letIdFunForall:22:4:
+letOverAppMulti:26:6:
    |
-22 |   (termbind
-   |    ^^^^^^^
+26 |     (termbind
+   |      ^^^^^^^
 unexpected "termbin"
 expecting "abs", "builtin", "con", "error", "iwrap", "lam", "let", or "unwrap"

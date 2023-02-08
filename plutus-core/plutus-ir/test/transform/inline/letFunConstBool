@@ -1,3 +1,15 @@
+{-
+Single occurrence const function with bool:
+The const function is expected to be inlined by the unconditional inlining optimization.
+Adding the datatype binding of bool should not affect the inlining.
+
+ 
+let 
+  constFun :: Integer -> Bool -> Integer
+  constFun x y = x
+in constFun 3 False 
+  -}
+
 (let
   (nonrec)
   (datatypebind

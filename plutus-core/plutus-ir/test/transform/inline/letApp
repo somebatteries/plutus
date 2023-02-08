@@ -1,27 +1,20 @@
+{- 
+Single occurrence of a let binding that is a function application. It gets inlined by the
+unconditional inlining optimization.
+
+let 
+  funApp :: Integer -> Integer
+  funApp = (\x y -> addInteger x y) 4
+in funApp 5
+
+-}
+
 (let
     (nonrec)
-    (termbind (strict) (vardecl appNum (con integer)) (con integer 4))
-    (termbind
-      (strict)
-      (vardecl addInteger (fun (con integer) (fun (con integer) (con integer))))
-      (builtin addInteger)
-    )
-    (termbind
-      (strict)
-      (vardecl addInteger (fun (con integer) (fun (con integer) (con integer))))
-      (lam x (con integer) (lam y (con integer) [ [ addInteger x ] y ]))
-    )
     (termbind
       (strict)
       (vardecl funApp (fun (con integer) (con integer)))
-      (lam
-        eta
-        (con integer)
-        [
-          [ AddInteger appNum ]
-          eta
-        ]
-      )
+      [ (builtin addInteger) (con integer 4) ]
     )
     [ funApp (con integer 5) ]
 )
