@@ -1,0 +1,22 @@
+(program
+  (let
+    (nonrec)
+    (termbind (strict) (vardecl appNum (con integer)) (con integer 4))
+    (termbind
+      (strict)
+      (vardecl addInteger (fun (con integer) (fun (con integer) (con integer))))
+      (builtin addInteger)
+    )
+    (termbind
+      (strict)
+      (vardecl addInteger (fun (con integer) (fun (con integer) (con integer))))
+      (lam x (con integer) (lam y (con integer) [ [ addInteger x ] y ]))
+    )
+    (termbind
+      (strict)
+      (vardecl funApp (fun (con integer) (con integer)))
+      (lam eta (con integer) [ [ addInteger appNum ] eta ])
+    )
+    [ funApp (con integer 5) ]
+  )
+)

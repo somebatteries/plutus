@@ -1,0 +1,31 @@
+(program
+  (let
+    (nonrec)
+    (termbind
+      (strict)
+      (vardecl idFun (fun (con integer) (con integer)))
+      (lam x (con integer) x)
+    )
+    (termbind
+      (strict)
+      (vardecl
+        g
+        (fun
+          (fun (con integer) (con integer)) (fun (con integer) (con integer))
+        )
+      )
+      (lam y (fun (con integer) (con integer)) idFun)
+    )
+    (termbind
+      (strict)
+      (vardecl
+        k
+        (fun
+          (fun (con integer) (con integer)) (fun (con integer) (con integer))
+        )
+      )
+      (lam eta (fun (con integer) (con integer)) [ g eta ])
+    )
+    [ k idFun ]
+  )
+)
