@@ -127,13 +127,6 @@ inBraces' = between (symbol "{") (char '}')
 isIdentifierChar :: Char -> Bool
 isIdentifierChar c = isAlphaNum c || c == '_' || c == '\''
 
--- | Create a parser that matches the input word and returns its source position.
--- This is for attaching source positions to parsed terms/programs.
-wordPos ::
-    -- | The word to match
-    T.Text -> Parser SourcePos
-wordPos w = lexeme $ try $ getSourcePos <* symbol w
-
 toSrcSpan :: SourcePos -> SourcePos -> SrcSpan
 toSrcSpan start end =
     SrcSpan
@@ -144,17 +137,8 @@ toSrcSpan start end =
         , srcSpanECol = unPos (sourceColumn end)
         }
 
-version :: Parser (Version SourcePos)
-version = lexeme $ do
-    p <- getSourcePos
-    x <- Lex.decimal
-    void $ char '.'
-    y <- Lex.decimal
-    void $ char '.'
-    Version p x y <$> Lex.decimal
-
-version' :: Parser (Version SrcSpan)
-version' = withSpan $ \sp -> do
+version :: Parser (Version SrcSpan)
+version = withSpan $ \sp -> do
     x <- Lex.decimal
     void $ char '.'
     y <- Lex.decimal
