@@ -25,15 +25,15 @@ This is a simple type without any validation, __use with caution__.
 You may want to add checks for its invariants. See the
  [Shelley ledger specification](https://hydra.iohk.io/build/16861845/download/1/ledger-spec.pdf).
 -}</span><span>
-</span><span id="line-28"></span><span id="local-6989586621679951408"><span id="local-6989586621679951409"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="PubKeyHash"><span class="annot"><a href="PlutusLedgerApi.V1.Crypto.html#PubKeyHash"><span class="hs-identifier hs-var">PubKeyHash</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="PubKeyHash"><span class="annot"><a href="PlutusLedgerApi.V1.Crypto.html#PubKeyHash"><span class="hs-identifier hs-var">PubKeyHash</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="getPubKeyHash"><span class="annot"><span class="annottext">PubKeyHash -&gt; BuiltinByteString
+</span><span id="line-28"></span><span id="local-6989586621679951437"><span id="local-6989586621679951438"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="PubKeyHash"><span class="annot"><a href="PlutusLedgerApi.V1.Crypto.html#PubKeyHash"><span class="hs-identifier hs-var">PubKeyHash</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="PubKeyHash"><span class="annot"><a href="PlutusLedgerApi.V1.Crypto.html#PubKeyHash"><span class="hs-identifier hs-var">PubKeyHash</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="getPubKeyHash"><span class="annot"><span class="annottext">PubKeyHash -&gt; BuiltinByteString
 </span><a href="PlutusLedgerApi.V1.Crypto.html#getPubKeyHash"><span class="hs-identifier hs-var hs-var">getPubKeyHash</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">PlutusTx.BuiltinByteString</span></a></span><span> </span><span class="hs-special">}</span><span>
-</span><span id="line-29"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679951400"><span id="local-6989586621679951404"><span class="annot"><span class="annottext">PubKeyHash -&gt; PubKeyHash -&gt; Bool
+</span><span id="line-29"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679951429"><span id="local-6989586621679951433"><span class="annot"><span class="annottext">PubKeyHash -&gt; PubKeyHash -&gt; Bool
 forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
 /= :: PubKeyHash -&gt; PubKeyHash -&gt; Bool
 $c/= :: PubKeyHash -&gt; PubKeyHash -&gt; Bool
 == :: PubKeyHash -&gt; PubKeyHash -&gt; Bool
 $c== :: PubKeyHash -&gt; PubKeyHash -&gt; Bool
-</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679951377"><span id="local-6989586621679951379"><span id="local-6989586621679951382"><span id="local-6989586621679951385"><span id="local-6989586621679951388"><span id="local-6989586621679951391"><span id="local-6989586621679951395"><span class="annot"><span class="annottext">Eq PubKeyHash
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679951406"><span id="local-6989586621679951408"><span id="local-6989586621679951411"><span id="local-6989586621679951414"><span id="local-6989586621679951417"><span id="local-6989586621679951420"><span id="local-6989586621679951424"><span class="annot"><span class="annottext">Eq PubKeyHash
 PubKeyHash -&gt; PubKeyHash -&gt; Bool
 PubKeyHash -&gt; PubKeyHash -&gt; Ordering
 PubKeyHash -&gt; PubKeyHash -&gt; PubKeyHash
@@ -68,18 +68,18 @@ forall a.
 $cto :: forall x. Rep PubKeyHash x -&gt; PubKeyHash
 $cfrom :: forall x. PubKeyHash -&gt; Rep PubKeyHash x
 </span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
-</span><span id="line-30"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679951371"><span class="annot"><span class="annottext">PubKeyHash -&gt; ()
+</span><span id="line-30"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679951400"><span class="annot"><span class="annottext">PubKeyHash -&gt; ()
 forall a. (a -&gt; ()) -&gt; NFData a
 rnf :: PubKeyHash -&gt; ()
 $crnf :: PubKeyHash -&gt; ()
 </span><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></a></span></span><span class="hs-special">)</span><span>
 </span><span id="line-31"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span>
-</span><span id="line-32"></span><span>        </span><span class="hs-special">(</span><span> </span><span id="local-6989586621679951368"><span class="annot"><span class="annottext">PubKeyHash -&gt; PubKeyHash -&gt; Bool
+</span><span id="line-32"></span><span>        </span><span class="hs-special">(</span><span> </span><span id="local-6989586621679951397"><span class="annot"><span class="annottext">PubKeyHash -&gt; PubKeyHash -&gt; Bool
 forall a. (a -&gt; a -&gt; Bool) -&gt; Eq a
 == :: PubKeyHash -&gt; PubKeyHash -&gt; Bool
 $c== :: PubKeyHash -&gt; PubKeyHash -&gt; Bool
 </span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">PlutusTx.Eq</span></a></span></span><span class="hs-special">,</span><span>
-</span><span id="line-33"></span><span>          </span><span id="local-6989586621679951334"><span id="local-6989586621679951338"><span id="local-6989586621679951342"><span id="local-6989586621679951346"><span id="local-6989586621679951350"><span id="local-6989586621679951354"><span id="local-6989586621679951359"><span class="annot"><span class="annottext">Eq PubKeyHash
+</span><span id="line-33"></span><span>          </span><span id="local-6989586621679951363"><span id="local-6989586621679951367"><span id="local-6989586621679951371"><span id="local-6989586621679951375"><span id="local-6989586621679951379"><span id="local-6989586621679951383"><span id="local-6989586621679951388"><span class="annot"><span class="annottext">Eq PubKeyHash
 PubKeyHash -&gt; PubKeyHash -&gt; Bool
 PubKeyHash -&gt; PubKeyHash -&gt; Ordering
 PubKeyHash -&gt; PubKeyHash -&gt; PubKeyHash
@@ -108,7 +108,7 @@ $c&lt; :: PubKeyHash -&gt; PubKeyHash -&gt; Bool
 compare :: PubKeyHash -&gt; PubKeyHash -&gt; Ordering
 $ccompare :: PubKeyHash -&gt; PubKeyHash -&gt; Ordering
 </span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">PlutusTx.Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span>
-</span><span id="line-34"></span><span>          </span><span id="local-6989586621679951323"><span id="local-6989586621679951328"><span class="annot"><span class="annottext">Integer -&gt; PubKeyHash -&gt; ShowS
+</span><span id="line-34"></span><span>          </span><span id="local-6989586621679951352"><span id="local-6989586621679951357"><span class="annot"><span class="annottext">Integer -&gt; PubKeyHash -&gt; ShowS
 PubKeyHash -&gt; BuiltinString
 forall a. (Integer -&gt; a -&gt; ShowS) -&gt; (a -&gt; BuiltinString) -&gt; Show a
 show :: PubKeyHash -&gt; BuiltinString
@@ -116,29 +116,29 @@ $cshow :: PubKeyHash -&gt; BuiltinString
 showsPrec :: Integer -&gt; PubKeyHash -&gt; ShowS
 $cshowsPrec :: Integer -&gt; PubKeyHash -&gt; ShowS
 </span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">PlutusTx.Show</span></a></span></span></span><span class="hs-special">,</span><span>
-</span><span id="line-35"></span><span>          </span><span id="local-6989586621679951317"><span class="annot"><span class="annottext">PubKeyHash -&gt; BuiltinData
+</span><span id="line-35"></span><span>          </span><span id="local-6989586621679951346"><span class="annot"><span class="annottext">PubKeyHash -&gt; BuiltinData
 forall a. (a -&gt; BuiltinData) -&gt; ToData a
 toBuiltinData :: PubKeyHash -&gt; BuiltinData
 $ctoBuiltinData :: PubKeyHash -&gt; BuiltinData
 </span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">PlutusTx.ToData</span></a></span></span><span class="hs-special">,</span><span>
-</span><span id="line-36"></span><span>          </span><span id="local-6989586621679951310"><span class="annot"><span class="annottext">BuiltinData -&gt; Maybe PubKeyHash
+</span><span id="line-36"></span><span>          </span><span id="local-6989586621679951339"><span class="annot"><span class="annottext">BuiltinData -&gt; Maybe PubKeyHash
 forall a. (BuiltinData -&gt; Maybe a) -&gt; FromData a
 fromBuiltinData :: BuiltinData -&gt; Maybe PubKeyHash
 $cfromBuiltinData :: BuiltinData -&gt; Maybe PubKeyHash
 </span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">PlutusTx.FromData</span></a></span></span><span class="hs-special">,</span><span>
-</span><span id="line-37"></span><span>          </span><span id="local-6989586621679951303"><span class="annot"><span class="annottext">BuiltinData -&gt; PubKeyHash
+</span><span id="line-37"></span><span>          </span><span id="local-6989586621679951332"><span class="annot"><span class="annottext">BuiltinData -&gt; PubKeyHash
 forall a. (BuiltinData -&gt; a) -&gt; UnsafeFromData a
 unsafeFromBuiltinData :: BuiltinData -&gt; PubKeyHash
 $cunsafeFromBuiltinData :: BuiltinData -&gt; PubKeyHash
 </span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">PlutusTx.UnsafeFromData</span></a></span></span><span>
 </span><span id="line-38"></span><span>        </span><span class="hs-special">)</span><span>
 </span><span id="line-39"></span><span>    </span><span class="hs-keyword">deriving</span><span>
-</span><span id="line-40"></span><span>        </span><span class="hs-special">(</span><span id="local-6989586621679951296"><span class="annot"><span class="annottext">String -&gt; PubKeyHash
+</span><span id="line-40"></span><span>        </span><span class="hs-special">(</span><span id="local-6989586621679951325"><span class="annot"><span class="annottext">String -&gt; PubKeyHash
 forall a. (String -&gt; a) -&gt; IsString a
 fromString :: String -&gt; PubKeyHash
 $cfromString :: String -&gt; PubKeyHash
 </span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">IsString</span></a></span></span><span>        </span><span class="hs-comment">-- ^ from hex encoding</span><span>
-</span><span id="line-41"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679951280"><span id="local-6989586621679951284"><span id="local-6989586621679951289"><span class="annot"><span class="annottext">Int -&gt; PubKeyHash -&gt; ShowS
+</span><span id="line-41"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679951309"><span id="local-6989586621679951313"><span id="local-6989586621679951318"><span class="annot"><span class="annottext">Int -&gt; PubKeyHash -&gt; ShowS
 [PubKeyHash] -&gt; ShowS
 PubKeyHash -&gt; String
 forall a.
@@ -150,7 +150,7 @@ $cshow :: PubKeyHash -&gt; String
 showsPrec :: Int -&gt; PubKeyHash -&gt; ShowS
 $cshowsPrec :: Int -&gt; PubKeyHash -&gt; ShowS
 </span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span>           </span><span class="hs-comment">-- ^ using hex encoding</span><span>
-</span><span id="line-42"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679951269"><span id="local-6989586621679951274"><span class="annot"><span class="annottext">forall ann. [PubKeyHash] -&gt; Doc ann
+</span><span id="line-42"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679951298"><span id="local-6989586621679951303"><span class="annot"><span class="annottext">forall ann. [PubKeyHash] -&gt; Doc ann
 forall ann. PubKeyHash -&gt; Doc ann
 forall a.
 (forall ann. a -&gt; Doc ann)
@@ -161,5 +161,5 @@ pretty :: forall ann. PubKeyHash -&gt; Doc ann
 $cpretty :: forall ann. PubKeyHash -&gt; Doc ann
 </span><a href="../../../../prettyprinter/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Pretty</span></a></span></span></span><span>         </span><span class="hs-comment">-- ^ using hex encoding</span><span>
 </span><span id="line-43"></span><span>        </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">via</span><span> </span><span class="annot"><a href="PlutusLedgerApi.V1.Bytes.html#LedgerBytes"><span class="hs-identifier hs-type">LedgerBytes</span></a></span><span>
-</span><span id="line-44"></span><span id="local-6989586621679951258"><span id="local-6989586621679951263"><span class="hs-identifier">makeLift</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">PubKeyHash</span></span></span><span>
+</span><span id="line-44"></span><span id="local-6989586621679951287"><span id="local-6989586621679951292"><span class="hs-identifier">makeLift</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">PubKeyHash</span></span></span><span>
 </span><span id="line-45"></span></pre></body></html>

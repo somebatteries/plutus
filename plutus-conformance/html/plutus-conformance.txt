@@ -21,7 +21,7 @@ shownParseError :: Text
 shownEvaluationFailure :: Text
 
 -- | The default parser to parse UPLC program inputs.
-parseTxt :: Text -> Either ParserErrorBundle (Program Name DefaultUni DefaultFun SourcePos)
+parseTxt :: Text -> Either ParserErrorBundle (Program Name DefaultUni DefaultFun SrcSpan)
 
 -- | The input/output UPLC program type.
 type UplcProg = Program Name DefaultUni DefaultFun ()
