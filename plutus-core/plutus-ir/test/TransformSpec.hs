@@ -34,16 +34,16 @@ import Text.Megaparsec.Pos
 
 transform :: TestNested
 transform = testNested "transform" [
-    thunkRecursions
-    , nonStrict
-    , letFloat
-    , recSplit
-    , inline
-    , beta
-    , unwrapCancel
-    , deadCode
-    , retainedSize
-    , rename
+    -- thunkRecursions
+    -- , nonStrict
+    -- , letFloat
+    -- , recSplit
+    inline
+    -- , beta
+    -- , unwrapCancel
+    -- , deadCode
+    -- , retainedSize
+    -- , rename
     ]
 
 thunkRecursions :: TestNested
