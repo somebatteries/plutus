@@ -20,25 +20,31 @@ in k idFun
       (vardecl idFun (fun (con integer) (con integer)))
       (lam x (con integer) x)
     )
-    (termbind
-      (strict)
-      (vardecl
-        g
-        (fun
-          (fun (con integer) (con integer)) (fun (con integer) (con integer))
+    (let
+    (nonrec)
+      (termbind
+        (strict)
+        (vardecl
+          g
+          (fun
+            (fun (con integer) (con integer)) (fun (con integer) (con integer))
+          )
         )
+        (lam y (fun (con integer) (con integer)) idFun)
       )
-      (lam y (fun (con integer) (con integer)) idFun)
-    )
-    (termbind
-      (strict)
-      (vardecl
-        k
-        (fun
-          (fun (con integer) (con integer)) (fun (con integer) (con integer))
+      (let
+      (nonrec)
+        (termbind
+          (strict)
+          (vardecl
+            k
+            (fun
+              (fun (con integer) (con integer)) (fun (con integer) (con integer))
+            )
+          )
+          g
         )
+        [ k idFun ]
       )
-      (g)
     )
-    [ k idFun ]
 )

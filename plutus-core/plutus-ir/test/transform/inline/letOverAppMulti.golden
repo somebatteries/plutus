@@ -1,6 +1,9 @@
-letOverAppMulti:26:6:
-   |
-26 |     (termbind
-   |      ^^^^^^^
-unexpected "termbin"
-expecting "abs", "builtin", "con", "error", "iwrap", "lam", "let", or "unwrap"
+(let
+  (nonrec)
+  (termbind
+    (strict)
+    (vardecl idFun (fun (con integer) (con integer)))
+    (lam y (con integer) y)
+  )
+  [ [ (lam x (fun (con integer) (con integer)) idFun) idFun ] (con integer 6) ]
+)

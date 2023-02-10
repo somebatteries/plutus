@@ -18,21 +18,22 @@ let
     (vardecl idFun (all a (type) (fun a a)))
     (abs a (type) (lam x a x))
   )
-
-  (termbind
-    (strict)
-    (vardecl
-      g
-      (fun
-        (fun (con integer) (con integer)) (fun (con integer) (con integer))
+  (let
+    (nonrec)
+    (termbind
+      (strict)
+      (vardecl
+        g
+        (fun
+          (fun (con integer) (con integer)) (fun (con integer) (con integer))
+        )
+      )
+      (lam
+        y
+        (fun (con integer) (con integer))
+        idFun
       )
     )
-    (lam
-      y
-      (fun (con integer) (con integer))
-      (idFun)
-    )
+    [ [ g { idFun (con integer) } ] (con integer 1) ]
   )
-  
-  [ [ g { idFun (con integer) } ] (con integer 1) ]
 )

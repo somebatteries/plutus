@@ -1,6 +1,10 @@
-letIdFunForall:22:4:
-   |
-22 |   (termbind
-   |    ^^^^^^^
-unexpected "termbin"
-expecting "abs", "builtin", "con", "error", "iwrap", "lam", "let", or "unwrap"
+(let
+  (nonrec)
+  (termbind
+    (strict) (vardecl idFun (all a (type) (fun a a))) (abs a (type) (lam x a x))
+  )
+  [
+    [ (lam y (fun (con integer) (con integer)) idFun) { idFun (con integer) } ]
+    (con integer 1)
+  ]
+)
